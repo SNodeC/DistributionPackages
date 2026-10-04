@@ -13,6 +13,10 @@ env:
   PYTHONPATH: ${{ github.workspace }}/feed
 jobs:
   prepare:
+    concurrency:
+      group: package-publication
+      cancel-in-progress: false
+      queue: max
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -41,15 +45,35 @@ jobs:
           ref: main
           path: feed
           persist-credentials: false
+      - uses: actions/create-github-app-token@v2
+        if: github.run_attempt == 1
+        id: allocator
+        with:
+          app-id: ${{ vars.PACKAGES_APP_ID }}
+          private-key: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
+          owner: SNodeC
+          repositories: Packages
+          permission-contents: write
       - uses: actions/checkout@v6
         if: github.run_attempt == 1
         with:
           repository: SNodeC/Packages
           ref: main
           path: published
-          sparse-checkout: '**/build.json'
+          token: ${{ steps.allocator.outputs.token }}
+          sparse-checkout: |
+            **/build.json
+            /status.json
           sparse-checkout-cone-mode: false
-          persist-credentials: false
+      - name: Reserve independent project revisions
+        if: github.run_attempt == 1
+        env:
+          RELEASE_PROJECT: ${{ inputs.release_project }}
+          PACKAGE_REVISION_BASE: ${{ vars.PACKAGE_REVISION_BASE }}
+        run: |
+          previous=$(git -C published rev-parse HEAD)
+          python3 -m ci.publish.publication reserve published
+          bash feed/ci/publish/push.sh published "$previous" "Reserve package revisions"
       - name: Reuse original capture (if missing, start a new run)
         if: github.run_attempt > 1
         uses: actions/download-artifact@v8
@@ -61,7 +85,6 @@ jobs:
         env:
           RELEASE_PROJECT: ${{ inputs.release_project }}
           RELEASE_TAG: ${{ inputs.release_tag }}
-          PACKAGE_REVISION_BASE: ${{ vars.PACKAGE_REVISION_BASE }}
           RECIPE_REF: main
         run: |
           export RELEASE_TAG="${RELEASE_TAG#refs/tags/}"

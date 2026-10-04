@@ -8,7 +8,7 @@ from pathlib import Path
 import shutil
 import sys
 
-from ci.repository import ROOT, matrix, linux_matrix, run, select, project_file, digest, REPOSITORIES
+from ci.repository import ROOT, matrix, linux_matrix, run, select, project_file, digest, REPOSITORIES, project_revision
 
 
 def targets():
@@ -101,6 +101,30 @@ def update(state, row, generation, project, status, attempt, job_url=None):
                                                    and previous.get('attempt') == attempt else None) or generation['run_url'])
 
 
+def reserve(root, project, run_id):
+    """Called under the same publication lock as every snapshot writer."""
+    if project not in REPOSITORIES:
+        raise ValueError('Unknown release project')
+    path = root / 'status.json'
+    state = read(path, dict(repository='SNodeC/Packages', branch='main', runs={}, targets={}))
+    allocations = state.setdefault('allocations', {})
+    selected = REPOSITORIES if project == 'snode.c' else (project,)
+    if run_id not in allocations:
+        floors = {repo: int(os.environ.get('PACKAGE_REVISION_BASE', '0')) for repo in REPOSITORIES}
+        for values in [*allocations.values(), *(r['revisions'] for r in state.get('runs', {}).values())]:
+            for repo, value in values.items():
+                floors[repo] = max(floors[repo], int(value))
+        for row in targets():
+            info, _ = published(root, row)
+            for repo in REPOSITORIES:
+                floors[repo] = max(floors[repo], project_revision(info, repo))
+        allocations[run_id] = {repo: str(floors[repo] + 1) for repo in selected}
+    if set(allocations[run_id]) != set(selected):
+        raise RuntimeError('A retry cannot change its release project')
+    write(path, state)
+    return allocations[run_id]
+
+
 def record_run(bundle, state, context):
     run_id = context['run_id']
     rows = read(bundle / 'targets.json')
@@ -136,7 +160,7 @@ def publish(root, bundle, incoming, row, generation, project):
         # The application must follow this target's successful library publication.
         # Allow an idempotent retry of this application's own completed publication.
         if (current.get('context', {}).get('run_id') != generation['run_id']
-                or current.get('revision') not in generation['revisions'].values()
+                or project_revision(current, 'snode.c') != int(generation['revisions']['snode.c'])
                 or current.get('sources', {}).get('snode.c') != original['sources']['snode.c']):
             raise RuntimeError('Corresponding SNode.C release has not been published or was superseded')
         baseline = current
@@ -221,6 +245,9 @@ def reconcile(state, run_id, attempt):
 
 def main():
     command, *args = sys.argv[1:]
+    if command == 'reserve':
+        reserve(Path(args[0]), os.environ['RELEASE_PROJECT'], os.environ['GITHUB_RUN_ID'])
+        return
     if command == 'matrix':
         print(json.dumps({'include': targets()}))
         return

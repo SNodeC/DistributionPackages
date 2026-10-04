@@ -74,14 +74,48 @@ class PackagingTest(unittest.TestCase):
         row = publication.targets()[0]
         with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {
             'RELEASE_PROJECT': 'mqttsuite', 'RELEASE_TAG': 'v1.0.2',
-            'PACKAGE_REVISION_BASE': '0', 'GITHUB_RUN_NUMBER': '1'}), \
+            'GITHUB_RUN_ID': 'new'}), \
                 patch.object(publication, 'targets', return_value=[row]), \
-                patch.object(publication, 'published', return_value=({'revision': '121'}, 'feed')), \
+                patch.object(publication, 'published', return_value=({'revision': '121', 'versions': {'mqttsuite': '1.0.2-r121'}}, 'feed')), \
                 patch.object(repository, 'run', return_value='recipe-commit'), \
                 patch.object(repository, 'sources') as fetch:
+            (Path(directory) / 'status.json').write_text(json.dumps({'allocations': {'new': {'mqttsuite': '120'}}}))
             with self.assertRaisesRegex(RuntimeError, 'Package revision must exceed'):
                 repository.prepare(Path(directory), Path(directory) / 'bundle')
             fetch.assert_not_called()
+
+    def test_independent_reservations_survive_retries_and_cancelled_runs(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'PACKAGE_REVISION_BASE': '122'}), \
+                patch.object(publication, 'targets', return_value=[]):
+            root = Path(directory)
+            publication.write(root / 'status.json', {'runs': {'active': {'revisions': {'snode.c': '128', 'mqttsuite': '129'}}}})
+            self.assertEqual(publication.reserve(root, 'mqttsuite', 'one'), {'mqttsuite': '130'})
+            self.assertEqual(publication.reserve(root, 'snode.c', 'two'), {'snode.c': '129', 'mqttsuite': '131'})
+            self.assertEqual(publication.reserve(root, 'mqttsuite', 'one'), {'mqttsuite': '130'})
+            self.assertEqual(publication.reserve(root, 'mqttsuite', 'three'), {'mqttsuite': '132'})
+            with self.assertRaisesRegex(RuntimeError, 'release project'):
+                publication.reserve(root, 'snode.c', 'one')
+
+    def test_reservation_seeds_from_each_published_project(self):
+        info = {'versions': {'snodec': '2.0.0-150~trixie', 'mqttsuite': '1.0.2-170.el9'}}
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'PACKAGE_REVISION_BASE': '122'}), \
+                patch.object(publication, 'targets', return_value=[{}]), \
+                patch.object(publication, 'published', return_value=(info, 'feed')):
+            self.assertEqual(publication.reserve(Path(directory), 'snode.c', 'new'),
+                             {'snode.c': '151', 'mqttsuite': '171'})
+
+    def test_publication_orders_only_the_affected_project(self):
+        for version in ['2.0.0-r128', '2.0.0-128~trixie', '2.0.0-128.el9']:
+            old = {'versions': {'snodec': version, 'mqttsuite': '1.0.2-r200'}, 'revision': '200'}
+            incoming = {'context': {'build_project': 'snode.c'}, 'revision': '129', 'files': {}, 'sources': {}}
+            self.assertTrue(repository.publication_needed(old, incoming))
+            incoming['revision'] = '127'
+            with self.assertRaisesRegex(RuntimeError, 'Superseded'):
+                repository.publication_needed(old, incoming)
+            incoming['revision'] = '129'
+            self.assertFalse(repository.publication_needed(incoming, incoming))
+            with self.assertRaisesRegex(RuntimeError, 'Different package content'):
+                repository.publication_needed(incoming, incoming | {'files': {'changed': 'hash'}})
 
     def test_newer_attempt_cannot_be_overwritten_by_older_generation(self):
         row = publication.targets()[0]

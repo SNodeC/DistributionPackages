@@ -7,7 +7,7 @@ import shutil
 import sys
 import tempfile
 
-from ci.repository import ROOT, digest, run, unchanged, linux_matrix, signer
+from ci.repository import ROOT, digest, run, unchanged, linux_matrix, signer, publication_needed
 
 
 def suites(distribution='raspberrypios'):
@@ -164,14 +164,8 @@ def publish(incoming, checkout, bundle, distribution='raspberrypios'):
                     incoming_packages[name] = path
             if sorted(names) != info['packages']:
                 raise RuntimeError('Incomplete Debian package set')
-            if arch in targets:
-                old = targets[arch]
-                if int(old['revision']) > int(info['revision']):
-                    raise RuntimeError('Superseded publication: a newer architecture revision exists')
-                if int(old['revision']) == int(info['revision']):
-                    if {k: v for k, v in old.items() if k != 'published_at'} != info:
-                        raise RuntimeError('Different APT content under the same publication revision')
-                    continue
+            if arch in targets and not publication_needed(targets[arch], info):
+                continue
             targets[arch] = info
             changed = True
         if not changed:

@@ -83,10 +83,9 @@ def prepare(published_root, bundle):
     tag = os.environ.get('RELEASE_TAG', '')
     if changed not in REPOSITORIES:
         raise ValueError('Unknown release project')
-    # A fixed migration floor preserves increasing revisions in this new repository.
-    revision_base = int(os.environ['PACKAGE_REVISION_BASE'])
-    revisions = {repo: str(revision_base + 2 * int(os.environ['GITHUB_RUN_NUMBER']) + index)
-                 for index, repo in enumerate(REPOSITORIES) if changed == 'snode.c' or repo == changed}
+    revisions = json.loads((published_root / 'status.json').read_text())['allocations'][os.environ['GITHUB_RUN_ID']]
+    if set(revisions) != (set(REPOSITORIES) if changed == 'snode.c' else {changed}):
+        raise RuntimeError('Reserved revisions do not match the release project')
     context = dict(recipe_ref=os.environ.get('RECIPE_REF', 'main'),
                    recipe_commit=run('git', '-C', str(ROOT), 'rev-parse', 'HEAD'),
                    destination='SNodeC/Packages',
@@ -102,9 +101,9 @@ def prepare(published_root, bundle):
     profiles, captured, observed = {}, {}, {}
     for row in targets():
         baseline, directory = published(published_root, row)
-        if (baseline and min(map(int, revisions.values())) <= int(baseline['revision'])
+        if (baseline and any(int(value) <= project_revision(baseline, repo) for repo, value in revisions.items())
                 and baseline.get('context', {}).get('run_id') != context['run_id']):
-            raise RuntimeError('Package revision must exceed the published revision; check PACKAGE_REVISION_BASE')
+            raise RuntimeError('Package revision must exceed the published revision; check the reserved project revisions')
         tags = ({'snode.c': tag, 'mqttsuite': mqtt_tag} if changed == 'snode.c' else
                 dict(baseline.get('context', {}).get('source_tags', {}), mqttsuite=tag))
         if set(tags) != set(REPOSITORIES):
@@ -294,14 +293,29 @@ def sdk_dependency(sdk, bundle, dependencies):
                 *(str(p.relative_to(sdk)) for p in sorted((target / 'pkginfo').glob('*.provides'))))
 
 
+def project_revision(info, project):
+    versions = info.get('versions', {})
+    version = versions.get(project, versions.get('snodec') if project == 'snode.c' else None)
+    if version is None:
+        return int(info['revision']) if info.get('context', {}).get('build_project') == project else 0
+    match = re.search(r'-r?(\d+)(?:[.~]|$)', version)
+    if not match:
+        raise RuntimeError(f'Invalid package revision: {version}')
+    return int(match[1])
+
+
 def publication_needed(previous, incoming):
-    if not previous.exists():
-        return True
-    current = json.loads(previous.read_text())
-    if int(current['revision']) > int(incoming['revision']):
-        raise RuntimeError('Superseded publication: a newer revision is already published')
-    if int(current['revision']) == int(incoming['revision']):
-        if all(current.get(key) == incoming.get(key) for key in ('sources', 'context', 'files')):
+    if isinstance(previous, Path):
+        if not previous.exists():
+            return True
+        previous = json.loads(previous.read_text())
+    project = incoming['context']['build_project']
+    old = project_revision(previous, project)
+    new = int(incoming['revision'])
+    if old > new:
+        raise RuntimeError('Superseded publication: a newer project revision is already published')
+    if old == new:
+        if all(previous.get(key) == incoming.get(key) for key in ('sources', 'context', 'files')):
             return False
         raise RuntimeError('Different package content under the same publication revision')
     return True

@@ -28,11 +28,10 @@ Newly superseded packages in Packages are retained by the normal 30-day policy.
 
 ## Revision continuity
 
-The migrated status/inventories record revisions up to 122.
-`PACKAGE_REVISION_BASE=122` is set on DistributionPackages. Its first release
-workflow run allocates revision 124 to SNode.C and 125 to MQTTSuite; an
-application-only event allocates only the MQTTSuite revision. This preserves the
-ordering of package revisions even though the workflow run number starts over.
+The migration used `PACKAGE_REVISION_BASE=122` to preserve the existing package
+revision ordering when the workflow run number started over. Allocation now uses
+[independent project counters](maintainers.md#revision-numbering), seeded above
+the migrated inventories and recorded runs. No package revision is reset.
 
 ## Activation boundary
 

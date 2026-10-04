@@ -91,15 +91,16 @@ See [CI setup and activation](setup.md) before connecting upstream notifications
 
 ## Revision numbering
 
-`PACKAGE_REVISION_BASE` is a fixed repository variable chosen above the migrated
-package revisions. Revisions are `base + 2 × workflow run number` for SNode.C and
-one higher for MQTTSuite. The same run and its retries keep the same revisions.
-Preparation rejects revisions that do not exceed the selected published baseline.
+SNode.C and MQTTSuite have independent package revision counters. A SNode.C
+release reserves the next number for both projects; an MQTTSuite-only release
+advances only MQTTSuite. Numbers are shared across targets of the same project.
 
-Do not lower the base or change it during active runs. A replacement entry workflow
-or a future repository migration requires checking its run-number sequence and
-choosing a new base before builds start. Source versions remain controlled by the
-upstream version tags; this counter controls package rebuild revisions only.
+Preparation reserves numbers in `Packages/status.json` under the publication
+lock before capturing sources. Retries reuse the captured reservation; cancelled
+runs leave gaps rather than reusing numbers. Allocation starts above existing
+reservations, recorded runs and published project versions. `PACKAGE_REVISION_BASE`
+remains a migration floor, not a shared counter. Publication compares revisions
+within the affected project. Source versions still come from upstream version tags.
 
 ## Coverage and tests
 
