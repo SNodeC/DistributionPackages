@@ -16,6 +16,6 @@ selective installation, manual setup, configuration and updates.
 
 - [OpenWrt package catalog](mqttsuite-package-options.md)
 - [DEB/RPM component catalog](linux.md#component-packages)
-- [Published versions](https://github.com/SNodeC/Packages/blob/main/README.md)
+- [Published versions](https://github.com/SNodeC/Packages/blob/main/docs/status.md)
 
 [Installation overview](../README.md#installation).

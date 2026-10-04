@@ -27,7 +27,7 @@ Noble is Ubuntu 24.04 LTS; Resolute is Ubuntu 26.04 LTS.
 ## Quick install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/SNodeC/DistributionPackages/main/install/install.sh \
+curl -fsSL https://raw.githubusercontent.com/SNodeC/Packages/main/install/install.sh \
   -o /tmp/snodec-install-feed.sh &&
 sudo sh /tmp/snodec-install-feed.sh
 ```
@@ -42,7 +42,7 @@ Prefer manual setup? Use [Manual repository setup](#manual-repository-setup).
 Prepare the repository without installing packages:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/SNodeC/DistributionPackages/main/install/install.sh \
+curl -fsSL https://raw.githubusercontent.com/SNodeC/Packages/main/install/install.sh \
   -o /tmp/snodec-install-feed.sh &&
 sudo sh /tmp/snodec-install-feed.sh --prepare
 ```
@@ -165,4 +165,4 @@ dependency and application errors.
 | --- | --- |
 | Installed suite is not listed | Use a supported Ubuntu suite; do not substitute Debian repositories or another Ubuntu release. |
 
-[Back to top](#ubuntu) · [All distributions](../README.md#distributions) · [Package status](https://github.com/SNodeC/Packages/blob/main/README.md#ubuntu)
+[Back to top](#ubuntu) · [All distributions](../README.md#distributions) · [Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#ubuntu)

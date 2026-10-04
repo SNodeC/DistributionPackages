@@ -54,5 +54,5 @@ dnf list --available 'snodec-*'
 
 For OpenWrt, use the [SNode.C](snodec-package-options.md) and
 [MQTTSuite](mqttsuite-package-options.md) catalogs.
-See [Package status](https://github.com/SNodeC/Packages/blob/main/README.md)
+See [Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md)
 for the available versions and [Signing keys](../README.md#signing-keys) for fingerprints.

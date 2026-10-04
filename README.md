@@ -2,7 +2,7 @@
 
 Signed binary packages for OpenWrt, Raspberry Pi OS, Debian, Ubuntu, Rocky Linux and Fedora.
 
-[Quick start](#quick-start) · [Distributions](#distributions) · [Packages](#packages) · [Package status](https://github.com/SNodeC/Packages/blob/main/README.md) · [Help](#help)
+[Quick start](#quick-start) · [Distributions](#distributions) · [Packages](#packages) · [Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md) · [Help](#help)
 
 ## What's inside
 
@@ -22,7 +22,7 @@ CRB/EPEL on Rocky Linux. Keep official repositories enabled for dependencies.
 
 ```sh
 # Download the installer; curl and CA certificates must be installed.
-curl -fsSL https://raw.githubusercontent.com/SNodeC/DistributionPackages/main/install/install.sh \
+curl -fsSL https://raw.githubusercontent.com/SNodeC/Packages/main/install/install.sh \
   -o /tmp/snodec-install-feed.sh &&
 sudo sh /tmp/snodec-install-feed.sh
 # For preparation only, replace the last command with:
@@ -34,7 +34,7 @@ sudo sh /tmp/snodec-install-feed.sh
 ```sh
 # Download the installer with HTTPS-capable wget.
 wget -O /tmp/snodec-install-feed.sh \
-  https://raw.githubusercontent.com/SNodeC/DistributionPackages/main/install/install.sh &&
+  https://raw.githubusercontent.com/SNodeC/Packages/main/install/install.sh &&
 sh /tmp/snodec-install-feed.sh
 # For preparation only, replace the last command with:
 # sh /tmp/snodec-install-feed.sh --prepare
@@ -48,12 +48,12 @@ Prefer manual setup? See your distribution guide.
 
 | Distribution | Releases | Architectures | Install guide | Package status |
 | --- | --- | --- | --- | --- |
-| OpenWrt | 24.10, 25.12 | 25 package architectures per release | [Install](docs/openwrt.md) | [Status](https://github.com/SNodeC/Packages/blob/main/README.md#openwrt) |
-| Raspberry Pi OS | bookworm, trixie | arm64; Pi 3, 4, 5 | [Install](docs/raspberrypi.md) | [Status](https://github.com/SNodeC/Packages/blob/main/README.md#raspberry-pi-os) |
-| Debian | trixie, forky, sid | amd64, arm64, armhf, riscv64 | [Install](docs/debian.md) | [Status](https://github.com/SNodeC/Packages/blob/main/README.md#debian) |
-| Ubuntu | noble, resolute | amd64, arm64 | [Install](docs/ubuntu.md) | [Status](https://github.com/SNodeC/Packages/blob/main/README.md#ubuntu) |
-| Rocky Linux | 9, 10 | aarch64, x86_64 | [Install](docs/rocky.md) | [Status](https://github.com/SNodeC/Packages/blob/main/README.md#rocky-linux) |
-| Fedora | 43, 44 | aarch64, x86_64 | [Install](docs/fedora.md) | [Status](https://github.com/SNodeC/Packages/blob/main/README.md#fedora) |
+| OpenWrt | 24.10, 25.12 | 25 package architectures per release | [Install](docs/openwrt.md) | [Status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#openwrt) |
+| Raspberry Pi OS | bookworm, trixie | arm64; Pi 3, 4, 5 | [Install](docs/raspberrypi.md) | [Status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#raspberry-pi-os) |
+| Debian | trixie, forky, sid | amd64, arm64, armhf, riscv64 | [Install](docs/debian.md) | [Status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#debian) |
+| Ubuntu | noble, resolute | amd64, arm64 | [Install](docs/ubuntu.md) | [Status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#ubuntu) |
+| Rocky Linux | 9, 10 | aarch64, x86_64 | [Install](docs/rocky.md) | [Status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#rocky-linux) |
+| Fedora | 43, 44 | aarch64, x86_64 | [Install](docs/fedora.md) | [Status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#fedora) |
 
 ## Packages
 
@@ -71,7 +71,7 @@ both mapping plugins. Configure listeners, credentials and TLS before starting s
 Full catalogs: [SNode.C for OpenWrt](docs/snodec-package-options.md),
 [MQTTSuite for OpenWrt](docs/mqttsuite-package-options.md),
 and [DEB/RPM components](docs/linux.md#component-packages).
-Find available versions and per-target results on [Package status](https://github.com/SNodeC/Packages/blob/main/README.md).
+Find available versions and per-target results on [Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md).
 
 ## Signing keys
 
@@ -90,7 +90,7 @@ APT and RPM use the same key. Keep signature verification enabled.
 ### Repository troubleshooting
 
 See [Troubleshooting](docs/troubleshooting.md) for common errors and packaging
-terms, or [open an issue](https://github.com/SNodeC/DistributionPackages/issues).
+terms, or [open an issue](https://github.com/SNodeC/Packages/issues).
 
 ---
 

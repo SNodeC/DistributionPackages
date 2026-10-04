@@ -6,13 +6,13 @@ These package names apply to **OpenWrt**.
 
 - [Install MQTTSuite, including repository setup](install-mqttsuite.md)
 - [DEB and RPM component packages](linux.md#mqttsuite)
-- [Published versions and build results](https://github.com/SNodeC/Packages/blob/main/README.md#openwrt)
+- [Published versions and build results](https://github.com/SNodeC/Packages/blob/main/docs/status.md#openwrt)
 - [Return to the repository overview](../README.md)
 
 ## Packages: 9
 
 Library `<version>` follows the published release; `<ABI>` identifies its binary
-interface. See [Package status](https://github.com/SNodeC/Packages/blob/main/README.md)
+interface. See [Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md)
 for current versions.
 
 | Package | Payload / role |

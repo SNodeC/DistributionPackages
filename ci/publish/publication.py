@@ -49,6 +49,9 @@ def published(root, row):
 
 
 def render(root, state):
+    shutil.copy2(ROOT / 'README.md', root / 'README.md')
+    shutil.copytree(ROOT / 'docs', root / 'docs', dirs_exist_ok=True)
+    shutil.copytree(ROOT / 'install', root / 'install', dirs_exist_ok=True)
     badges = root / 'status'
     badges.mkdir(exist_ok=True)
     sections = {}
@@ -58,16 +61,16 @@ def render(root, state):
         info, feed = published(root, row)
         versions = info.get('versions', {})
         snodec = versions.get('snodec', versions.get('snode.c'))
-        date = f"[{info['published_at'][:10]}]({feed}/build.json)" if info.get('published_at') else '—'
+        date = f"[{info['published_at'][:10]}](../{feed}/build.json)" if info.get('published_at') else '—'
         packages = f"{row['distribution']}/pool/{row['suite']}" if row['distribution'] in {'debian', 'ubuntu', 'raspberrypios'} else f'{feed}/Packages' if row['distribution'] in {'rocky', 'fedora'} else feed
-        links = f'[Packages]({packages}/)' if info else '—'
+        links = f'[Packages](../{packages}/)' if info else '—'
         for project, version in zip(REPOSITORIES, (snodec, versions.get('mqttsuite'))):
             item = state['targets'].get(f"{row['id']}/{project}", {})
             status = item.get('status', 'published' if version else 'not built')
             width = len(status) * 7 + 16
             filename = f"{row['id']}-{project}.svg"
             (badges / filename).write_text(f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="20" role="img" aria-label="{escape(project)}: {escape(status)}"><rect width="{width}" height="20" rx="3" fill="{colors[status]}"/><text x="{width / 2}" y="14" text-anchor="middle" fill="white" font-family="Verdana,sans-serif" font-size="11">{escape(status)}</text></svg>\n')
-            badge = f"![{project}: {status}](status/{filename})"
+            badge = f"![{project}: {status}](../status/{filename})"
             url = item.get('job_url', item.get('run_url'))
             badge = f'[{badge}]({url})' if url else badge
             version = f'`{version}`' if version else '—'
@@ -82,7 +85,7 @@ def render(root, state):
                 title = 'SNode.C' if project == 'snode.c' else 'MQTTSuite'
                 tables.append(f'#### {title}\n\n| Architecture | Version | Status | Published | Packages |\n| --- | --- | --- | --- | --- |\n' + '\n'.join(lines))
         text = text.replace(f'<!-- targets:{distribution} -->', '\n\n'.join(tables))
-    (root / 'README.md').write_text(text)
+    (root / 'docs/status.md').write_text(text)
     for project in REPOSITORIES:
         directory = root / project.replace('.', '')
         directory.mkdir(exist_ok=True)
@@ -230,7 +233,7 @@ def main():
         row = json.loads(args[0])
         if row not in targets():
             raise ValueError('Unknown publication target')
-        print('\n'.join(['**/build.json', '/README.md', '/snodec/README.md', '/mqttsuite/README.md', '/status.json', '/retention.json', '/status/', '/keys/']
+        print('\n'.join(['**/build.json', '/README.md', '/docs/', '/install/', '/snodec/README.md', '/mqttsuite/README.md', '/status.json', '/retention.json', '/status/', '/keys/']
                         + [f'/{path}/' for path in feed_paths(row)]))
         return
     root, bundle = (Path(p).resolve() for p in args[:2])

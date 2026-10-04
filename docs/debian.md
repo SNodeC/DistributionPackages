@@ -31,7 +31,7 @@ repository; it does not upgrade the operating system.
 ## Quick install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/SNodeC/DistributionPackages/main/install/install.sh \
+curl -fsSL https://raw.githubusercontent.com/SNodeC/Packages/main/install/install.sh \
   -o /tmp/snodec-install-feed.sh &&
 sudo sh /tmp/snodec-install-feed.sh
 ```
@@ -46,7 +46,7 @@ Prefer manual setup? Use [Manual repository setup](#manual-repository-setup).
 Prepare the repository without installing packages:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/SNodeC/DistributionPackages/main/install/install.sh \
+curl -fsSL https://raw.githubusercontent.com/SNodeC/Packages/main/install/install.sh \
   -o /tmp/snodec-install-feed.sh &&
 sudo sh /tmp/snodec-install-feed.sh --prepare
 ```
@@ -184,4 +184,4 @@ dependency and application errors.
 | --- | --- |
 | Sid selects a testing suite | Pass `--suite sid` to the installer on an installed Sid system. |
 
-[Back to top](#debian) · [All distributions](../README.md#distributions) · [Package status](https://github.com/SNodeC/Packages/blob/main/README.md#debian)
+[Back to top](#debian) · [All distributions](../README.md#distributions) · [Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#debian)

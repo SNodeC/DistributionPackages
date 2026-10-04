@@ -24,7 +24,7 @@ sudo dnf install ca-certificates curl
 ## Quick install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/SNodeC/DistributionPackages/main/install/install.sh \
+curl -fsSL https://raw.githubusercontent.com/SNodeC/Packages/main/install/install.sh \
   -o /tmp/snodec-install-feed.sh &&
 sudo sh /tmp/snodec-install-feed.sh
 ```
@@ -39,7 +39,7 @@ Prefer manual setup? Use [Manual repository setup](#manual-repository-setup).
 Prepare the repository without installing packages:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/SNodeC/DistributionPackages/main/install/install.sh \
+curl -fsSL https://raw.githubusercontent.com/SNodeC/Packages/main/install/install.sh \
   -o /tmp/snodec-install-feed.sh &&
 sudo sh /tmp/snodec-install-feed.sh --prepare
 ```
@@ -158,4 +158,4 @@ dependency and application errors.
 | --- | --- |
 | DNF selects the wrong release | Check `VERSION_ID` and DNF’s `$releasever`; do not mix Fedora release repositories. |
 
-[Back to top](#fedora) · [All distributions](../README.md#distributions) · [Package status](https://github.com/SNodeC/Packages/blob/main/README.md#fedora)
+[Back to top](#fedora) · [All distributions](../README.md#distributions) · [Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#fedora)

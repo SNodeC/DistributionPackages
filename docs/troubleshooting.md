@@ -10,7 +10,7 @@
 | Signature verification fails | Check the system clock, repository URL and installed [signing key](../README.md#signing-keys). Keep signature verification enabled. |
 | Dependencies cannot be installed | Keep the official repositories enabled for the installed release. Do not mix distributions, releases or package architectures. Check the guide for additional dependency repositories. |
 | Download fails just after publication | Refresh package indexes and retry after GitHub's raw-content caches update. |
-| A newer package is unavailable | Check the target's version and badge on [Package status](https://github.com/SNodeC/Packages/blob/main/README.md). A successful compilation alone does not mean publication succeeded. |
+| A newer package is unavailable | Check the target's version and badge on [Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md). A successful compilation alone does not mean publication succeeded. |
 | The latest rebuild failed | The previous published packages remain available. Check the status badge for the failing job. |
 | An application does not start | Inspect its `--help` output, configuration and logs. Verify installation completed and configure listeners, credentials, certificates and any required database before starting it. |
 | A package cannot be downloaded from a browser | Open **Browse** to find its filename. Package managers use the raw index URLs listed in the guide. |
@@ -24,7 +24,7 @@
 - [Rocky Linux](rocky.md#troubleshooting)
 - [Fedora](fedora.md#troubleshooting)
 
-If the problem remains, [open an issue](https://github.com/SNodeC/DistributionPackages/issues).
+If the problem remains, [open an issue](https://github.com/SNodeC/Packages/issues).
 Include the distribution, release, package architecture, package name and error
 message. Remove passwords and other credentials from logs.
 

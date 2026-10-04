@@ -25,7 +25,7 @@ architecture. OpenWrt 24.10 uses `opkg`/IPK; 25.12 uses `apk`/APK.
 
 ```sh
 wget -O /tmp/snodec-install-feed.sh \
-  https://raw.githubusercontent.com/SNodeC/DistributionPackages/main/install/install.sh &&
+  https://raw.githubusercontent.com/SNodeC/Packages/main/install/install.sh &&
 sh /tmp/snodec-install-feed.sh
 ```
 
@@ -40,7 +40,7 @@ Prepare the feed without installing packages:
 
 ```sh
 wget -O /tmp/snodec-install-feed.sh \
-  https://raw.githubusercontent.com/SNodeC/DistributionPackages/main/install/install.sh &&
+  https://raw.githubusercontent.com/SNodeC/Packages/main/install/install.sh &&
 sh /tmp/snodec-install-feed.sh --prepare
 ```
 
@@ -267,4 +267,4 @@ dependency and application errors.
 | Architecture looks right but packages fail on vendor firmware | Use official OpenWrt with the matching release and `DISTRIB_ARCH`; matching CPU names alone are insufficient. |
 | Service does not start | Inspect `logread -e mqttbroker` and the application configuration before enabling its procd service. |
 
-[Back to top](#openwrt) · [All distributions](../README.md#distributions) · [Package status](https://github.com/SNodeC/Packages/blob/main/README.md#openwrt)
+[Back to top](#openwrt) · [All distributions](../README.md#distributions) · [Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#openwrt)

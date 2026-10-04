@@ -7,8 +7,10 @@
 [SNodeC/DistributionPackages](https://github.com/SNodeC/DistributionPackages) owns
 recipes, build automation, installation instructions and public signing keys.
 [SNodeC/Packages](https://github.com/SNodeC/Packages) holds generated binary
-repositories and package status. Both use `main`. No package branch or separate
-SNode.C/MQTTSuite recipe branch is required.
+repositories, the public landing page, all documentation, the installer and package status. Both use `main`. No package branch or separate
+SNode.C/MQTTSuite recipe branch is required. DistributionPackages can be private;
+installation and public documentation depend only on Packages. Source-code,
+workflow and settings links in these maintainer guides require access to DistributionPackages.
 
 | Source path | Purpose |
 | --- | --- |
@@ -77,11 +79,11 @@ and `build.json` records the files currently referenced by signed indexes.
 
 | Workflow | Responsibility |
 | --- | --- |
-| [release.yml](../.github/workflows/release.yml) | Receive `release-tag-changed` repository dispatches |
-| [packages.yml](../.github/workflows/packages.yml) | Capture source releases and expand all targets |
-| [package-target.yml](../.github/workflows/package-target.yml) | Order the two projects independently for each target |
-| [package-build.yml](../.github/workflows/package-build.yml) | Build one project/target and request publication |
-| [package-write.yml](../.github/workflows/package-write.yml) | Update Packages/main using a GitHub App token |
+| [release.yml](https://github.com/SNodeC/DistributionPackages/blob/main/.github/workflows/release.yml) | Receive `release-tag-changed` repository dispatches |
+| [packages.yml](https://github.com/SNodeC/DistributionPackages/blob/main/.github/workflows/packages.yml) | Capture source releases and expand all targets |
+| [package-target.yml](https://github.com/SNodeC/DistributionPackages/blob/main/.github/workflows/package-target.yml) | Order the two projects independently for each target |
+| [package-build.yml](https://github.com/SNodeC/DistributionPackages/blob/main/.github/workflows/package-build.yml) | Build one project/target and request publication |
+| [package-write.yml](https://github.com/SNodeC/DistributionPackages/blob/main/.github/workflows/package-write.yml) | Update Packages/main using a GitHub App token |
 
 The ordinary workflow token reads this repository and its Actions jobs. A short-lived
 GitHub App token, scoped to Packages, writes the separate binary repository.
@@ -101,8 +103,8 @@ upstream version tags; this counter controls package rebuild revisions only.
 
 ## Coverage and tests
 
-The authoritative target files are [OpenWrt](../ci/targets/openwrt.json),
-[Linux](../ci/targets/linux.json) and [Raspberry Pi OS](../ci/targets/raspberrypi.json).
+The authoritative target files are [OpenWrt](https://github.com/SNodeC/DistributionPackages/blob/main/ci/targets/openwrt.json),
+[Linux](https://github.com/SNodeC/DistributionPackages/blob/main/ci/targets/linux.json) and [Raspberry Pi OS](https://github.com/SNodeC/DistributionPackages/blob/main/ci/targets/raspberrypi.json).
 The matrix contains 76 distribution/release/architecture combinations. Presentation
 sorts architectures alphabetically without changing the build scheduling order.
 Raspberry Pi OS uses an ARMv8-A baseline for Pi 3, 4 and 5, not per-board tuning.
@@ -118,9 +120,10 @@ Each feed's `build.json` records versions, source tags and commits, checksums an
 publication context. APT aggregates architectures within a suite. These records
 provide provenance; package and index signatures establish signing authenticity.
 
-[publication.py](../ci/publish/publication.py) generates Packages' root README,
-project navigation READMEs and badges from [the status template](../ci/templates/package-status.md)
-and [project template](../ci/templates/project-packages.md). Status describes the
+[publication.py](https://github.com/SNodeC/DistributionPackages/blob/main/ci/publish/publication.py) copies the authored root README, all `docs/` files and
+`install/install.sh` into Packages on every publication. It generates `docs/status.md`,
+project navigation READMEs and badges from [the status template](https://github.com/SNodeC/DistributionPackages/blob/main/ci/templates/package-status.md)
+and [project template](https://github.com/SNodeC/DistributionPackages/blob/main/ci/templates/project-packages.md). Status describes the
 latest attempted build; the version describes the available package. The publication
 date belongs to the feed and can change when either project publishes.
 

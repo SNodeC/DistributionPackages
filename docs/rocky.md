@@ -32,7 +32,7 @@ sudo dnf config-manager --set-enabled crb
 ## Quick install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/SNodeC/DistributionPackages/main/install/install.sh \
+curl -fsSL https://raw.githubusercontent.com/SNodeC/Packages/main/install/install.sh \
   -o /tmp/snodec-install-feed.sh &&
 sudo sh /tmp/snodec-install-feed.sh
 ```
@@ -47,7 +47,7 @@ Prefer manual setup? Use [Manual repository setup](#manual-repository-setup).
 Prepare the repository without installing packages:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/SNodeC/DistributionPackages/main/install/install.sh \
+curl -fsSL https://raw.githubusercontent.com/SNodeC/Packages/main/install/install.sh \
   -o /tmp/snodec-install-feed.sh &&
 sudo sh /tmp/snodec-install-feed.sh --prepare
 ```
@@ -167,4 +167,4 @@ dependency and application errors.
 | Dependencies are missing | Enable CRB and EPEL as shown in Requirements. |
 | Illegal instruction on x86 | Check the x86-64-v3 requirement for Rocky Linux 10. |
 
-[Back to top](#rocky-linux) · [All distributions](../README.md#distributions) · [Package status](https://github.com/SNodeC/Packages/blob/main/README.md#rocky-linux)
+[Back to top](#rocky-linux) · [All distributions](../README.md#distributions) · [Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#rocky-linux)

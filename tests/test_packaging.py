@@ -27,6 +27,24 @@ class PackagingTest(unittest.TestCase):
             self.assertTrue(repository.project_file(name, 'snode.c'))
             self.assertFalse(repository.project_file(name, 'mqttsuite'))
 
+    def test_public_documentation_and_installer_are_published(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            publication.render(root, {'targets': {}})
+            for source in [repository.ROOT / 'README.md',
+                           *(repository.ROOT / 'docs').rglob('*.md'),
+                           repository.ROOT / 'install/install.sh']:
+                self.assertEqual((root / source.relative_to(repository.ROOT)).read_bytes(), source.read_bytes())
+            status = (root / 'docs/status.md').read_text()
+            self.assertTrue(status.startswith('# Package status'))
+            self.assertIn('](../status/', status)
+            self.assertNotIn('<!-- targets:', status)
+            self.assertIn('../docs/status.md', (root / 'snodec/README.md').read_text())
+            scope = subprocess.check_output(
+                ['python3', '-m', 'ci.publish.publication', 'scope', json.dumps(publication.targets()[0])], text=True)
+            self.assertIn('/docs/', scope.splitlines())
+            self.assertIn('/install/', scope.splitlines())
+
     def test_installer_openwrt_series_and_urls(self):
         source = (repository.ROOT / 'install/install.sh').read_text().split('fetch() {', 1)[0]
         with tempfile.TemporaryDirectory() as directory:

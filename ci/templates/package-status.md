@@ -1,11 +1,11 @@
 # Package status
 
-To install, see [Quick start](https://github.com/SNodeC/DistributionPackages/blob/main/README.md#quick-start).
+To install, see [Quick start](https://github.com/SNodeC/Packages/blob/main/README.md#quick-start).
 
 ## Reading the matrix
 
 **Version** is what is available to install. **Status** describes the latest
-build attempt; click its badge to inspect the job. An unfinished or failed rebuild
+build attempt; click its badge to inspect the job (repository access required for private build logs). An unfinished or failed rebuild
 does not replace an available version. A dash means no version is recorded.
 
 <details>
@@ -28,40 +28,40 @@ its signed index to select the current files.
 
 ## OpenWrt
 
-[Installation guide](https://github.com/SNodeC/DistributionPackages/blob/main/docs/openwrt.md)
+[Installation guide](https://github.com/SNodeC/Packages/blob/main/docs/openwrt.md)
 
 <!-- targets:openwrt -->
 
 ## Raspberry Pi OS
 
-[Installation guide](https://github.com/SNodeC/DistributionPackages/blob/main/docs/raspberrypi.md)
+[Installation guide](https://github.com/SNodeC/Packages/blob/main/docs/raspberrypi.md)
 
 <!-- targets:raspberrypios -->
 
 ## Debian
 
-[Installation guide](https://github.com/SNodeC/DistributionPackages/blob/main/docs/debian.md)
+[Installation guide](https://github.com/SNodeC/Packages/blob/main/docs/debian.md)
 
 <!-- targets:debian -->
 
 ## Ubuntu
 
-[Installation guide](https://github.com/SNodeC/DistributionPackages/blob/main/docs/ubuntu.md)
+[Installation guide](https://github.com/SNodeC/Packages/blob/main/docs/ubuntu.md)
 
 <!-- targets:ubuntu -->
 
 ## Rocky Linux
 
-[Installation guide](https://github.com/SNodeC/DistributionPackages/blob/main/docs/rocky.md)
+[Installation guide](https://github.com/SNodeC/Packages/blob/main/docs/rocky.md)
 
 <!-- targets:rocky -->
 
 ## Fedora
 
-[Installation guide](https://github.com/SNodeC/DistributionPackages/blob/main/docs/fedora.md)
+[Installation guide](https://github.com/SNodeC/Packages/blob/main/docs/fedora.md)
 
 <!-- targets:fedora -->
 
 ## Help
 
-[Troubleshooting](https://github.com/SNodeC/DistributionPackages/blob/main/docs/troubleshooting.md) · [Repository maintenance](https://github.com/SNodeC/DistributionPackages/blob/main/docs/maintainers.md) · [Back to installation](https://github.com/SNodeC/DistributionPackages/blob/main/README.md#quick-start)
+[Troubleshooting](https://github.com/SNodeC/Packages/blob/main/docs/troubleshooting.md) · [Repository maintenance](https://github.com/SNodeC/Packages/blob/main/docs/maintainers.md) · [Back to installation](https://github.com/SNodeC/Packages/blob/main/README.md#quick-start)

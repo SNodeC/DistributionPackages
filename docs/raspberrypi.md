@@ -30,7 +30,7 @@ Raspberry Pi OS through `/etc/rpi-issue`, even when `/etc/os-release` says Debia
 ## Quick install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/SNodeC/DistributionPackages/main/install/install.sh \
+curl -fsSL https://raw.githubusercontent.com/SNodeC/Packages/main/install/install.sh \
   -o /tmp/snodec-install-feed.sh &&
 sudo sh /tmp/snodec-install-feed.sh
 ```
@@ -45,7 +45,7 @@ Prefer manual setup? Use [Manual repository setup](#manual-repository-setup).
 Prepare the repository without installing packages:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/SNodeC/DistributionPackages/main/install/install.sh \
+curl -fsSL https://raw.githubusercontent.com/SNodeC/Packages/main/install/install.sh \
   -o /tmp/snodec-install-feed.sh &&
 sudo sh /tmp/snodec-install-feed.sh --prepare
 ```
@@ -164,4 +164,4 @@ dependency and application errors.
 | Installer identifies the Pi as Debian | Check `/etc/rpi-issue`; the installer uses it to identify Raspberry Pi OS. Use the Pi repository only on Raspberry Pi OS. |
 | Architecture is `armhf` | This repository supports 64-bit Raspberry Pi OS (`arm64`) only. |
 
-[Back to top](#raspberry-pi-os) · [All distributions](../README.md#distributions) · [Package status](https://github.com/SNodeC/Packages/blob/main/README.md#raspberry-pi-os)
+[Back to top](#raspberry-pi-os) · [All distributions](../README.md#distributions) · [Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#raspberry-pi-os)

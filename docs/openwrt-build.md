@@ -1,14 +1,17 @@
 # SNode.C and MQTTSuite for GL-MT3000
 
-The [SNode.C recipe](../net/snode.c/Makefile) and
-[MQTTSuite recipe](../net/mqttsuite/Makefile) declare the default source releases.
+This maintainer guide requires access to the private DistributionPackages repository.
+For binary installation, use the [OpenWrt installation guide](openwrt.md).
+
+The [SNode.C recipe](https://github.com/SNodeC/DistributionPackages/blob/main/net/snode.c/Makefile) and
+[MQTTSuite recipe](https://github.com/SNodeC/DistributionPackages/blob/main/net/mqttsuite/Makefile) declare the default source releases.
 For a release build, export `SNODEC_SOURCE_TAG=vX.Y.Z` and
 `MQTTSUITE_SOURCE_TAG=vA.B.C` before running the SDK commands; each recipe derives
 its package version from its selected release tag. CI selects and records these
 versions automatically.
 
 The recipes use the upstream build systems without source patches. See
-[Package status](https://github.com/SNodeC/Packages/blob/main/README.md#openwrt)
+[Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#openwrt)
 for published versions. The SDK commands below are a recorded GL-MT3000 example.
 
 The build uses the official OpenWrt 25.12.5 `mediatek/filogic` SDK with GCC
