@@ -1,0 +1,20 @@
+name: Distribution packages
+on:
+  repository_dispatch:
+    types: [release-tag-changed]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  packages:
+    if: >-
+      (github.event.action == 'release-tag-changed' &&
+       startsWith(github.event.client_payload.ref, 'refs/tags/v') &&
+       github.event.client_payload.deleted == false &&
+       (github.event.client_payload.repository == 'SNodeC/snode.c' ||
+        github.event.client_payload.repository == 'SNodeC/mqttsuite'))
+    uses: ./.github/workflows/packages.yml
+    with:
+      release_project: ${{ github.event.client_payload.repository == 'SNodeC/snode.c' && 'snode.c' || 'mqttsuite' }}
+      release_tag: ${{ github.event.client_payload.ref }}
+    secrets: inherit

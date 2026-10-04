@@ -1,0 +1,89 @@
+[
+  {
+    "distribution": "debian",
+    "suite": "trixie",
+    "image": "debian:trixie",
+    "architectures": [
+      "amd64",
+      "arm64",
+      "armhf",
+      "riscv64"
+    ]
+  },
+  {
+    "distribution": "debian",
+    "suite": "forky",
+    "image": "debian:forky",
+    "architectures": [
+      "amd64",
+      "arm64",
+      "armhf",
+      "riscv64"
+    ]
+  },
+  {
+    "distribution": "debian",
+    "suite": "sid",
+    "image": "debian:sid",
+    "architectures": [
+      "amd64",
+      "arm64",
+      "armhf",
+      "riscv64"
+    ]
+  },
+  {
+    "distribution": "ubuntu",
+    "suite": "noble",
+    "image": "ubuntu:noble",
+    "architectures": [
+      "amd64",
+      "arm64"
+    ]
+  },
+  {
+    "distribution": "ubuntu",
+    "suite": "resolute",
+    "image": "ubuntu:resolute",
+    "architectures": [
+      "amd64",
+      "arm64"
+    ]
+  },
+  {
+    "distribution": "rocky",
+    "suite": "9",
+    "image": "rockylinux/rockylinux:9",
+    "architectures": [
+      "x86_64",
+      "aarch64"
+    ]
+  },
+  {
+    "distribution": "rocky",
+    "suite": "10",
+    "image": "rockylinux/rockylinux:10",
+    "architectures": [
+      "x86_64",
+      "aarch64"
+    ]
+  },
+  {
+    "distribution": "fedora",
+    "suite": "43",
+    "image": "fedora:43",
+    "architectures": [
+      "x86_64",
+      "aarch64"
+    ]
+  },
+  {
+    "distribution": "fedora",
+    "suite": "44",
+    "image": "fedora:44",
+    "architectures": [
+      "x86_64",
+      "aarch64"
+    ]
+  }
+]
