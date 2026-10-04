@@ -129,7 +129,7 @@ date belongs to the feed and can change when either project publishes.
 
 Guides and package catalogs are handwritten. Keep their architecture tables in
 agreement with the target files. Native component names follow upstream CPack;
-`snodec-unspecified` currently contains `snodec-control`.
+`snodec-control` contains the configuration tool.
 
 ## Signing-key verification
 

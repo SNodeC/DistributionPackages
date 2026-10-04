@@ -57,7 +57,7 @@ preparation, install the complete-project packages listed below.
 | --- | --- |
 | `snodec` | All framework components, headers, examples and configuration tool |
 | `snodec-apps` | Demonstration applications |
-| `snodec-unspecified` | Component containing `snodec-control` |
+| `snodec-control` | Component containing `snodec-control` |
 | `mqttsuite` | All five applications and both mapping plugins |
 | `mqttsuite-broker` | MQTT broker |
 | `mqttsuite-cli` | Publish/subscribe command-line client |

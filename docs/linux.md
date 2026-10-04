@@ -17,7 +17,7 @@ automatically. OpenWrt uses different names; see the [name map](../README.md#pac
 | `snodec-http-server` | HTTP server library |
 | `snodec-mqtt-server` | MQTT server library |
 | `snodec-apps` | Demonstration applications |
-| `snodec-unspecified` | Component containing the `snodec-control` executable |
+| `snodec-control` | Component containing the `snodec-control` executable |
 
 List all available framework component packages:
 
