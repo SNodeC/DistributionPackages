@@ -36,11 +36,13 @@ jobs:
             fi
           done
       - uses: actions/checkout@v6
+        if: github.run_attempt == 1
         with:
           ref: main
           path: feed
           persist-credentials: false
       - uses: actions/checkout@v6
+        if: github.run_attempt == 1
         with:
           repository: SNodeC/Packages
           ref: main
@@ -48,8 +50,14 @@ jobs:
           sparse-checkout: '**/build.json'
           sparse-checkout-cone-mode: false
           persist-credentials: false
+      - name: Reuse original capture (if missing, start a new run)
+        if: github.run_attempt > 1
+        uses: actions/download-artifact@v8
+        with:
+          name: source-pair
+          path: bundle
       - name: Capture the source pair and full matrix
-        id: matrix
+        if: github.run_attempt == 1
         env:
           RELEASE_PROJECT: ${{ inputs.release_project }}
           RELEASE_TAG: ${{ inputs.release_tag }}
@@ -58,15 +66,17 @@ jobs:
         run: |
           export RELEASE_TAG="${RELEASE_TAG#refs/tags/}"
           python3 -m ci.repository prepare published bundle
-          echo "revisions=$(jq -c . bundle/revisions.json)" >> "$GITHUB_OUTPUT"
-          python3 -m ci.publish.publication matrix > matrix.json
-          echo "value=$(jq -c . matrix.json)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v7
+        if: github.run_attempt == 1
         with:
           name: source-pair
           path: bundle/
           if-no-files-found: error
-          overwrite: true
+      - name: Read the captured matrix and revisions
+        id: matrix
+        run: |
+          echo "revisions=$(jq -c . bundle/revisions.json)" >> "$GITHUB_OUTPUT"
+          echo "value=$(jq -c '{include: .}' bundle/targets.json)" >> "$GITHUB_OUTPUT"
   target:
     name: ${{ matrix.distribution }} · ${{ matrix.suite }} · ${{ matrix.arch }}
     needs: prepare
