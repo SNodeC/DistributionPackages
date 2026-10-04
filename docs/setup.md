@@ -31,16 +31,16 @@ write access to the publisher and repository administrators.
 
 ## Connect upstream releases
 
-Do this only after validating the new feed and CI configuration. Until then the
-existing upstream notifications continue to target the original repository.
+The upstream notification workflows target DistributionPackages. Configure the
+App installation and signing credentials before creating or moving a version tag.
 
 Both upstream projects use the same `Package release tag changed` workflow.
-In each upstream workflow, the required destination changes are:
+Both retain their existing upstream App credential names:
 
 ```yaml
 # actions/create-github-app-token inputs:
-app-id: ${{ vars.PACKAGES_APP_ID }}
-private-key: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
+app-id: ${{ vars.OPENWRT_APP_ID }}
+private-key: ${{ secrets.OPENWRT_APP_PRIVATE_KEY }}
 owner: SNodeC
 repositories: DistributionPackages
 permission-contents: write
@@ -55,7 +55,9 @@ gh api --method POST repos/SNodeC/DistributionPackages/dispatches --input -
 Keep its existing strict version-tag validation and JSON payload fields:
 `repository`, `ref`, `before`, `after`, and `deleted`. The event type stays
 `release-tag-changed`. Set the App variable/secret in each upstream repository or
-share them using organization settings. Do not send each event to both old and
+share them using organization settings. These existing `OPENWRT_APP_*` names
+identify credentials only; they do not select the destination or an OpenWrt tag.
+The publisher uses `PACKAGES_APP_*` in DistributionPackages. Do not send each event to both old and
 new destinations.
 
 Only version-tag creation or movement starts builds. No ordinary push or README
