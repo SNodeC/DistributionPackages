@@ -21,7 +21,7 @@ def targets():
                   runner=r['runner'], build=r) for r in linux_matrix()]
     for index, row in enumerate(rows):
         row['id'] = '-'.join(row[k] for k in ('distribution', 'suite', 'arch'))
-        row['build_slot'] = index % 19
+        row['build_slot'] = {'linux-armhf': 0, 'linux-riscv64': 1}.get(f"{row['family']}-{row['arch']}", 2 + index % 17)
     return rows
 
 

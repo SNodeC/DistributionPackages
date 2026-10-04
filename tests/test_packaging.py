@@ -21,6 +21,10 @@ class PackagingTest(unittest.TestCase):
         self.assertEqual(sum(r['family'] == 'raspberrypi' for r in rows), 2)
         self.assertEqual(sum(r['family'] == 'linux' for r in rows), 24)
         for row in rows:
+            if row['family'] == 'linux' and row['arch'] in {'armhf', 'riscv64'}:
+                self.assertEqual(row['build_slot'], 0 if row['arch'] == 'armhf' else 1)
+            else:
+                self.assertIn(row['build_slot'], range(2, 19))
             self.assertEqual(len(publication.feed_paths(row)),
                              2 if row['distribution'] in {'debian', 'ubuntu', 'raspberrypios'} else 1)
         for name in ['snode.c-sdk-2.0.0-r124.tar.zst', 'snodec-core_2.0.0-124~trixie_arm64.deb']:
