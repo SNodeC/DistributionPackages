@@ -122,8 +122,7 @@ provide provenance; package and index signatures establish signing authenticity.
 
 [publication.py](https://github.com/SNodeC/DistributionPackages/blob/main/ci/publish/publication.py) copies the authored root README, all `docs/` files and
 `install/install.sh` into Packages on every publication. It generates `docs/status.md`,
-project navigation READMEs and badges from [the status template](https://github.com/SNodeC/DistributionPackages/blob/main/ci/templates/package-status.md)
-and [project template](https://github.com/SNodeC/DistributionPackages/blob/main/ci/templates/project-packages.md). Status describes the
+and badges from [the status template](https://github.com/SNodeC/DistributionPackages/blob/main/ci/templates/package-status.md). Status describes the
 latest attempted build; the version describes the available package. The publication
 date belongs to the feed and can change when either project publishes.
 

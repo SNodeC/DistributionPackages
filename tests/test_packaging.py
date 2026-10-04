@@ -39,7 +39,8 @@ class PackagingTest(unittest.TestCase):
             self.assertTrue(status.startswith('# Package status'))
             self.assertIn('](../status/', status)
             self.assertNotIn('<!-- targets:', status)
-            self.assertIn('../docs/status.md', (root / 'snodec/README.md').read_text())
+            self.assertFalse((root / 'snodec').exists())
+            self.assertFalse((root / 'mqttsuite').exists())
             scope = subprocess.check_output(
                 ['python3', '-m', 'ci.publish.publication', 'scope', json.dumps(publication.targets()[0])], text=True)
             self.assertIn('/docs/', scope.splitlines())

@@ -86,11 +86,6 @@ def render(root, state):
                 tables.append(f'#### {title}\n\n| Architecture | Version | Status | Published | Packages |\n| --- | --- | --- | --- | --- |\n' + '\n'.join(lines))
         text = text.replace(f'<!-- targets:{distribution} -->', '\n\n'.join(tables))
     (root / 'docs/status.md').write_text(text)
-    for project in REPOSITORIES:
-        directory = root / project.replace('.', '')
-        directory.mkdir(exist_ok=True)
-        text = (ROOT / 'ci/templates/project-packages.md').read_text().replace('<!-- project -->', 'SNode.C' if project == 'snode.c' else 'MQTTSuite')
-        (directory / 'README.md').write_text(text)
     (root / 'STATUS.md').unlink(missing_ok=True)
 
 
@@ -233,7 +228,7 @@ def main():
         row = json.loads(args[0])
         if row not in targets():
             raise ValueError('Unknown publication target')
-        print('\n'.join(['**/build.json', '/README.md', '/docs/', '/install/', '/snodec/README.md', '/mqttsuite/README.md', '/status.json', '/retention.json', '/status/', '/keys/']
+        print('\n'.join(['**/build.json', '/README.md', '/docs/', '/install/', '/status.json', '/retention.json', '/status/', '/keys/']
                         + [f'/{path}/' for path in feed_paths(row)]))
         return
     root, bundle = (Path(p).resolve() for p in args[:2])
