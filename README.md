@@ -63,10 +63,10 @@ both mapping plugins. Configure listeners, credentials and TLS before starting s
 
 | OpenWrt name | DEB/RPM name | Contents |
 | --- | --- | --- |
-| `snode.c-full` | `snodec` | Framework runtime modules; DEB/RPM also includes headers, examples and tools |
-| `snode.c-apps` | `snodec-apps` | Demonstration applications |
-| `snode.c-control` | `snodec-unspecified` | The `snodec-control` executable |
-| `mqttsuite-full` | `mqttsuite` | All five applications and both mapping plugins |
+| `snodec` | `snodec` | All available runtime modules, demonstration apps and control tool; DEB/RPM also includes development files |
+| `snodec-apps` | `snodec-apps` | Demonstration applications |
+| `snodec-control` | `snodec-unspecified` | The `snodec-control` executable |
+| `mqttsuite` | `mqttsuite` | All five applications and both mapping plugins |
 
 Full catalogs: [SNode.C for OpenWrt](docs/snodec-package-options.md),
 [MQTTSuite for OpenWrt](docs/mqttsuite-package-options.md),

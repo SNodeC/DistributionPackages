@@ -61,10 +61,10 @@ preparation, install the complete-project packages listed below.
 
 | Package | Contents |
 | --- | --- |
-| `snode.c-full` | All framework runtime modules |
-| `snode.c-apps` | Demonstration applications |
-| `snode.c-control` | Configuration tool |
-| `mqttsuite-full` | All five applications and both mapping plugins |
+| `snodec` | All framework runtime modules, demonstration apps and control tool |
+| `snodec-apps` | Demonstration applications |
+| `snodec-control` | Configuration tool |
+| `mqttsuite` | All five applications and both mapping plugins |
 | `mqttsuite-broker` | MQTT broker |
 | `mqttsuite-cli` | Publish/subscribe command-line client |
 
@@ -72,12 +72,12 @@ Full catalogs: [SNode.C](snodec-package-options.md) and [MQTTSuite](mqttsuite-pa
 
 ```sh
 # OpenWrt 24.10: full selection
-opkg install mqttsuite-full snode.c-full snode.c-apps snode.c-control
+opkg install snodec mqttsuite
 ```
 
 ```sh
 # OpenWrt 25.12: full selection
-apk add mqttsuite-full snode.c-full snode.c-apps snode.c-control
+apk add snodec mqttsuite
 ```
 
 ## Configure and run
@@ -118,6 +118,18 @@ Update selected packages with `opkg upgrade <package> ...` or
 `apk upgrade <package> ...`. Review related library and application updates
 together. This does not upgrade firmware. After changing OpenWrt release series,
 configure the matching feed again.
+
+### Moving from the old package names
+
+Earlier feeds used `snode.c-*`, `snode.c-full` and `mqttsuite-full`. The complete
+install is now `snodec mqttsuite`; the small foundation packages are
+`snodec-common` and `mqttsuite-common`. Configuration paths remain `/etc/snode.c`.
+
+For an existing installation, wait until both projects have published the renamed
+packages for your target. Back up `/etc/snode.c`, stop the MQTT services, and remove
+the old SNode.C and MQTTSuite package selection before installing `snodec mqttsuite`.
+Restore configuration if necessary and restart the services. Do not treat this
+package-name migration as an ordinary in-place upgrade or force file overwrites.
 
 ## Manual repository setup
 

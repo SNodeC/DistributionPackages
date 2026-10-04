@@ -60,7 +60,7 @@ PKG_CONFIG_DEPENDS:=CONFIG_SNODEC_GROUP_NAME \
   CONFIG_SNODEC_TLS_INIT_TIMEOUT \
   CONFIG_SNODEC_TLS_SHUTDOWN_TIMEOUT \
   CONFIG_SNODEC_HTTP_REQUEST_PIPELINED \
-  CONFIG_PACKAGE_snode.c-apps
+  CONFIG_PACKAGE_snodec-apps
 
 CMAKE_INSTALL:=1
 
@@ -111,7 +111,7 @@ CMAKE_OPTIONS+=-U'SNODEC_*' \
                -DFETCHCONTENT_SOURCE_DIR_SPDLOG=$(PKG_BUILD_DIR)/spdlog-1.17.0 \
                -DFETCHCONTENT_FULLY_DISCONNECTED=ON \
                -DSPDLOG_INSTALL=OFF -DSPDLOG_SYSTEM_INCLUDES=ON \
-               -DSNODEC_BUILD_APPS=$(if $(CONFIG_PACKAGE_snode.c-apps),ON,OFF) \
+               -DSNODEC_BUILD_APPS=$(if $(CONFIG_PACKAGE_snodec-apps),ON,OFF) \
                -DSNODEC_BUILD_TESTS=OFF \
                -DSNODEC_CONTROL_BUILD_TUI=OFF \
                -DGROUP_NAME=$(patsubst "%",%,$(CONFIG_SNODEC_GROUP_NAME)) \
@@ -158,133 +158,133 @@ CMAKE_OPTIONS+=-U'SNODEC_*' \
                -DCMAKE_SKIP_RPATH=FALSE \
                -DCHECK_INCLUDES=OFF
 
-define Package/snode.c/Default
+define Package/snodec/Default
   SECTION:=net
   CATEGORY:=Network
   SUBMENU:=SNode.C
 endef
 
-define Package/snode.c
-  $(call Package/snode.c/Default)
+define Package/snodec-common
+  $(call Package/snodec/Default)
   TITLE:=Easy to use lightwight layer based network framework for C++
   DEPENDS:=+libstdcpp
   USERID:=$(patsubst "%",%,$(CONFIG_SNODEC_GROUP_NAME)):$(patsubst "%",%,$(CONFIG_SNODEC_GROUP_NAME))
 endef
 
-define Package/snode.c/description
+define Package/snodec-common/description
   SNode.C is a very simple to use lightweight highly extendable event
 driven layer-based framework for network applications in the spirit
 of node.js written entirely in C++.
 
 endef
 
-define Package/snode.c/config
+define Package/snodec-common/config
   source "$(SOURCE)/Config.in"
 endef
 
-define Package/snode.c/conffiles
+define Package/snodec-common/conffiles
 /etc/snode.c/
 endef
 
-define Package/snode.c/install
+define Package/snodec-common/install
 	$(INSTALL_DIR) $(1)/etc/snode.c
 endef
 
 SO_VERSION=$(shell echo $(PKG_VERSION) | cut -d'.' -f1)
 
 define BuildSNodeCModule
-  define Package/snode.c-$(1)
-    $$(call Package/snode.c/Default)
+  define Package/snodec-$(1)
+    $$(call Package/snodec/Default)
     TITLE:=$(1) module
     DEPENDS:=$(2)
   endef
 
-  define Package/snode.c-$(1)/description
+  define Package/snodec-$(1)/description
     This package contains the module '$(1)' of SNode.C
 
   endef
   
-  define Package/snode.c-$(1)/install
+  define Package/snodec-$(1)/install
 	$(INSTALL_DIR) $$(1)$(3)
 	$(CP) $(PKG_INSTALL_DIR)$(3)/libsnodec-$(1).so.$(SO_VERSION) $$(1)$(3)/
 	$(CP) $(PKG_INSTALL_DIR)$(3)/libsnodec-$(1).so.$(PKG_VERSION) $$(1)$(3)/
   endef
 
-  $$(eval $$(call BuildPackage,snode.c-$(1)))
+  $$(eval $$(call BuildPackage,snodec-$(1)))
 endef
 
-define Package/snode.c-full
-  $(call Package/snode.c/Default)
-  TITLE:=install all modules (no apps)
-  DEPENDS:=+snode.c-core-mux-epoll \
-           +snode.c-core-mux-poll \
-           +snode.c-core-mux-select \
-           +snode.c-net-in-stream-legacy \
-           +snode.c-net-in-stream-tls \
-           +snode.c-net-in6-stream-legacy \
-           +snode.c-net-in6-stream-tls \
-           +snode.c-net-l2-stream-legacy \
-           +snode.c-net-l2-stream-tls \
-           +snode.c-net-rc-stream-legacy \
-           +snode.c-net-rc-stream-tls \
-           +snode.c-net-un-stream-legacy \
-           +snode.c-net-un-stream-tls \
-           +snode.c-net-un-dgram \
-           +snode.c-http-server-express \
-           +snode.c-http-server-express-legacy-in \
-           +snode.c-http-server-express-legacy-in6 \
-           +snode.c-http-server-express-legacy-rc \
-           +snode.c-http-server-express-legacy-un \
-           +snode.c-http-server-express-tls-in \
-           +snode.c-http-server-express-tls-in6 \
-           +snode.c-http-server-express-tls-rc \
-           +snode.c-http-server-express-tls-un \
-           +snode.c-http-client \
-           +snode.c-websocket-server \
-           +snode.c-websocket-client \
-           +snode.c-mqtt-server-websocket \
-           +snode.c-mqtt-client-websocket \
-           +snode.c-db-mariadb
+define Package/snodec
+  $(call Package/snodec/Default)
+  TITLE:=All SNode.C runtime modules, applications and control tool
+  DEPENDS:=+snodec-apps +snodec-control +snodec-core-mux-epoll \
+           +snodec-core-mux-poll \
+           +snodec-core-mux-select \
+           +snodec-net-in-stream-legacy \
+           +snodec-net-in-stream-tls \
+           +snodec-net-in6-stream-legacy \
+           +snodec-net-in6-stream-tls \
+           +snodec-net-l2-stream-legacy \
+           +snodec-net-l2-stream-tls \
+           +snodec-net-rc-stream-legacy \
+           +snodec-net-rc-stream-tls \
+           +snodec-net-un-stream-legacy \
+           +snodec-net-un-stream-tls \
+           +snodec-net-un-dgram \
+           +snodec-http-server-express \
+           +snodec-http-server-express-legacy-in \
+           +snodec-http-server-express-legacy-in6 \
+           +snodec-http-server-express-legacy-rc \
+           +snodec-http-server-express-legacy-un \
+           +snodec-http-server-express-tls-in \
+           +snodec-http-server-express-tls-in6 \
+           +snodec-http-server-express-tls-rc \
+           +snodec-http-server-express-tls-un \
+           +snodec-http-client \
+           +snodec-websocket-server \
+           +snodec-websocket-client \
+           +snodec-mqtt-server-websocket \
+           +snodec-mqtt-client-websocket \
+           +snodec-db-mariadb
 endef
 
-define Package/snode.c-full/description
- This meta-package contains dependencies for all of the SNode.C modules.
-Note that the demo applications are not part of that dependency.
+define Package/snodec/description
+ This meta-package selects all SNode.C runtime modules, demonstration
+applications and the control tool.
 
 endef
 
-define Package/snode.c-full/install
+define Package/snodec/install
 	true
 endef
 
-define Package/snode.c-apps
-  $(call Package/snode.c/Default)
+define Package/snodec-apps
+  $(call Package/snodec/Default)
   TITLE:=SNode.C demo applications
-  DEPENDS:=+snode.c-net-in-stream-legacy \
-           +snode.c-net-in-stream-tls \
-           +snode.c-net-in6-stream-legacy \
-           +snode.c-net-in6-stream-tls \
-           +snode.c-net-l2-stream-legacy \
-           +snode.c-net-l2-stream-tls \
-           +snode.c-net-rc-stream-legacy \
-           +snode.c-net-rc-stream-tls \
-           +snode.c-net-un-stream-legacy \
-           +snode.c-net-un-stream-tls \
-           +snode.c-http-server-express \
-           +snode.c-http-client \
-           +snode.c-websocket-server \
-           +snode.c-websocket-client \
-           +snode.c-mqtt-server \
-           +snode.c-mqtt-client \
-           +snode.c-db-mariadb
+  DEPENDS:=+snodec-net-in-stream-legacy \
+           +snodec-net-in-stream-tls \
+           +snodec-net-in6-stream-legacy \
+           +snodec-net-in6-stream-tls \
+           +snodec-net-l2-stream-legacy \
+           +snodec-net-l2-stream-tls \
+           +snodec-net-rc-stream-legacy \
+           +snodec-net-rc-stream-tls \
+           +snodec-net-un-stream-legacy \
+           +snodec-net-un-stream-tls \
+           +snodec-http-server-express \
+           +snodec-http-client \
+           +snodec-websocket-server \
+           +snodec-websocket-client \
+           +snodec-mqtt-server \
+           +snodec-mqtt-client \
+           +snodec-db-mariadb
 endef
 
-define Package/snode.c-apps/description
+define Package/snodec-apps/description
  This package contains all demo applications of SNode.C.
 
 endef
 
-define Package/snode.c-apps/install
+define Package/snodec-apps/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	find $(PKG_INSTALL_DIR)/usr/bin -mindepth 1 -maxdepth 1 ! -name snodec-control -exec $(CP) {} $(1)/usr/bin/ \;
 	$(INSTALL_DIR) $(1)/usr/lib/snode.c/web/http/upgrade/websocket
@@ -294,81 +294,81 @@ define Package/snode.c-apps/install
 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/snode.c/web/http/upgrade/websocket/libsnodec-websocket-echo-client.so.$(PKG_VERSION) $(1)/usr/lib/snode.c/web/http/upgrade/websocket/
 endef
 
-define Package/snode.c-control
-  $(call Package/snode.c/Default)
+define Package/snodec-control
+  $(call Package/snodec/Default)
   TITLE:=SNode.C control socket client
-  DEPENDS:=+snode.c
+  DEPENDS:=+snodec-common
 endef
 
-define Package/snode.c-control/install
+define Package/snodec-control/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/snodec-control $(1)/usr/bin/
 endef
 
-$(eval $(call BuildPackage,snode.c))
-$(eval $(call BuildPackage,snode.c-apps))
-$(eval $(call BuildPackage,snode.c-control))
-$(eval $(call BuildPackage,snode.c-full))
-$(eval $(call BuildSNodeCModule,logger,+snode.c,/usr/lib))
-$(eval $(call BuildSNodeCModule,utils,+snode.c-logger,/usr/lib))
-$(eval $(call BuildSNodeCModule,core-mux-epoll,+snode.c-logger,/usr/lib))
-$(eval $(call BuildSNodeCModule,core-mux-poll,+snode.c-logger,/usr/lib))
-$(eval $(call BuildSNodeCModule,core-mux-select,+snode.c-logger,/usr/lib))
-$(eval $(call BuildSNodeCModule,core,+snode.c-utils +libatomic +SNODEC_EPOLL:snode.c-core-mux-epoll +SNODEC_POLL:snode.c-core-mux-poll +SNODEC_SELECT:snode.c-core-mux-select,/usr/lib))
-$(eval $(call BuildSNodeCModule,core-socket,+snode.c-core,/usr/lib))
-$(eval $(call BuildSNodeCModule,core-socket-stream,+snode.c-core-socket,/usr/lib))
-$(eval $(call BuildSNodeCModule,core-socket-stream-legacy,+snode.c-core-socket-stream,/usr/lib))
-$(eval $(call BuildSNodeCModule,core-socket-stream-tls,+snode.c-core-socket-stream +libopenssl,/usr/lib))
-$(eval $(call BuildSNodeCModule,db-mariadb,+snode.c-core +libmariadb,/usr/lib))
-$(eval $(call BuildSNodeCModule,net,+snode.c-core-socket,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-in,+snode.c-net,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-in-phy,+snode.c-net-in,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-in-phy-stream,+snode.c-net-in-phy,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-in-stream,+snode.c-net-in-phy-stream,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-in-stream-legacy,+snode.c-net-in-stream +snode.c-core-socket-stream-legacy,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-in-stream-tls,+snode.c-net-in-stream +snode.c-core-socket-stream-tls,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-in6,+snode.c-net,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-in6-phy,+snode.c-net-in6,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-in6-phy-stream,+snode.c-net-in6-phy,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-in6-stream,+snode.c-net-in6-phy-stream,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-in6-stream-legacy,+snode.c-net-in6-stream +snode.c-core-socket-stream-legacy,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-in6-stream-tls,+snode.c-net-in6-stream +snode.c-core-socket-stream-tls,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-l2,+snode.c-net +bluez-libs,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-l2-phy,+snode.c-net-l2 +bluez-libs,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-l2-phy-stream,+snode.c-net-l2-phy,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-l2-stream,+snode.c-net-l2-phy-stream,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-l2-stream-legacy,+snode.c-net-l2-stream +snode.c-core-socket-stream-legacy,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-l2-stream-tls,+snode.c-net-l2-stream +snode.c-core-socket-stream-tls,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-rc,+snode.c-net +bluez-libs,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-rc-phy,+snode.c-net-rc +bluez-libs,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-rc-phy-stream,+snode.c-net-rc-phy,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-rc-stream,+snode.c-net-rc-phy-stream,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-rc-stream-legacy,+snode.c-net-rc-stream +snode.c-core-socket-stream-legacy,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-rc-stream-tls,+snode.c-net-rc-stream +snode.c-core-socket-stream-tls,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-un,+snode.c-net,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-un-phy,+snode.c-net-un,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-un-phy-stream,+snode.c-net-un-phy,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-un-stream,+snode.c-net-un-phy-stream,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-un-stream-legacy,+snode.c-net-un-stream +snode.c-core-socket-stream-legacy,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-un-stream-tls,+snode.c-net-un-stream +snode.c-core-socket-stream-tls,/usr/lib))
-$(eval $(call BuildSNodeCModule,net-un-dgram,+snode.c-net-un-phy +snode.c-net-un,/usr/lib))
-$(eval $(call BuildSNodeCModule,http,+snode.c-core-socket-stream +libmagic,/usr/lib/snode.c/web/http))
-$(eval $(call BuildSNodeCModule,http-server,+snode.c-http,/usr/lib/snode.c/web/http))
-$(eval $(call BuildSNodeCModule,http-client,+snode.c-http,/usr/lib/snode.c/web/http))
-$(eval $(call BuildSNodeCModule,http-server-express,+snode.c-http-server,/usr/lib/snode.c/web/http))
-$(eval $(call BuildSNodeCModule,http-server-express-legacy-in,+snode.c-http-server-express +snode.c-net-in-stream-legacy,/usr/lib/snode.c/web/http))
-$(eval $(call BuildSNodeCModule,http-server-express-legacy-in6,+snode.c-http-server-express +snode.c-net-in6-stream-legacy,/usr/lib/snode.c/web/http))
-$(eval $(call BuildSNodeCModule,http-server-express-legacy-rc,+snode.c-http-server-express +snode.c-net-rc-stream-legacy,/usr/lib/snode.c/web/http))
-$(eval $(call BuildSNodeCModule,http-server-express-legacy-un,+snode.c-http-server-express +snode.c-net-un-stream-legacy,/usr/lib/snode.c/web/http))
-$(eval $(call BuildSNodeCModule,http-server-express-tls-in,+snode.c-http-server +snode.c-http-server-express +snode.c-net-in-stream-tls,/usr/lib/snode.c/web/http))
-$(eval $(call BuildSNodeCModule,http-server-express-tls-in6,+snode.c-http-server +snode.c-http-server-express +snode.c-net-in6-stream-tls,/usr/lib/snode.c/web/http))
-$(eval $(call BuildSNodeCModule,http-server-express-tls-rc,+snode.c-http-server +snode.c-http-server-express +snode.c-net-rc-stream-tls,/usr/lib/snode.c/web/http))
-$(eval $(call BuildSNodeCModule,http-server-express-tls-un,+snode.c-http-server +snode.c-http-server-express +snode.c-net-un-stream-tls,/usr/lib/snode.c/web/http))
-$(eval $(call BuildSNodeCModule,websocket,+snode.c-utils,/usr/lib/snode.c/web/http/upgrade))
-$(eval $(call BuildSNodeCModule,websocket-server,+snode.c-websocket +snode.c-http-server,/usr/lib/snode.c/web/http/upgrade))
-$(eval $(call BuildSNodeCModule,websocket-client,+snode.c-websocket +snode.c-http-client,/usr/lib/snode.c/web/http/upgrade))
-$(eval $(call BuildSNodeCModule,mqtt,+snode.c-core-socket-stream,/usr/lib/snode.c/iot/mqtt))
-$(eval $(call BuildSNodeCModule,mqtt-server,+snode.c-mqtt,/usr/lib/snode.c/iot/mqtt))
-$(eval $(call BuildSNodeCModule,mqtt-client,+snode.c-mqtt,/usr/lib/snode.c/iot/mqtt))
-$(eval $(call BuildSNodeCModule,mqtt-server-websocket,+snode.c-mqtt-server +snode.c-websocket-server,/usr/lib/snode.c/iot/mqtt))
-$(eval $(call BuildSNodeCModule,mqtt-client-websocket,+snode.c-mqtt-client +snode.c-websocket-client,/usr/lib/snode.c/iot/mqtt))
+$(eval $(call BuildPackage,snodec-common))
+$(eval $(call BuildPackage,snodec-apps))
+$(eval $(call BuildPackage,snodec-control))
+$(eval $(call BuildPackage,snodec))
+$(eval $(call BuildSNodeCModule,logger,+snodec-common,/usr/lib))
+$(eval $(call BuildSNodeCModule,utils,+snodec-logger,/usr/lib))
+$(eval $(call BuildSNodeCModule,core-mux-epoll,+snodec-logger,/usr/lib))
+$(eval $(call BuildSNodeCModule,core-mux-poll,+snodec-logger,/usr/lib))
+$(eval $(call BuildSNodeCModule,core-mux-select,+snodec-logger,/usr/lib))
+$(eval $(call BuildSNodeCModule,core,+snodec-utils +libatomic +SNODEC_EPOLL:snodec-core-mux-epoll +SNODEC_POLL:snodec-core-mux-poll +SNODEC_SELECT:snodec-core-mux-select,/usr/lib))
+$(eval $(call BuildSNodeCModule,core-socket,+snodec-core,/usr/lib))
+$(eval $(call BuildSNodeCModule,core-socket-stream,+snodec-core-socket,/usr/lib))
+$(eval $(call BuildSNodeCModule,core-socket-stream-legacy,+snodec-core-socket-stream,/usr/lib))
+$(eval $(call BuildSNodeCModule,core-socket-stream-tls,+snodec-core-socket-stream +libopenssl,/usr/lib))
+$(eval $(call BuildSNodeCModule,db-mariadb,+snodec-core +libmariadb,/usr/lib))
+$(eval $(call BuildSNodeCModule,net,+snodec-core-socket,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-in,+snodec-net,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-in-phy,+snodec-net-in,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-in-phy-stream,+snodec-net-in-phy,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-in-stream,+snodec-net-in-phy-stream,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-in-stream-legacy,+snodec-net-in-stream +snodec-core-socket-stream-legacy,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-in-stream-tls,+snodec-net-in-stream +snodec-core-socket-stream-tls,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-in6,+snodec-net,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-in6-phy,+snodec-net-in6,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-in6-phy-stream,+snodec-net-in6-phy,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-in6-stream,+snodec-net-in6-phy-stream,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-in6-stream-legacy,+snodec-net-in6-stream +snodec-core-socket-stream-legacy,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-in6-stream-tls,+snodec-net-in6-stream +snodec-core-socket-stream-tls,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-l2,+snodec-net +bluez-libs,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-l2-phy,+snodec-net-l2 +bluez-libs,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-l2-phy-stream,+snodec-net-l2-phy,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-l2-stream,+snodec-net-l2-phy-stream,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-l2-stream-legacy,+snodec-net-l2-stream +snodec-core-socket-stream-legacy,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-l2-stream-tls,+snodec-net-l2-stream +snodec-core-socket-stream-tls,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-rc,+snodec-net +bluez-libs,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-rc-phy,+snodec-net-rc +bluez-libs,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-rc-phy-stream,+snodec-net-rc-phy,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-rc-stream,+snodec-net-rc-phy-stream,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-rc-stream-legacy,+snodec-net-rc-stream +snodec-core-socket-stream-legacy,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-rc-stream-tls,+snodec-net-rc-stream +snodec-core-socket-stream-tls,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-un,+snodec-net,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-un-phy,+snodec-net-un,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-un-phy-stream,+snodec-net-un-phy,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-un-stream,+snodec-net-un-phy-stream,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-un-stream-legacy,+snodec-net-un-stream +snodec-core-socket-stream-legacy,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-un-stream-tls,+snodec-net-un-stream +snodec-core-socket-stream-tls,/usr/lib))
+$(eval $(call BuildSNodeCModule,net-un-dgram,+snodec-net-un-phy +snodec-net-un,/usr/lib))
+$(eval $(call BuildSNodeCModule,http,+snodec-core-socket-stream +libmagic,/usr/lib/snode.c/web/http))
+$(eval $(call BuildSNodeCModule,http-server,+snodec-http,/usr/lib/snode.c/web/http))
+$(eval $(call BuildSNodeCModule,http-client,+snodec-http,/usr/lib/snode.c/web/http))
+$(eval $(call BuildSNodeCModule,http-server-express,+snodec-http-server,/usr/lib/snode.c/web/http))
+$(eval $(call BuildSNodeCModule,http-server-express-legacy-in,+snodec-http-server-express +snodec-net-in-stream-legacy,/usr/lib/snode.c/web/http))
+$(eval $(call BuildSNodeCModule,http-server-express-legacy-in6,+snodec-http-server-express +snodec-net-in6-stream-legacy,/usr/lib/snode.c/web/http))
+$(eval $(call BuildSNodeCModule,http-server-express-legacy-rc,+snodec-http-server-express +snodec-net-rc-stream-legacy,/usr/lib/snode.c/web/http))
+$(eval $(call BuildSNodeCModule,http-server-express-legacy-un,+snodec-http-server-express +snodec-net-un-stream-legacy,/usr/lib/snode.c/web/http))
+$(eval $(call BuildSNodeCModule,http-server-express-tls-in,+snodec-http-server +snodec-http-server-express +snodec-net-in-stream-tls,/usr/lib/snode.c/web/http))
+$(eval $(call BuildSNodeCModule,http-server-express-tls-in6,+snodec-http-server +snodec-http-server-express +snodec-net-in6-stream-tls,/usr/lib/snode.c/web/http))
+$(eval $(call BuildSNodeCModule,http-server-express-tls-rc,+snodec-http-server +snodec-http-server-express +snodec-net-rc-stream-tls,/usr/lib/snode.c/web/http))
+$(eval $(call BuildSNodeCModule,http-server-express-tls-un,+snodec-http-server +snodec-http-server-express +snodec-net-un-stream-tls,/usr/lib/snode.c/web/http))
+$(eval $(call BuildSNodeCModule,websocket,+snodec-utils,/usr/lib/snode.c/web/http/upgrade))
+$(eval $(call BuildSNodeCModule,websocket-server,+snodec-websocket +snodec-http-server,/usr/lib/snode.c/web/http/upgrade))
+$(eval $(call BuildSNodeCModule,websocket-client,+snodec-websocket +snodec-http-client,/usr/lib/snode.c/web/http/upgrade))
+$(eval $(call BuildSNodeCModule,mqtt,+snodec-core-socket-stream,/usr/lib/snode.c/iot/mqtt))
+$(eval $(call BuildSNodeCModule,mqtt-server,+snodec-mqtt,/usr/lib/snode.c/iot/mqtt))
+$(eval $(call BuildSNodeCModule,mqtt-client,+snodec-mqtt,/usr/lib/snode.c/iot/mqtt))
+$(eval $(call BuildSNodeCModule,mqtt-server-websocket,+snodec-mqtt-server +snodec-websocket-server,/usr/lib/snode.c/iot/mqtt))
+$(eval $(call BuildSNodeCModule,mqtt-client-websocket,+snodec-mqtt-client +snodec-websocket-client,/usr/lib/snode.c/iot/mqtt))

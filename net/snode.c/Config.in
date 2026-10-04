@@ -1,7 +1,7 @@
 menu "SNode.C build defaults"
 
 	comment "Select individual modules in Network / SNode.C (including net-l2 and net-rc)"
-	comment "Dependencies select required lower layers; full selects every module"
+	comment "Dependencies select required lower layers; the snodec package selects all modules, apps and the control tool"
 
 	config SNODEC_GROUP_NAME
 		string "Group name of unix group used for config/log/pid file management"
@@ -20,7 +20,7 @@ menu "SNode.C build defaults"
 	endchoice
 
 	menu "Socket connection behavior"
-		depends on PACKAGE_snode.c-net
+		depends on PACKAGE_snodec-net
 
 		config SNODEC_READ_BLOCKSIZE
 			int "Read block size in bytes"
@@ -60,7 +60,7 @@ menu "SNode.C build defaults"
 	endmenu
 
 	menu "Server (stream) behavior"
-		depends on PACKAGE_snode.c-net
+		depends on PACKAGE_snodec-net
 
 		config SNODEC_BACKLOG
 			int "Listen backlog"
@@ -74,7 +74,7 @@ menu "SNode.C build defaults"
 	endmenu
 
 	menu "Socket (stream) behavior"
-		depends on PACKAGE_snode.c-net
+		depends on PACKAGE_snodec-net
 
 		config SNODEC_ACCEPT_TIMEOUT
 			int "Accept inactivity timeout in seconds"
@@ -132,7 +132,7 @@ menu "SNode.C build defaults"
 			default 0
 
 		menu "IPv4 Options"
-			depends on PACKAGE_snode.c-net-in
+			depends on PACKAGE_snodec-net-in
 
 			config SNODEC_INV4_REUSE_ADDRESS
 				bool "Reuse address"
@@ -143,7 +143,7 @@ menu "SNode.C build defaults"
 				default n
 
 			choice
-				depends on PACKAGE_snode.c-net-in-stream
+				depends on PACKAGE_snodec-net-in-stream
 				prompt "Disable Nagle algorithm for IPv4 sockets"
 				default SNODEC_INV4_DISABLE_NAGLE_ALGORITHM_DEFAULT
 				config SNODEC_INV4_DISABLE_NAGLE_ALGORITHM_TRUE
@@ -164,7 +164,7 @@ menu "SNode.C build defaults"
 		endmenu
 
 		menu "IPv6 Options"
-			depends on PACKAGE_snode.c-net-in6
+			depends on PACKAGE_snodec-net-in6
 
 			config SNODEC_IN6_REUSE_ADDRESS
 				bool "Reuse address"
@@ -175,7 +175,7 @@ menu "SNode.C build defaults"
 				default n
 
 			choice
-				depends on PACKAGE_snode.c-net-in6-stream
+				depends on PACKAGE_snodec-net-in6-stream
 				prompt "Disable Nagle algorithm for IPv6 sockets"
 				default SNODEC_INV6_DISABLE_NAGLE_ALGORITHM_DEFAULT
 				config SNODEC_INV6_DISABLE_NAGLE_ALGORITHM_TRUE
@@ -205,7 +205,7 @@ menu "SNode.C build defaults"
 	endmenu
 
 	menu "SSL/TLS behavior"
-		depends on PACKAGE_snode.c-core-socket-stream-tls
+		depends on PACKAGE_snodec-core-socket-stream-tls
 
 		config SNODEC_TLS_INIT_TIMEOUT
 			int "SSL/TLS initial handshake timeout in seconds"
@@ -219,7 +219,7 @@ menu "SNode.C build defaults"
 	endmenu
 
 	menu "HTTP client behavior"
-		depends on PACKAGE_snode.c-http-client
+		depends on PACKAGE_snodec-http-client
 
 		config SNODEC_HTTP_REQUEST_PIPELINED
 			bool "Pipelined requests"

@@ -43,14 +43,14 @@ The complete package tables are:
 [SNode.C package catalog](snodec-package-options.md) and
 [MQTTSuite package catalog](mqttsuite-package-options.md).
 
-`snode.c-full` selects all 63 shared runtime modules. The demonstration
-applications and `snodec-control` have separate packages. Static/internal
+`snodec` selects all 63 shared runtime modules, the demonstration
+applications (`snodec-apps`) and the control tool (`snodec-control`). Static/internal
 CMake targets have no separate runtime payload and therefore no empty module
 packages. Both RFCOMM (`net-rc`) and L2CAP (`net-l2`) have six separate layers:
 address/configuration, physical socket, physical stream, stream configuration,
 legacy stream and TLS stream. RFCOMM also has legacy/TLS Express packages.
 
-`mqttsuite-full` selects all five applications and both mapping plugins.
+`mqttsuite` selects all five applications and both mapping plugins.
 Each application has eight existing-style transport options, including the
 new MQTTStore menu. TLS depends on its base socket family; WSS depends on WS
 and an enabled TLS family. WS requires a socket family. If both IPv6 and Unix
@@ -82,10 +82,8 @@ cat > .config <<'EOF'
 # CONFIG_ALL_KMODS is not set
 # CONFIG_SIGNED_PACKAGES is not set
 # CONFIG_AUTOREMOVE is not set
-CONFIG_PACKAGE_snode.c-full=m
-CONFIG_PACKAGE_snode.c-apps=m
-CONFIG_PACKAGE_snode.c-control=m
-CONFIG_PACKAGE_mqttsuite-full=m
+CONFIG_PACKAGE_snodec=m
+CONFIG_PACKAGE_mqttsuite=m
 EOF
 make defconfig
 make -j16 package/local/mqttsuite/compile V=s
@@ -205,7 +203,7 @@ that the application's existing configuration system can override.
 | `SNODEC_HTTP_REQUEST_PIPELINED` | Pipelined requests | `y` |
 
 Read/write sizes, timeouts, retry/reconnect settings and write-queue limits
-configure `snode.c-net`. IPv4/IPv6 stream flags configure their stream layers;
+configure `snodec-net`. IPv4/IPv6 stream flags configure their stream layers;
 name-resolution flags configure their address layers. TLS defaults are shared
 by TLS endpoints. HTTP pipelining configures the HTTP client. The I/O choice
 controls the core's linked default multiplexer and its package dependency;

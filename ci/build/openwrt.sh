@@ -41,10 +41,8 @@ cat > .config <<'EOF'
 # CONFIG_ALL_KMODS is not set
 # CONFIG_AUTOREMOVE is not set
 CONFIG_SIGNED_PACKAGES=y
-CONFIG_PACKAGE_snode.c-full=m
-CONFIG_PACKAGE_snode.c-apps=m
-CONFIG_PACKAGE_snode.c-control=m
-CONFIG_PACKAGE_mqttsuite-full=m
+CONFIG_PACKAGE_snodec=m
+CONFIG_PACKAGE_mqttsuite=m
 EOF
 make defconfig
 if [ "$BUILD_PROJECT" = snode.c ]; then

@@ -35,16 +35,16 @@ define Package/mqttsuite/Default
   URL:=https://github.com/SNodeC/mqttsuite
 endef
 
-define Package/mqttsuite
+define Package/mqttsuite-common
   $(call Package/mqttsuite/Default)
   TITLE:=MQTTSuite configuration and application base
 endef
 
-define Package/mqttsuite/config
+define Package/mqttsuite-common/config
   source "$(SOURCE)/Config.in"
 endef
 
-define Package/mqttsuite/install
+define Package/mqttsuite-common/install
 	true
 endef
 
@@ -53,87 +53,87 @@ endef
 define Package/mqttsuite-broker
   $(call Package/mqttsuite/Default)
   TITLE:=MQTT broker
-  DEPENDS:=+mqttsuite \
-    +snode.c-mqtt-server \
-    +MQTTSUITE_BROKER_TCP_IPV4:snode.c-net-in-stream-legacy \
-    +MQTTSUITE_BROKER_TCP_IPV4:snode.c-http-server-express-legacy-in \
-    +MQTTSUITE_BROKER_TLS_IPV4:snode.c-net-in-stream-tls \
-    +MQTTSUITE_BROKER_TLS_IPV4:snode.c-http-server-express-tls-in \
-    +MQTTSUITE_BROKER_TCP_IPV6:snode.c-net-in6-stream-legacy \
-    +MQTTSUITE_BROKER_TCP_IPV6:snode.c-http-server-express-legacy-in6 \
-    +MQTTSUITE_BROKER_TLS_IPV6:snode.c-net-in6-stream-tls \
-    +MQTTSUITE_BROKER_TLS_IPV6:snode.c-http-server-express-tls-in6 \
-    +MQTTSUITE_BROKER_UNIX:snode.c-net-un-stream-legacy \
-    +MQTTSUITE_BROKER_UNIX:snode.c-http-server-express-legacy-un \
-    +MQTTSUITE_BROKER_UNIX_TLS:snode.c-net-un-stream-tls \
-    +MQTTSUITE_BROKER_UNIX_TLS:snode.c-http-server-express-tls-un \
-    +MQTTSUITE_BROKER_WS:snode.c-mqtt-server-websocket \
-    +MQTTSUITE_BROKER_WSS:snode.c-mqtt-server-websocket
+  DEPENDS:=+mqttsuite-common \
+    +snodec-mqtt-server \
+    +MQTTSUITE_BROKER_TCP_IPV4:snodec-net-in-stream-legacy \
+    +MQTTSUITE_BROKER_TCP_IPV4:snodec-http-server-express-legacy-in \
+    +MQTTSUITE_BROKER_TLS_IPV4:snodec-net-in-stream-tls \
+    +MQTTSUITE_BROKER_TLS_IPV4:snodec-http-server-express-tls-in \
+    +MQTTSUITE_BROKER_TCP_IPV6:snodec-net-in6-stream-legacy \
+    +MQTTSUITE_BROKER_TCP_IPV6:snodec-http-server-express-legacy-in6 \
+    +MQTTSUITE_BROKER_TLS_IPV6:snodec-net-in6-stream-tls \
+    +MQTTSUITE_BROKER_TLS_IPV6:snodec-http-server-express-tls-in6 \
+    +MQTTSUITE_BROKER_UNIX:snodec-net-un-stream-legacy \
+    +MQTTSUITE_BROKER_UNIX:snodec-http-server-express-legacy-un \
+    +MQTTSUITE_BROKER_UNIX_TLS:snodec-net-un-stream-tls \
+    +MQTTSUITE_BROKER_UNIX_TLS:snodec-http-server-express-tls-un \
+    +MQTTSUITE_BROKER_WS:snodec-mqtt-server-websocket \
+    +MQTTSUITE_BROKER_WSS:snodec-mqtt-server-websocket
 endef
 
 define Package/mqttsuite-integrator
   $(call Package/mqttsuite/Default)
   TITLE:=MQTT integrator
-  DEPENDS:=+mqttsuite \
-    +snode.c-mqtt-client \
-    +snode.c-http-server-express-legacy-in \
-    +snode.c-http-server-express-tls-in \
-    +MQTTSUITE_INTEGRATOR_TCP_IPV4:snode.c-net-in-stream-legacy \
-    +MQTTSUITE_INTEGRATOR_TLS_IPV4:snode.c-net-in-stream-tls \
-    +MQTTSUITE_INTEGRATOR_TCP_IPV6:snode.c-net-in6-stream-legacy \
-    +MQTTSUITE_INTEGRATOR_TLS_IPV6:snode.c-net-in6-stream-tls \
-    +MQTTSUITE_INTEGRATOR_UNIX:snode.c-net-un-stream-legacy \
-    +MQTTSUITE_INTEGRATOR_UNIX_TLS:snode.c-net-un-stream-tls \
-    +MQTTSUITE_INTEGRATOR_WS:snode.c-mqtt-client-websocket \
-    +MQTTSUITE_INTEGRATOR_WSS:snode.c-mqtt-client-websocket
+  DEPENDS:=+mqttsuite-common \
+    +snodec-mqtt-client \
+    +snodec-http-server-express-legacy-in \
+    +snodec-http-server-express-tls-in \
+    +MQTTSUITE_INTEGRATOR_TCP_IPV4:snodec-net-in-stream-legacy \
+    +MQTTSUITE_INTEGRATOR_TLS_IPV4:snodec-net-in-stream-tls \
+    +MQTTSUITE_INTEGRATOR_TCP_IPV6:snodec-net-in6-stream-legacy \
+    +MQTTSUITE_INTEGRATOR_TLS_IPV6:snodec-net-in6-stream-tls \
+    +MQTTSUITE_INTEGRATOR_UNIX:snodec-net-un-stream-legacy \
+    +MQTTSUITE_INTEGRATOR_UNIX_TLS:snodec-net-un-stream-tls \
+    +MQTTSUITE_INTEGRATOR_WS:snodec-mqtt-client-websocket \
+    +MQTTSUITE_INTEGRATOR_WSS:snodec-mqtt-client-websocket
 endef
 
 define Package/mqttsuite-bridge
   $(call Package/mqttsuite/Default)
   TITLE:=MQTT bridge
-  DEPENDS:=+mqttsuite \
-    +snode.c-mqtt-client \
-    +snode.c-http-server-express-legacy-in \
-    +snode.c-http-server-express-tls-in \
-    +MQTTSUITE_BRIDGE_TCP_IPV4:snode.c-net-in-stream-legacy \
-    +MQTTSUITE_BRIDGE_TLS_IPV4:snode.c-net-in-stream-tls \
-    +MQTTSUITE_BRIDGE_TCP_IPV6:snode.c-net-in6-stream-legacy \
-    +MQTTSUITE_BRIDGE_TLS_IPV6:snode.c-net-in6-stream-tls \
-    +MQTTSUITE_BRIDGE_UNIX:snode.c-net-un-stream-legacy \
-    +MQTTSUITE_BRIDGE_UNIX_TLS:snode.c-net-un-stream-tls \
-    +MQTTSUITE_BRIDGE_WS:snode.c-mqtt-client-websocket \
-    +MQTTSUITE_BRIDGE_WSS:snode.c-mqtt-client-websocket
+  DEPENDS:=+mqttsuite-common \
+    +snodec-mqtt-client \
+    +snodec-http-server-express-legacy-in \
+    +snodec-http-server-express-tls-in \
+    +MQTTSUITE_BRIDGE_TCP_IPV4:snodec-net-in-stream-legacy \
+    +MQTTSUITE_BRIDGE_TLS_IPV4:snodec-net-in-stream-tls \
+    +MQTTSUITE_BRIDGE_TCP_IPV6:snodec-net-in6-stream-legacy \
+    +MQTTSUITE_BRIDGE_TLS_IPV6:snodec-net-in6-stream-tls \
+    +MQTTSUITE_BRIDGE_UNIX:snodec-net-un-stream-legacy \
+    +MQTTSUITE_BRIDGE_UNIX_TLS:snodec-net-un-stream-tls \
+    +MQTTSUITE_BRIDGE_WS:snodec-mqtt-client-websocket \
+    +MQTTSUITE_BRIDGE_WSS:snodec-mqtt-client-websocket
 endef
 
 define Package/mqttsuite-cli
   $(call Package/mqttsuite/Default)
   TITLE:=MQTT cli
-  DEPENDS:=+mqttsuite \
-    +snode.c-mqtt-client \
-    +MQTTSUITE_CLI_TCP_IPV4:snode.c-net-in-stream-legacy \
-    +MQTTSUITE_CLI_TLS_IPV4:snode.c-net-in-stream-tls \
-    +MQTTSUITE_CLI_TCP_IPV6:snode.c-net-in6-stream-legacy \
-    +MQTTSUITE_CLI_TLS_IPV6:snode.c-net-in6-stream-tls \
-    +MQTTSUITE_CLI_UNIX:snode.c-net-un-stream-legacy \
-    +MQTTSUITE_CLI_UNIX_TLS:snode.c-net-un-stream-tls \
-    +MQTTSUITE_CLI_WS:snode.c-mqtt-client-websocket \
-    +MQTTSUITE_CLI_WSS:snode.c-mqtt-client-websocket
+  DEPENDS:=+mqttsuite-common \
+    +snodec-mqtt-client \
+    +MQTTSUITE_CLI_TCP_IPV4:snodec-net-in-stream-legacy \
+    +MQTTSUITE_CLI_TLS_IPV4:snodec-net-in-stream-tls \
+    +MQTTSUITE_CLI_TCP_IPV6:snodec-net-in6-stream-legacy \
+    +MQTTSUITE_CLI_TLS_IPV6:snodec-net-in6-stream-tls \
+    +MQTTSUITE_CLI_UNIX:snodec-net-un-stream-legacy \
+    +MQTTSUITE_CLI_UNIX_TLS:snodec-net-un-stream-tls \
+    +MQTTSUITE_CLI_WS:snodec-mqtt-client-websocket \
+    +MQTTSUITE_CLI_WSS:snodec-mqtt-client-websocket
 endef
 
 define Package/mqttsuite-store
   $(call Package/mqttsuite/Default)
   TITLE:=MQTT store
-  DEPENDS:=+mqttsuite \
-    +snode.c-mqtt-client \
-    +snode.c-db-mariadb \
-    +MQTTSUITE_STORE_TCP_IPV4:snode.c-net-in-stream-legacy \
-    +MQTTSUITE_STORE_TLS_IPV4:snode.c-net-in-stream-tls \
-    +MQTTSUITE_STORE_TCP_IPV6:snode.c-net-in6-stream-legacy \
-    +MQTTSUITE_STORE_TLS_IPV6:snode.c-net-in6-stream-tls \
-    +MQTTSUITE_STORE_UNIX:snode.c-net-un-stream-legacy \
-    +MQTTSUITE_STORE_UNIX_TLS:snode.c-net-un-stream-tls \
-    +MQTTSUITE_STORE_WS:snode.c-mqtt-client-websocket \
-    +MQTTSUITE_STORE_WSS:snode.c-mqtt-client-websocket
+  DEPENDS:=+mqttsuite-common \
+    +snodec-mqtt-client \
+    +snodec-db-mariadb \
+    +MQTTSUITE_STORE_TCP_IPV4:snodec-net-in-stream-legacy \
+    +MQTTSUITE_STORE_TLS_IPV4:snodec-net-in-stream-tls \
+    +MQTTSUITE_STORE_TCP_IPV6:snodec-net-in6-stream-legacy \
+    +MQTTSUITE_STORE_TLS_IPV6:snodec-net-in6-stream-tls \
+    +MQTTSUITE_STORE_UNIX:snodec-net-un-stream-legacy \
+    +MQTTSUITE_STORE_UNIX_TLS:snodec-net-un-stream-tls \
+    +MQTTSUITE_STORE_WS:snodec-mqtt-client-websocket \
+    +MQTTSUITE_STORE_WSS:snodec-mqtt-client-websocket
 endef
 
 # Install a plugin only when its transport is compiled. Keep ABI symlinks;
@@ -175,7 +175,7 @@ define MQTTSuiteMappingPlugin
   define Package/mqttsuite-mapping-$(1)
     $$(call Package/mqttsuite/Default)
     TITLE:=MQTT mapping plugin: $(1)
-    DEPENDS:=+mqttsuite +libstdcpp
+    DEPENDS:=+mqttsuite-common +libstdcpp
   endef
   define Package/mqttsuite-mapping-$(1)/install
 	$$(INSTALL_DIR) $$(1)/usr/lib
@@ -185,18 +185,18 @@ define MQTTSuiteMappingPlugin
   $$(eval $$(call BuildPackage,mqttsuite-mapping-$(1)))
 endef
 
-define Package/mqttsuite-full
+define Package/mqttsuite
   $(call Package/mqttsuite/Default)
   TITLE:=All MQTTSuite applications and mapping plugins
   DEPENDS:=$(foreach app,$(MQTTSUITE_APPS),+mqttsuite-$(app)) +mqttsuite-mapping-double +mqttsuite-mapping-storage
 endef
 
-define Package/mqttsuite-full/install
+define Package/mqttsuite/install
 	true
 endef
 
-$(eval $(call BuildPackage,mqttsuite))
+$(eval $(call BuildPackage,mqttsuite-common))
 $(foreach app,$(MQTTSUITE_APPS),$(eval $(call BuildPackage,mqttsuite-$(app))))
 $(eval $(call MQTTSuiteMappingPlugin,double))
 $(eval $(call MQTTSuiteMappingPlugin,storage))
-$(eval $(call BuildPackage,mqttsuite-full))
+$(eval $(call BuildPackage,mqttsuite))

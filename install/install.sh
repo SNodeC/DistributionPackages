@@ -111,6 +111,6 @@ esac
 case "$manager" in
     apt) apt-get install -y snodec mqttsuite ;;
     dnf) dnf install -y snodec mqttsuite ;;
-    opkg) opkg install mqttsuite-full snode.c-full snode.c-apps snode.c-control ;;
-    apk) apk add mqttsuite-full snode.c-full snode.c-apps snode.c-control ;;
+    opkg) opkg install snodec mqttsuite ;;
+    apk) apk add snodec mqttsuite ;;
 esac
