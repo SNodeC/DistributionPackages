@@ -6,7 +6,7 @@
 
 The `snodec` and `mqttsuite` metapackages install their respective complete
 component sets. Selective application installs pull required framework modules
-automatically. OpenWrt uses different names; see the [name map](../README.md#packages).
+automatically. See [common packages](../README.md#packages) for names shared across distributions.
 
 ### SNode.C
 
