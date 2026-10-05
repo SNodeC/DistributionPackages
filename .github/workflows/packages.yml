@@ -8,7 +8,7 @@ on:
         type: string
 permissions:
   contents: read
-  actions: write
+  actions: read
 env:
   PYTHONPATH: ${{ github.workspace }}/feed
 jobs:
@@ -45,6 +45,7 @@ jobs:
           path: feed
           persist-credentials: false
       - uses: actions/create-github-app-token@v2
+        if: github.run_attempt == 1
         id: allocator
         with:
           app-id: ${{ vars.PACKAGES_APP_ID }}
@@ -53,6 +54,7 @@ jobs:
           repositories: Packages
           permission-contents: write
       - uses: actions/checkout@v6
+        if: github.run_attempt == 1
         with:
           repository: SNodeC/Packages
           ref: main
@@ -61,8 +63,6 @@ jobs:
           sparse-checkout: |
             **/build.json
             /status.json
-            /status/
-            /docs/status.md
           sparse-checkout-cone-mode: false
       - name: Reserve independent project revisions
         if: github.run_attempt == 1
@@ -93,18 +93,6 @@ jobs:
           name: source-pair
           path: bundle/
           if-no-files-found: error
-      - name: Publish pending status before starting builds
-        run: |
-          if [ "$GITHUB_RUN_ATTEMPT" != 1 ]; then
-            mkdir feed
-            tar -xzf bundle/feed.tar.gz -C feed
-          else
-            git -C published fetch origin main
-            git -C published reset --hard FETCH_HEAD
-          fi
-          previous=$(git -C published rev-parse HEAD)
-          python3 -m ci.publish.publication start published bundle
-          bash feed/ci/publish/push.sh published "$previous" "Initialize package status"
       - name: Read the captured matrix and revisions
         id: matrix
         run: |
