@@ -73,7 +73,7 @@ jobs:
         run: |
           previous=$(git -C published rev-parse HEAD)
           python3 -m ci.publish.publication reserve published
-          bash feed/ci/publish/push.sh published "$previous" "Reserve package revisions"
+          bash feed/ci/publish/push.sh published "$previous" "Reserve package revisions" python3 -m ci.publish.publication reserve published
       - name: Reuse original capture (if missing, start a new run)
         if: github.run_attempt > 1
         uses: actions/download-artifact@v8
@@ -102,13 +102,45 @@ jobs:
           echo "value=$(jq -c '{include: .}' bundle/targets.json)" >> "$GITHUB_OUTPUT"
   pending:
     needs: prepare
-    uses: ./.github/workflows/package-write.yml
-    with:
-      operation: start
-    secrets: inherit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      STATUS_OPERATION: status
+      FINAL_STATUS: pending
+    steps: &status_steps
+      - uses: actions/download-artifact@v8
+        with:
+          name: source-pair
+          path: bundle
+      - name: Unpack captured status tools
+        run: |
+          mkdir feed
+          tar -xzf bundle/feed.tar.gz -C feed
+      - uses: actions/create-github-app-token@v3
+        id: status
+        continue-on-error: true
+        timeout-minutes: 1
+        with:
+          app-id: ${{ vars.PACKAGES_APP_ID }}
+          private-key: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
+          owner: SNodeC
+          repositories: Packages
+          permission-contents: write
+      - name: Publish status event
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          PACKAGES_TOKEN: ${{ steps.status.outputs.token }}
+        run: |
+          if [ "$STATUS_OPERATION" = finalize ]; then
+            bash feed/ci/publish/status.sh published finalize bundle "$FINAL_STATUS"
+          else
+            bash feed/ci/publish/status.sh published status bundle - - pending
+          fi
   target:
     name: ${{ matrix.distribution }} · ${{ matrix.suite }} · ${{ matrix.arch }}
     needs: [prepare, pending]
+    if: ${{ !cancelled() && needs.prepare.result == 'success' }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
@@ -118,3 +150,12 @@ jobs:
       revisions: ${{ needs.prepare.outputs.revisions }}
       release_project: ${{ inputs.release_project }}
     secrets: inherit
+  finalize:
+    needs: target
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      STATUS_OPERATION: finalize
+      FINAL_STATUS: ${{ needs.target.result == 'cancelled' && 'cancelled' || 'failed' }}
+    steps: *status_steps

@@ -60,9 +60,10 @@ The captured source bundle freezes the selected tags, resolved commits and
 matrix for a run. Tag changes during a build reject a superseded publication.
 Publication checks also prevent a build from replacing a newer counterpart.
 
-There are 19 build slots per run. Publications use one serialized writer because
-APT architectures share suite metadata and all targets share status and retention
-records. A successful build publishes as soon as its writer acquires that lock.
+There are 19 build slots per run. Feed publications use one serialized writer
+because APT architectures share suite metadata. Status events run independently
+in their originating jobs and use Git leases. A publisher merges intervening
+status-only commits and aborts if any other remote files changed.
 
 A failed build leaves the previous feed intact. Packages/main is a generated
 snapshot: the writer uses a parentless commit and force-with-lease. Source history
@@ -126,6 +127,20 @@ provide provenance; package and index signatures establish signing authenticity.
 and badges from [the status template](https://github.com/SNodeC/DistributionPackages/blob/main/ci/templates/package-status.md). Status describes the
 latest attempted build; the version describes the available package. The publication
 date belongs to the feed and can change when either project publishes.
+
+Preparation initializes pending entries before builds become eligible. A build
+reports running after acquiring its build slot, and publishing, failed or cancelled
+at its end. The publisher commits its terminal event with the package snapshot.
+A finalization job closes non-terminal entries after the target matrix finishes.
+Newer revisions/attempts win; within one attempt states move forward and terminal
+states cannot be overwritten. Failed SNode.C builds mark their dependent MQTTSuite
+build skipped. Status delivery is best-effort and cannot prevent builds from running.
+
+Badges are immutable images under `status/badges/`; the generated table changes
+which image it references. This avoids stale per-target image contents, but GitHub
+may still cache the Markdown page. GitHub scheduling and network failures can delay
+updates; force-cancellation or runner loss can prevent final steps from executing.
+No polling workflow is used.
 
 Guides and package catalogs are handwritten. Keep their architecture tables in
 agreement with the target files. Native component names follow upstream CPack;

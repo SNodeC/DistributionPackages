@@ -20,16 +20,7 @@ permissions:
 env:
   PYTHONPATH: ${{ github.workspace }}/feed
 jobs:
-  running:
-    uses: ./.github/workflows/package-write.yml
-    with:
-      operation: status
-      target: ${{ inputs.target }}
-      project: ${{ inputs.project }}
-      result: running
-    secrets: inherit
   build:
-    needs: running
     name: Build and test ${{ inputs.project }} · ${{ fromJSON(inputs.target).id }}
     runs-on: ${{ fromJSON(inputs.target).runner }}
     timeout-minutes: 360
@@ -48,15 +39,35 @@ jobs:
         with:
           name: source-pair
           path: bundle
+      - name: Unpack captured packaging tools
+        run: |
+          mkdir feed status-bundle
+          tar -xzf bundle/feed.tar.gz -C feed
+          cp bundle/*.json status-bundle/
+      - uses: actions/create-github-app-token@v3
+        id: running_status
+        continue-on-error: true
+        timeout-minutes: 1
+        with:
+          app-id: ${{ vars.PACKAGES_APP_ID }}
+          private-key: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
+          owner: SNodeC
+          repositories: Packages
+          permission-contents: write
+      - name: Report build started
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          PACKAGES_TOKEN: ${{ steps.running_status.outputs.token }}
+          TARGET: ${{ inputs.target }}
+        run: bash feed/ci/publish/status.sh published status status-bundle "$TARGET" "$BUILD_PROJECT" running
       - uses: actions/download-artifact@v8
         if: inputs.project == 'mqttsuite' && inputs.release_project == 'snode.c'
         with:
           name: packages-snode.c-${{ fromJSON(inputs.target).id }}
           path: published-snodec
-      - name: Unpack captured packaging tools
+      - name: Select captured dependencies
         run: |
-          mkdir feed
-          tar -xzf bundle/feed.tar.gz -C feed
           python3 -m ci.repository select bundle "$TARGET_ID" "$BUILD_PROJECT" published-snodec
           python3 -m ci.repository reuse bundle "$TARGET_ID" dependencies
       - uses: docker/setup-qemu-action@v4
@@ -109,13 +120,32 @@ jobs:
             sdk/logs/
             sdk/.config
             sdk/ci-sdk.json
+      - uses: actions/create-github-app-token@v3
+        if: ${{ always() }}
+        id: ended_status
+        continue-on-error: true
+        timeout-minutes: 1
+        with:
+          app-id: ${{ vars.PACKAGES_APP_ID }}
+          private-key: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
+          owner: SNodeC
+          repositories: Packages
+          permission-contents: write
+      - name: Report build ended
+        if: ${{ always() }}
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          PACKAGES_TOKEN: ${{ steps.ended_status.outputs.token }}
+          TARGET: ${{ inputs.target }}
+          BUILD_STATUS: ${{ job.status == 'success' && 'publishing' || job.status == 'cancelled' && 'cancelled' || 'failed' }}
+        run: bash feed/ci/publish/status.sh published status status-bundle "$TARGET" "$BUILD_PROJECT" "$BUILD_STATUS"
   finish:
     name: Publish ${{ inputs.project }} · ${{ fromJSON(inputs.target).id }}
     if: ${{ !cancelled() }}
-    needs: [running, build]
+    needs: build
     uses: ./.github/workflows/package-write.yml
     with:
-      operation: finish
       project: ${{ inputs.project }}
       target: ${{ inputs.target }}
       result: ${{ needs.build.result }}

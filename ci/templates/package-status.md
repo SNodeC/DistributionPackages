@@ -11,14 +11,16 @@ does not replace an available version. A dash means no version is recorded.
 <details>
 <summary>Status legend and links</summary>
 
-- **Pending:** waiting to build or publish.
+- **Pending:** waiting for a build slot.
 - **Running:** building and testing.
-- **Publishing:** updating the package source.
+- **Publishing:** build and tests succeeded; waiting for or performing package publication.
 - **Published:** the packages have been pushed.
 - **Failed**, **cancelled**, **skipped**, **superseded:** the attempt did not publish.
 - **Not built:** neither a build result nor a published version is recorded.
 
-Badges are snapshots refreshed during publication, not live monitors.
+Jobs report build start, build end and publication directly. Each state has an
+immutable badge image; the table selects the current state. GitHub may cache the
+page, so refresh it to see newly committed transitions.
 **Published** shows the feed's latest publication date in UTC; click the date
 for the full timestamp and source record. Either project's publication can update
 that date. **Packages** opens the shared package directory; package managers use
