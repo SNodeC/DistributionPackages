@@ -13,12 +13,12 @@ does not replace an available version. A dash means no version is recorded.
 
 - **Pending:** waiting to build or publish.
 - **Running:** building and testing.
-- **Publishing:** updating the package source.
 - **Published:** the packages have been pushed.
 - **Failed**, **cancelled**, **skipped**, **superseded:** the attempt did not publish.
 - **Not built:** neither a build result nor a published version is recorded.
 
-Badges are snapshots refreshed during publication, not live monitors.
+Badges update at preparation, build-start notifications, publication and workflow completion.
+GitHub scheduling and image caching can delay their display.
 **Published** shows the feed's latest publication date in UTC; click the date
 for the full timestamp and source record. Either project's publication can update
 that date. **Packages** opens the shared package directory; package managers use

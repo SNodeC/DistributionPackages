@@ -4,7 +4,7 @@ on:
     types: [release-tag-changed]
 permissions:
   contents: read
-  actions: read
+  actions: write
 jobs:
   packages:
     if: >-

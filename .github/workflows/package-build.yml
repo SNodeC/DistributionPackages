@@ -16,7 +16,7 @@ on:
         type: string
 permissions:
   contents: read
-  actions: read
+  actions: write
 env:
   PYTHONPATH: ${{ github.workspace }}/feed
 jobs:
@@ -30,11 +30,16 @@ jobs:
       queue: max
     permissions:
       contents: read
+      actions: write
     env:
       PACKAGE_RELEASE: ${{ fromJSON(inputs.revisions)[inputs.project] }}
       BUILD_PROJECT: ${{ inputs.project }}
       TARGET_ID: ${{ fromJSON(inputs.target).id }}
     steps:
+      - name: Refresh public build status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run package-status.yml --repo "$GITHUB_REPOSITORY" --ref main -f run_id="$GITHUB_RUN_ID" -f attempt="$GITHUB_RUN_ATTEMPT"
       - uses: actions/download-artifact@v8
         with:
           name: source-pair

@@ -1,4 +1,5 @@
 """Check packaging boundaries without building applications or contacting GitHub."""
+import copy
 import json
 import os
 from pathlib import Path
@@ -12,6 +13,28 @@ from ci.publish import publication
 
 
 class PackagingTest(unittest.TestCase):
+    def capture(self, directory, project='snode.c'):
+        root, bundle = Path(directory) / 'published', Path(directory) / 'bundle'
+        root.mkdir()
+        row = publication.targets()[0]
+        revisions = publication.reserve(root, project, '100')
+        context = dict(run_id='100', run_url='https://example.invalid/run/100',
+                       destination='SNodeC/Packages', release_project=project)
+        for name, value in dict(context=context, targets=[row], revisions=revisions,
+                                sources={}, profiles={}).items():
+            publication.write(bundle / f'{name}.json', value)
+        return root, bundle, row
+
+    def operation(self, *args, attempt=1, details=None, jobs=()):
+        details = details or dict(run_attempt=attempt, status='in_progress', conclusion=None)
+        with patch('sys.argv', ['publication', *map(str, args)]), patch.dict(os.environ, {
+                'GITHUB_RUN_ATTEMPT': str(attempt), 'GITHUB_REPOSITORY': 'SNodeC/DistributionPackages'}), \
+                patch.object(publication, 'run', side_effect=[json.dumps(details), '\n'.join(map(json.dumps, jobs))]):
+            try:
+                publication.main()
+            except SystemExit as result:
+                self.assertEqual(result.code, 0)
+
     def test_complete_matrix_and_dependency_files(self):
         rows = publication.targets()
         self.assertEqual(len(rows), 76)
@@ -33,8 +56,9 @@ class PackagingTest(unittest.TestCase):
 
     def test_public_documentation_and_installer_are_published(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            publication.render(root, {'targets': {}})
+            root, bundle, row = self.capture(directory)
+            self.operation('start', root, bundle)
+            self.operation('finish', root, bundle, json.dumps(row), 'failure', 'unused', 'snode.c')
             for source in [repository.ROOT / 'README.md',
                            *(repository.ROOT / 'docs').rglob('*.md'),
                            repository.ROOT / 'install/install.sh']:
@@ -128,6 +152,99 @@ class PackagingTest(unittest.TestCase):
         publication.update(state, row, old, 'snode.c', 'failed', 3)
         item = state['targets'][row['id'] + '/snode.c']
         self.assertEqual((item['revision'], item['status'], item['run_id']), ('124', 'published', 'new'))
+
+    def test_status_initialization_refresh_and_retry_preserve_public_output(self):
+        for project in ('snode.c', 'mqttsuite'):
+            with self.subTest(project=project), tempfile.TemporaryDirectory() as directory:
+                root, bundle, row = self.capture(directory, project)
+                (root / 'README.md').write_text('Keep the public landing page')
+                self.operation('start', root, bundle)
+                state = publication.read(root / 'status.json')
+                selected = ('snode.c', 'mqttsuite') if project == 'snode.c' else ('mqttsuite',)
+                self.assertEqual(set(state['targets']), {f"{row['id']}/{p}" for p in selected})
+                self.assertEqual({item['status'] for item in state['targets'].values()}, {'pending'})
+                # A status refresh must preserve installed versions and authored docs.
+                manifest = root / publication.feed_paths(row)[0] / 'build.json'
+                publication.write(manifest, {'versions': {'mqttsuite': '1.0.2-r9'}})
+                original_manifest = manifest.read_bytes()
+                jobs = [dict(name=f"Build and test {project} · {row['id']}", status='in_progress',
+                             conclusion=None, html_url='https://example.invalid/job', run_attempt=1)]
+                self.operation('refresh', root, '100', '1', jobs=jobs)
+                self.assertIn('>running</text>', (root / 'status' / f"{row['id']}-{project}.svg").read_text())
+                self.assertIn('`1.0.2-r9`', (root / 'docs/status.md').read_text())
+                self.assertEqual(manifest.read_bytes(), original_manifest)
+                self.assertEqual((root / 'README.md').read_text(), 'Keep the public landing page')
+                # Retry only the selected project and any dependent application.
+                state = publication.read(root / 'status.json')
+                for item in state['targets'].values():
+                    item['status'] = 'published'
+                publication.write(root / 'status.json', state)
+                self.operation('finish', root, bundle, json.dumps(row), 'skipped', 'unused', project, attempt=2)
+                result = publication.read(root / 'status.json')['targets']
+                self.assertEqual(result[f"{row['id']}/{project}"]['status'], 'skipped')
+                for other in set(selected) - {project}:
+                    self.assertEqual(result[f"{row['id']}/{other}"]['status'], 'skipped')
+
+    def test_status_lifecycle_from_job_results_and_committed_publications(self):
+        row = publication.targets()[0]
+        generation = dict(run_id='100', run_url='run', revisions={'snode.c': '1', 'mqttsuite': '1'},
+                          targets=[row], context={'release_project': 'snode.c'})
+        cases = [
+            ('in_progress', None, 'queued', None, 'in_progress', None, 'running', 'pending'),
+            ('completed', 'failure', 'queued', None, 'in_progress', None, 'failed', 'skipped'),
+            ('completed', 'success', 'queued', None, 'in_progress', None, 'pending', 'pending'),
+            ('completed', 'success', 'completed', 'failure', 'completed', 'failure', 'failed', 'skipped'),
+            ('completed', 'cancelled', 'completed', 'skipped', 'completed', 'cancelled', 'cancelled', 'cancelled'),
+            ('completed', 'timed_out', 'queued', None, 'completed', 'failure', 'failed', 'skipped'),
+            # Success of a job is not evidence of a committed package snapshot.
+            ('completed', 'success', 'completed', 'success', 'completed', 'success', 'failed', 'skipped'),
+        ]
+        for bs, bc, ps, pc, rs, rc, sn, mq in cases:
+            with self.subTest(build=bc, publisher=pc, run=rs):
+                state = {'runs': {'100': generation}, 'targets': {}}
+                for project in generation['revisions']:
+                    publication.update(state, row, generation, project, 'pending', 1)
+                jobs = [dict(name=f'{prefix} snode.c · {row["id"]}', status=status, conclusion=conclusion)
+                        for prefix, status, conclusion in [('Build and test', bs, bc), ('Publish', ps, pc)]]
+                with patch.dict(os.environ, {'GITHUB_REPOSITORY': 'SNodeC/DistributionPackages'}), \
+                        patch.object(publication, 'run', side_effect=[json.dumps(dict(run_attempt=1, status=rs, conclusion=rc)),
+                                                                      '\n'.join(map(json.dumps, jobs))]):
+                    publication.reconcile(state, '100', 1)
+                self.assertEqual([state['targets'][f"{row['id']}/{p}"]['status'] for p in generation['revisions']], [sn, mq])
+
+        state = {'runs': {'100': generation}, 'targets': {}}
+        for project in generation['revisions']:
+            publication.update(state, row, generation, project, 'published', 1)
+        original = copy.deepcopy(state)
+        jobs = [dict(name=f'Build and test mqttsuite · {row["id"]}', status='in_progress', run_attempt=2),
+                dict(name=f'Build and test snode.c · {row["id"]}', status='completed', conclusion='success', run_attempt=1)]
+        with patch.dict(os.environ, {'GITHUB_REPOSITORY': 'SNodeC/DistributionPackages'}), \
+                patch.object(publication, 'run', side_effect=[json.dumps(dict(run_attempt=2, status='in_progress')),
+                                                              '\n'.join(map(json.dumps, jobs))]):
+            publication.reconcile(state, '100', 2)
+        self.assertEqual(state['targets'][f"{row['id']}/snode.c"], original['targets'][f"{row['id']}/snode.c"])
+        self.assertEqual(state['targets'][f"{row['id']}/mqttsuite"]['status'], 'running')
+        # Cancellation keeps already committed packages; it ends unfinished work.
+        with patch.dict(os.environ, {'GITHUB_REPOSITORY': 'SNodeC/DistributionPackages'}), \
+                patch.object(publication, 'run', side_effect=[json.dumps(dict(run_attempt=2, status='completed', conclusion='cancelled')), '']):
+            publication.reconcile(state, '100', 2)
+        self.assertEqual(state['targets'][f"{row['id']}/snode.c"]['status'], 'published')
+        self.assertEqual(state['targets'][f"{row['id']}/mqttsuite"]['status'], 'cancelled')
+        # Retrying SNode.C also schedules its dependent MQTTSuite, before its job appears.
+        jobs = [dict(name=f'Build and test snode.c · {row["id"]}', status='in_progress', run_attempt=3)]
+        with patch.dict(os.environ, {'GITHUB_REPOSITORY': 'SNodeC/DistributionPackages'}), \
+                patch.object(publication, 'run', side_effect=[json.dumps(dict(run_attempt=3, status='in_progress')),
+                                                              '\n'.join(map(json.dumps, jobs))]):
+            publication.reconcile(state, '100', 3)
+        self.assertEqual(state['targets'][f"{row['id']}/snode.c"]['status'], 'running')
+        self.assertEqual(state['targets'][f"{row['id']}/mqttsuite"]['status'], 'pending')
+        newer = generation | dict(run_id='101', revisions={'mqttsuite': '2'})
+        publication.update(state, row, newer, 'mqttsuite', 'pending', 1)
+        snapshot = copy.deepcopy(state)
+        with patch.dict(os.environ, {'GITHUB_REPOSITORY': 'SNodeC/DistributionPackages'}), \
+                patch.object(publication, 'run', side_effect=[json.dumps(dict(run_attempt=3, status='in_progress')), '']):
+            publication.reconcile(state, '100', 3)
+        self.assertEqual(state, snapshot)
 
     def test_snapshot_writer_preserves_other_feeds_and_rejects_stale_writer(self):
         def git(*args, cwd):
