@@ -184,7 +184,7 @@ def reuse(bundle, target, destination):
     info = json.loads((bundle / 'baseline.json').read_text())
     built = json.loads((bundle / 'context.json').read_text())['build_project']
     project = next(repo for repo in REPOSITORIES if repo != built)
-    if project == 'snode.c' and row['family'] == 'openwrt' and len([n for n in info.get('files', {}) if n.startswith('snode.c-sdk-') and n.endswith('.tar.zst')]) != 1:
+    if project == 'snode.c' and row['family'] == 'openwrt' and len([n for n in info.get('files', {}) if n.startswith('snodec-openwrt-build-deps-') and n.endswith('.tar.zst')]) != 1:
         raise RuntimeError(f'{target}: published SNode.C development files are missing; publish a SNode.C release first')
     destination.mkdir(parents=True, exist_ok=True)
     for name, checksum in info.get('files', {}).items():
@@ -238,7 +238,7 @@ def stage(sdk, bundle, output):
     destination = output / 'openwrt' / info['series'] / info['arch']
     destination.mkdir(parents=True)
     indexes = ['Packages', 'Packages.gz', 'Packages.sig'] if extension == '.ipk' else ['packages.adb']
-    development = list(sdk.glob('snode.c-sdk-*.tar.zst'))
+    development = list(sdk.glob('snodec-openwrt-build-deps-*.tar.zst'))
     if len(development) != 1:
         raise RuntimeError('Expected one SNode.C development archive')
     for path in packages + [feed / name for name in indexes] + development:
@@ -264,7 +264,7 @@ def sdk_dependency(sdk, bundle, dependencies):
     if json.loads((bundle / 'context.json').read_text())['build_project'] == 'mqttsuite':
         if any(baseline[key] != info[key] for key in ('release', 'target', 'arch', 'sha256')):
             raise RuntimeError('Published SNode.C requires a different OpenWrt SDK; publish a SNode.C release first')
-        name, = (n for n in baseline['files'] if n.startswith('snode.c-sdk-') and n.endswith('.tar.zst'))
+        name, = (n for n in baseline['files'] if n.startswith('snodec-openwrt-build-deps-') and n.endswith('.tar.zst'))
         archive = dependencies / name
         if digest(archive) != baseline['files'][name]:
             raise RuntimeError('SNode.C development archive checksum mismatch')
@@ -284,7 +284,7 @@ def sdk_dependency(sdk, bundle, dependencies):
     else:
         target, = sdk.glob('staging_dir/target-*')
         context = json.loads((bundle / 'context.json').read_text())
-        archive = sdk / f'snode.c-sdk-{context["versions"]["snode.c"]}-r{os.environ["PACKAGE_RELEASE"]}.tar.zst'
+        archive = sdk / f'snodec-openwrt-build-deps-{context["versions"]["snode.c"]}-r{os.environ["PACKAGE_RELEASE"]}.tar.zst'
         with tempfile.TemporaryDirectory(dir=sdk) as tmp:
             (Path(tmp) / 'sdk-development.json').write_text(json.dumps(dict(sdk=info, path=str(sdk))))
             run('tar', '--zstd', '-cf', str(archive), '-C', tmp, 'sdk-development.json',

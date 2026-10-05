@@ -29,7 +29,7 @@ class PackagingTest(unittest.TestCase):
                 self.assertIn(row['build_slot'], range(2, 19))
             self.assertEqual(len(publication.feed_paths(row)),
                              2 if row['distribution'] in {'debian', 'ubuntu', 'raspberrypios'} else 1)
-        for name in ['snode.c-sdk-2.0.0-r124.tar.zst', 'snodec-core_2.0.0-124~trixie_arm64.deb']:
+        for name in ['snodec-openwrt-build-deps-2.0.0-r124.tar.zst', 'snodec-core_2.0.0-124~trixie_arm64.deb']:
             self.assertTrue(repository.project_file(name, 'snode.c'))
             self.assertFalse(repository.project_file(name, 'mqttsuite'))
 

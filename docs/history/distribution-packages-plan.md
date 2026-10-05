@@ -76,7 +76,7 @@ verifies each artifact against the captured source selection. Recorded commit ID
 verify version tags; they are not source selectors.
 
 Linux and Raspberry Pi OS install the published SNode.C development packages.
-OpenWrt also publishes `snode.c-sdk-<version>-r<revision>.tar.zst`, containing the
+OpenWrt also publishes `snodec-openwrt-build-deps-<version>-r<revision>.tar.zst`, containing the
 SDK's installed headers, libraries and library dependency metadata. It contains no
 source tree, build tree or build stamps. MQTTSuite restores these files into the
 same SDK release and architecture, relocates installed CMake/pkg-config metadata,

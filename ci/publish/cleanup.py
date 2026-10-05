@@ -17,7 +17,7 @@ def cleanup(root, row, now=None):
         raise RuntimeError("Symlink in package feed; refusing cleanup")
     manifest = directories[0] / 'build.json'
     base = root / row['distribution'] if len(directories) == 2 else directories[0]
-    patterns = (('*.ipk', '*.apk', 'snode.c-sdk-*.tar.zst') if row['family'] == 'openwrt' else
+    patterns = (('*.ipk', '*.apk', 'snodec-openwrt-build-deps-*.tar.zst', 'snode.c-sdk-*.tar.zst') if row['family'] == 'openwrt' else
                 ('*.deb', '**/by-hash/SHA256/*') if len(directories) == 2 else
                 ('Packages/*.rpm', 'repodata/*'))
     candidates = {path for directory in directories for pattern in patterns for path in directory.glob(pattern)}
