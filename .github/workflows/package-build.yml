@@ -142,7 +142,7 @@ jobs:
         run: bash feed/ci/publish/status.sh published status status-bundle "$TARGET" "$BUILD_PROJECT" "$BUILD_STATUS"
   finish:
     name: Publish ${{ inputs.project }} · ${{ fromJSON(inputs.target).id }}
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
     needs: build
     uses: ./.github/workflows/package-write.yml
     with:
