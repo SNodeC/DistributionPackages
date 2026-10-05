@@ -28,10 +28,10 @@ Newly superseded packages in Packages are retained by the normal 30-day policy.
 
 ## Revision continuity
 
-The migration used `PACKAGE_REVISION_BASE=122` to preserve the existing package
-revision ordering when the workflow run number started over. Allocation now uses
-[independent project counters](maintainers.md#revision-numbering), seeded above
-the migrated inventories and recorded runs. No package revision is reset.
+The original migration used a revision floor of 122 to preserve package ordering.
+That migration floor has been removed. Allocation now increments the two explicit
+[independent project counters](maintainers.md#revision-numbering) in
+`Packages/status.json`. A fresh feed starts with both counters at zero.
 
 ## Activation boundary
 

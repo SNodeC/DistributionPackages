@@ -13,7 +13,6 @@ No GitHub Environment is used by these workflows.
 | --- | --- | --- |
 | Variable | `PACKAGES_APP_CLIENT_ID` | Client ID of the publishing GitHub App (from its settings page) |
 | Secret | `PACKAGES_APP_PRIVATE_KEY` | The App's private key |
-| Variable | `PACKAGE_REVISION_BASE` | Fixed migration floor; see the migration record |
 | Secret | `APT_SIGNING_KEY` | Existing ASCII-armored private key for APT and RPM |
 | Secret | `OPENWRT_USIGN_KEY` | Existing OpenWrt opkg signing private key |
 | Secret | `OPENWRT_APK_KEY` | Existing OpenWrt APK signing private key |
@@ -68,7 +67,7 @@ The migration never creates or moves upstream tags automatically.
 
 1. Verify all current indexes and their referenced files exist in Packages/main.
 2. Verify signing keys match the original feed and configure all credentials above.
-3. Verify the fixed revision floor exceeds migrated package revisions.
+3. Verify the two counters in `Packages/status.json` match the last allocated revisions; use zero for a fresh package repository.
 4. Review the source scripts and workflow validation results.
 5. With explicit approval, connect upstream notifications and exercise a version-tag event.
 6. Confirm each target publishes SNode.C before its MQTTSuite build starts, and an

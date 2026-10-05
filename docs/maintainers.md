@@ -96,12 +96,14 @@ SNode.C and MQTTSuite have independent package revision counters. A SNode.C
 release reserves the next number for both projects; an MQTTSuite-only release
 advances only MQTTSuite. Numbers are shared across targets of the same project.
 
-Preparation reserves numbers in `Packages/status.json` under the publication
-lock before capturing sources. Retries reuse the captured reservation; cancelled
-runs leave gaps rather than reusing numbers. Allocation starts above existing
-reservations, recorded runs and published project versions. `PACKAGE_REVISION_BASE`
-remains a migration floor, not a shared counter. Publication compares revisions
-within the affected project. Source versions still come from upstream version tags.
+`Packages/status.json` holds the authoritative integer counters at
+`counters["snode.c"]` and `counters["mqttsuite"]`. Preparation increments each selected
+counter once and saves its run allocation in the same snapshot under the publication
+lock. Retries reuse that allocation without incrementing; cancelled runs leave gaps.
+History and feed versions never determine the next number. With both counters at
+zero, the next SNode.C release allocates r1 for both projects. Reset counters only
+while CI is stopped and preparing a fresh feed; existing feeds retain protection
+against older publications. Source versions still come from upstream version tags.
 
 ## Coverage and tests
 

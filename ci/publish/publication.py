@@ -122,19 +122,13 @@ def reserve(root, project, run_id):
     if project not in REPOSITORIES:
         raise ValueError('Unknown release project')
     path = root / 'status.json'
-    state = read(path, dict(repository='SNodeC/Packages', branch='main', runs={}, targets={}))
+    state = read(path, dict(repository='SNodeC/Packages', branch='main', counters=dict.fromkeys(REPOSITORIES, 0), runs={}, targets={}))
     allocations = state.setdefault('allocations', {})
     selected = REPOSITORIES if project == 'snode.c' else (project,)
     if run_id not in allocations:
-        floors = {repo: int(os.environ.get('PACKAGE_REVISION_BASE', '0')) for repo in REPOSITORIES}
-        for values in [*allocations.values(), *(r['revisions'] for r in state.get('runs', {}).values())]:
-            for repo, value in values.items():
-                floors[repo] = max(floors[repo], int(value))
-        for row in targets():
-            info, _ = published(root, row)
-            for repo in REPOSITORIES:
-                floors[repo] = max(floors[repo], project_revision(info, repo))
-        allocations[run_id] = {repo: str(floors[repo] + 1) for repo in selected}
+        for repo in selected:
+            state['counters'][repo] += 1
+        allocations[run_id] = {repo: str(state['counters'][repo]) for repo in selected}
     if set(allocations[run_id]) != set(selected):
         raise RuntimeError('A retry cannot change its release project')
     write(path, state)
@@ -243,7 +237,7 @@ def main():
                         + ([f'/{path}/' for path in feed_paths(row)] if row else [])))
         return
     root, bundle = (Path(p).resolve() for p in args[:2])
-    state = read(root / 'status.json', dict(repository='SNodeC/Packages', branch='main', runs={}, targets={}))
+    state = read(root / 'status.json', dict(repository='SNodeC/Packages', branch='main', counters=dict.fromkeys(REPOSITORIES, 0), runs={}, targets={}))
     if state.get('repository') != 'SNodeC/Packages' or state['branch'] != 'main':
         raise RuntimeError('Publication destination mismatch')
     context = read(bundle / 'context.json')

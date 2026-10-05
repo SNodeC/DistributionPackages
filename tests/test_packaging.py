@@ -88,24 +88,42 @@ class PackagingTest(unittest.TestCase):
             fetch.assert_not_called()
 
     def test_independent_reservations_survive_retries_and_cancelled_runs(self):
-        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'PACKAGE_REVISION_BASE': '122'}), \
-                patch.object(publication, 'targets', return_value=[]):
+        with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            publication.write(root / 'status.json', {'runs': {'active': {'revisions': {'snode.c': '128', 'mqttsuite': '129'}}}})
+            publication.write(root / 'status.json', {'counters': {'snode.c': 128, 'mqttsuite': 129}})
             self.assertEqual(publication.reserve(root, 'mqttsuite', 'one'), {'mqttsuite': '130'})
+            self.assertEqual(publication.read(root / 'status.json')['counters'], {'snode.c': 128, 'mqttsuite': 130})
             self.assertEqual(publication.reserve(root, 'snode.c', 'two'), {'snode.c': '129', 'mqttsuite': '131'})
+            before = (root / 'status.json').read_bytes()
             self.assertEqual(publication.reserve(root, 'mqttsuite', 'one'), {'mqttsuite': '130'})
+            self.assertEqual((root / 'status.json').read_bytes(), before)
             self.assertEqual(publication.reserve(root, 'mqttsuite', 'three'), {'mqttsuite': '132'})
+            self.assertEqual(publication.read(root / 'status.json')['counters'], {'snode.c': 129, 'mqttsuite': 132})
             with self.assertRaisesRegex(RuntimeError, 'release project'):
                 publication.reserve(root, 'snode.c', 'one')
+            self.assertEqual(publication.read(root / 'status.json')['counters'], {'snode.c': 129, 'mqttsuite': 132})
 
-    def test_reservation_seeds_from_each_published_project(self):
-        info = {'versions': {'snodec': '2.0.0-150~trixie', 'mqttsuite': '1.0.2-170.el9'}}
-        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'PACKAGE_REVISION_BASE': '122'}), \
-                patch.object(publication, 'targets', return_value=[{}]), \
-                patch.object(publication, 'published', return_value=(info, 'feed')):
-            self.assertEqual(publication.reserve(Path(directory), 'snode.c', 'new'),
-                             {'snode.c': '151', 'mqttsuite': '171'})
+    def test_fresh_repository_allocates_revision_one(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertEqual(publication.reserve(root, 'snode.c', 'first'), {'snode.c': '1', 'mqttsuite': '1'})
+            self.assertEqual(publication.read(root / 'status.json')['counters'], {'snode.c': 1, 'mqttsuite': 1})
+
+    def test_reset_counters_override_history_and_published_versions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            row = publication.targets()[0]
+            publication.write(root / publication.feed_paths(row)[0] / 'build.json',
+                              {'versions': {'snodec': '2.0.0-r150', 'mqttsuite': '1.0.2-r170'}})
+            publication.write(root / 'status.json', {
+                'counters': {'snode.c': 0, 'mqttsuite': 0},
+                'allocations': {'old': {'snode.c': '200', 'mqttsuite': '250'}},
+                'runs': {'old': {'revisions': {'snode.c': '200', 'mqttsuite': '250'}}}})
+            self.assertEqual(publication.reserve(root, 'snode.c', 'fresh'), {'snode.c': '1', 'mqttsuite': '1'})
+            state = publication.read(root / 'status.json')
+            state['counters'] = {'snode.c': 7, 'mqttsuite': 0}
+            publication.write(root / 'status.json', state)
+            self.assertEqual(publication.reserve(root, 'snode.c', 'another'), {'snode.c': '8', 'mqttsuite': '1'})
 
     def test_publication_orders_only_the_affected_project(self):
         for version in ['2.0.0-r128', '2.0.0-128~trixie', '2.0.0-128.el9']:
@@ -168,7 +186,7 @@ class StatusEventsTest(unittest.TestCase):
         self.git('init','--bare','-b','main',str(self.remote))
         self.seed = self.clone('seed')
         (self.seed/'feed').write_text('original feed')
-        publication.write(self.seed/'status.json',dict(repository='SNodeC/Packages',branch='main',runs={},targets={}))
+        publication.write(self.seed/'status.json',dict(repository='SNodeC/Packages',branch='main',counters={'snode.c':1,'mqttsuite':1},runs={},targets={}))
         self.git('add','.',cwd=self.seed)
         self.git('commit','-m','seed',cwd=self.seed)
         self.git('push','origin','main',cwd=self.seed)
@@ -274,13 +292,14 @@ class StatusEventsTest(unittest.TestCase):
         previous=self.git('rev-parse','HEAD',cwd=allocator)
         status=self.clone('status')
         subprocess.run(['bash',str(self.status_script),str(status),'status',str(self.bundle),json.dumps(self.rows[1]),'mqttsuite','running'],env=self.env,check=True,capture_output=True)
-        env=self.env | {'RELEASE_PROJECT':'mqttsuite','GITHUB_RUN_ID':'200','PACKAGE_REVISION_BASE':'0'}
+        env=self.env | {'RELEASE_PROJECT':'mqttsuite','GITHUB_RUN_ID':'200'}
         command=['python3','-m','ci.publish.publication','reserve',str(allocator)]
         subprocess.run(command,env=env,check=True)
         result=subprocess.run(['bash',str(self.push_script),str(allocator),previous,'reserve',*command],env=env,capture_output=True,text=True)
         self.assertEqual(result.returncode,0,result.stderr)
         state=self.snapshot()
         self.assertEqual(state['allocations']['200']['mqttsuite'],'2')
+        self.assertEqual(state['counters'],{'snode.c':1,'mqttsuite':2})
         self.assertEqual(state['targets'][self.rows[1]['id']+'/mqttsuite']['status'],'running')
 
     def test_late_terminal_event_cannot_skip_a_published_dependency(self):
