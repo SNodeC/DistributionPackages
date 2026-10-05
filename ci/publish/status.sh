@@ -25,7 +25,7 @@ for attempt in {1..30}; do
     python3 -m ci.publish.publication "$command" "$root" "$@"
     git -C "$root" add -- status.json docs/status.md status/
     if git -C "$root" diff --cached --quiet; then exit 0; fi
-    snapshot=$(git -C "$root" commit-tree "$(git -C "$root" write-tree)" -m "Package status: $command")
+    snapshot=$(git -C "$root" commit-tree "$(git -C "$root" write-tree)" -p "$previous" -m "Package status: $command")
     if git -C "$root" push --force-with-lease="refs/heads/main:$previous" origin "$snapshot:refs/heads/main"; then
         exit 0
     fi
