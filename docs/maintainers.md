@@ -97,11 +97,10 @@ advances only MQTTSuite. Numbers are shared across targets of the same project.
 
 Preparation reserves numbers in `Packages/status.json` under the publication
 lock before capturing sources. Retries reuse the captured reservation; cancelled
-runs leave gaps rather than reusing numbers. The `counters` object stores the last
-allocated integer for `snode.c` and `mqttsuite`, independently. Each starts at zero;
-the first allocation is revision 1. No environment variable or historical scan
-sets the counter. Publication still rejects revisions older than the affected
-project's published packages. Source versions come from upstream version tags.
+runs leave gaps rather than reusing numbers. Allocation starts above existing
+reservations, recorded runs and published project versions. `PACKAGE_REVISION_BASE`
+remains a migration floor, not a shared counter. Publication compares revisions
+within the affected project. Source versions still come from upstream version tags.
 
 ## Coverage and tests
 

@@ -28,11 +28,12 @@ jobs:
         env:
           PACKAGES_APP_ID: ${{ vars.PACKAGES_APP_ID }}
           PACKAGES_APP_PRIVATE_KEY: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
+          PACKAGE_REVISION_BASE: ${{ vars.PACKAGE_REVISION_BASE }}
           APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
           OPENWRT_APK_KEY: ${{ secrets.OPENWRT_APK_KEY }}
           OPENWRT_USIGN_KEY: ${{ secrets.OPENWRT_USIGN_KEY }}
         run: |
-          for name in PACKAGES_APP_ID PACKAGES_APP_PRIVATE_KEY APT_SIGNING_KEY OPENWRT_APK_KEY OPENWRT_USIGN_KEY; do
+          for name in PACKAGES_APP_ID PACKAGES_APP_PRIVATE_KEY PACKAGE_REVISION_BASE APT_SIGNING_KEY OPENWRT_APK_KEY OPENWRT_USIGN_KEY; do
             if [ -z "${!name}" ]; then
               echo "Missing CI configuration: $name" >&2
               exit 1
@@ -68,6 +69,7 @@ jobs:
         if: github.run_attempt == 1
         env:
           RELEASE_PROJECT: ${{ inputs.release_project }}
+          PACKAGE_REVISION_BASE: ${{ vars.PACKAGE_REVISION_BASE }}
         run: |
           previous=$(git -C published rev-parse HEAD)
           python3 -m ci.publish.publication reserve published
