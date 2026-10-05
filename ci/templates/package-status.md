@@ -13,12 +13,15 @@ does not replace an available version. A dash means no version is recorded.
 
 - **Pending:** waiting to build or publish.
 - **Running:** building and testing.
+- **Built:** build and tests succeeded; waiting for publication.
+- **Publishing:** assembling and pushing the package snapshot.
 - **Published:** the packages have been pushed.
 - **Failed**, **cancelled**, **skipped**, **superseded:** the attempt did not publish.
 - **Not built:** neither a build result nor a published version is recorded.
 
-Badges update during preparation and package publication, not continuously.
-Cancellation without a later publication can leave stale status. GitHub image
+Existing jobs synchronously push badges at preparation, build start, build exit
+and publication. Force cancellation, runner loss or an unavailable publication
+endpoint can prevent a final update. GitHub image
 caching can delay display after an update.
 **Published** shows the feed's latest publication date in UTC; click the date
 for the full timestamp and source record. Either project's publication can update

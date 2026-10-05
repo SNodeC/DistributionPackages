@@ -1,4 +1,4 @@
-"""One serialized writer for per-target publications and their displayed status."""
+"""Per-target publications and their displayed status, committed with a Git lease."""
 from datetime import datetime, timezone
 from html import escape
 import importlib
@@ -52,7 +52,7 @@ def render(root, state):
     badges = root / 'status'
     badges.mkdir(exist_ok=True)
     sections = {}
-    colors = {'pending': '#57606a', 'running': '#0969da', 'published': '#1a7f37',
+    colors = {'pending': '#57606a', 'running': '#0969da', 'built': '#0969da', 'publishing': '#0969da', 'published': '#1a7f37',
               'failed': '#cf222e', 'cancelled': '#57606a', 'skipped': '#57606a', 'superseded': '#9a6700', 'not built': '#57606a'}
     for row in sorted(targets(), key=lambda item: item['arch']):
         info, feed = published(root, row)
@@ -93,6 +93,9 @@ def update(state, row, generation, project, status, attempt, job_url=None):
     revision = generation['revisions'][project]
     if (int(revision), attempt) < (int(previous.get('revision', 0)), previous.get('attempt', 0)):
         return
+    if (previous.get('run_id') == generation['run_id'] and previous.get('attempt') == attempt
+            and previous.get('status') == 'published' and status != 'published'):
+        return  # A cleanup step cannot erase a committed publication.
     state['targets'][key] = dict(target=row, revision=revision, attempt=attempt,
                                 run_id=generation['run_id'], run_url=generation['run_url'], status=status,
                                 job_url=job_url or (previous.get('job_url') if previous.get('run_id') == generation['run_id']
@@ -100,7 +103,7 @@ def update(state, row, generation, project, status, attempt, job_url=None):
 
 
 def reserve(root, project, run_id):
-    """Called under the same publication lock as every snapshot writer."""
+    """Reapplied from the latest snapshot by push.sh when a Git lease conflicts."""
     if project not in REPOSITORIES:
         raise ValueError('Unknown release project')
     path = root / 'status.json'
@@ -210,24 +213,22 @@ def reconcile(state, run_id, attempt):
             latest = state['targets'].get(f"{row['id']}/{project}", {})
             if latest.get('run_id') != run_id:
                 continue
-            publication = jobs.get(f'Publish {project} · {row["id"]}', {})
-            build = jobs.get(f'Build and test {project} · {row["id"]}', {})
-            job = publication if publication and (not build or build.get('conclusion') == 'success') else build
+            job = jobs.get(f'Build and publish {project} · {row["id"]}', {})
             dependency = (state['targets'].get(f"{row['id']}/snode.c", {})
                           if project == 'mqttsuite' and generation['context']['release_project'] == 'snode.c' else {})
-            if not (build or publication) and latest['attempt'] < attempt and dependency.get('attempt') != attempt:
+            if not job and latest['attempt'] < attempt and dependency.get('attempt') != attempt:
                 continue  # A partial retry must leave untouched targets alone.
-            if latest['attempt'] == attempt and latest['status'] not in {'pending', 'running'}:
+            if latest['attempt'] == attempt and latest['status'] not in {'pending', 'running', 'built', 'publishing'}:
                 continue  # A committed publication result outranks job bookkeeping.
-            status = latest['status'] if not (build or publication) and latest['attempt'] == attempt else 'pending'
-            if job.get('status') == 'in_progress' and job is build:
+            status = latest['status'] if latest['attempt'] == attempt else 'pending'
+            if job.get('status') == 'in_progress' and status == 'pending':
                 status = 'running'
-            elif job.get('status') == 'completed' and job.get('conclusion') != 'success':
+            elif job.get('status') == 'completed':
                 conclusion = job.get('conclusion')
                 status = conclusion if conclusion in {'cancelled', 'skipped'} else 'failed'
-            if status == 'pending' and not build and dependency.get('status') in {'failed', 'skipped', 'superseded'}:
+            if status == 'pending' and not job and dependency.get('status') in {'failed', 'skipped', 'superseded'}:
                 status = 'skipped'
-            if details['status'] == 'completed' and status in {'pending', 'running'}:
+            if details['status'] == 'completed' and status in {'pending', 'running', 'built', 'publishing'}:
                 # Only the writer's committed result proves publication, never a
                 # successful build or a successful failure-reporting writer job.
                 status = 'cancelled' if details['conclusion'] == 'cancelled' else 'failed'
@@ -263,16 +264,21 @@ def main():
         for row in generation['targets']:
             for project in generation['revisions']:
                 update(state, row, generation, project, 'pending', int(os.environ['GITHUB_RUN_ATTEMPT']))
-    elif command == 'finish':
-        generation = record_run(bundle, state, context)
+    elif command in {'status', 'finish'}:
+        generation = (record_run(bundle, state, context) if command == 'finish'
+                      else state['runs'][context['run_id']])
         row = json.loads(args[2])
         project = args[5]
-        if row not in generation['targets']:
+        if row not in generation['targets'] or project not in generation['revisions']:
             raise RuntimeError('Unknown publication target')
         status = args[3]
-        if status not in {'success', 'failure', 'cancelled', 'skipped'}:
+        allowed = ({'success', 'failure', 'cancelled', 'skipped'} if command == 'finish'
+                   else {'running', 'built', 'publishing', 'failed', 'cancelled', 'skipped'})
+        if status not in allowed:
             raise ValueError('Unknown job status')
         if status == 'success':
+            sources = (bundle / 'sources.json').read_bytes()
+            original_context = (bundle / 'context.json').read_bytes()
             try:
                 publish(root, bundle, Path(args[4]).resolve(), row, generation, project)
                 status = 'published'
@@ -283,17 +289,32 @@ def main():
                 run('git', '-C', str(root), 'reset', '--hard', 'HEAD')
                 run('git', '-C', str(root), 'clean', '-fd')
                 status = 'superseded' if 'superseded' in str(error).lower() else 'failed'
-                result = 1
+                result = 2
+            finally:
+                # Selection mutates these files; contention retries reuse the original capture.
+                (bundle / 'sources.json').write_bytes(sources)
+                (bundle / 'context.json').write_bytes(original_context)
         else:
             status = 'failed' if status == 'failure' else status
-        update(state, row, generation, project, status, int(os.environ.get('GITHUB_RUN_ATTEMPT', '1')))
+        if command == 'finish':
+            update(state, row, generation, project, status, int(os.environ.get('GITHUB_RUN_ATTEMPT', '1')))
         try:
             reconcile(state, context['run_id'], int(os.environ.get('GITHUB_RUN_ATTEMPT', '1')))
         except Exception as error:
             print(f'Status refresh unavailable; keeping recorded results: {error}', file=sys.stderr)
-        shutil.copy2(ROOT / 'README.md', root / 'README.md')
-        shutil.copytree(ROOT / 'docs', root / 'docs', dirs_exist_ok=True)
-        shutil.copytree(ROOT / 'install', root / 'install', dirs_exist_ok=True)
+        if command == 'status':
+            attempt = int(os.environ['GITHUB_RUN_ATTEMPT'])
+            previous = state['targets'].get(f"{row['id']}/{project}", {})
+            if (previous.get('run_id') == generation['run_id'] and previous.get('attempt') == attempt
+                    and previous.get('status') not in {'pending', 'running', 'built', 'publishing'}):
+                status = previous['status']
+            update(state, row, generation, project, status, attempt)
+            if project == 'snode.c' and status in {'failed', 'cancelled', 'skipped'}:
+                update(state, row, generation, 'mqttsuite', 'skipped', attempt)
+        else:
+            shutil.copy2(ROOT / 'README.md', root / 'README.md')
+            shutil.copytree(ROOT / 'docs', root / 'docs', dirs_exist_ok=True)
+            shutil.copytree(ROOT / 'install', root / 'install', dirs_exist_ok=True)
     else:
         raise ValueError(f'Unknown publication operation: {command}')
     write(root / 'status.json', state)
