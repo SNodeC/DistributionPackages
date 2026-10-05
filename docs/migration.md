@@ -28,10 +28,11 @@ Newly superseded packages in Packages are retained by the normal 30-day policy.
 
 ## Revision continuity
 
-The migration used `PACKAGE_REVISION_BASE=122` to preserve the existing package
-revision ordering when the workflow run number started over. Allocation now uses
-[independent project counters](maintainers.md#revision-numbering), seeded above
-the migrated inventories and recorded runs. No package revision is reset.
+The migration initially preserved the existing package revision ordering.
+After migration, the owner requested a clean restart: published feeds and release
+history were cleared, and both [independent project counters](maintainers.md#revision-numbering)
+were reset to zero. The next SNode.C-triggered release allocates revision 1 to
+both projects. Signing keys, installers and documentation are preserved.
 
 ## Activation boundary
 

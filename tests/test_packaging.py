@@ -85,10 +85,9 @@ class PackagingTest(unittest.TestCase):
             fetch.assert_not_called()
 
     def test_independent_reservations_survive_retries_and_cancelled_runs(self):
-        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'PACKAGE_REVISION_BASE': '122'}), \
-                patch.object(publication, 'targets', return_value=[]):
+        with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            publication.write(root / 'status.json', {'runs': {'active': {'revisions': {'snode.c': '128', 'mqttsuite': '129'}}}})
+            publication.write(root / 'status.json', {'counters': {'snode.c': 128, 'mqttsuite': 129}})
             self.assertEqual(publication.reserve(root, 'mqttsuite', 'one'), {'mqttsuite': '130'})
             self.assertEqual(publication.reserve(root, 'snode.c', 'two'), {'snode.c': '129', 'mqttsuite': '131'})
             self.assertEqual(publication.reserve(root, 'mqttsuite', 'one'), {'mqttsuite': '130'})
@@ -96,13 +95,16 @@ class PackagingTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'release project'):
                 publication.reserve(root, 'snode.c', 'one')
 
-    def test_reservation_seeds_from_each_published_project(self):
-        info = {'versions': {'snodec': '2.0.0-150~trixie', 'mqttsuite': '1.0.2-170.el9'}}
-        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'PACKAGE_REVISION_BASE': '122'}), \
-                patch.object(publication, 'targets', return_value=[{}]), \
-                patch.object(publication, 'published', return_value=(info, 'feed')):
-            self.assertEqual(publication.reserve(Path(directory), 'snode.c', 'new'),
-                             {'snode.c': '151', 'mqttsuite': '171'})
+    def test_first_release_starts_both_counters_at_one(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertEqual(publication.reserve(root, 'snode.c', 'first'),
+                             {'snode.c': '1', 'mqttsuite': '1'})
+            self.assertEqual(publication.reserve(root, 'mqttsuite', 'second'), {'mqttsuite': '2'})
+            self.assertEqual(publication.reserve(root, 'snode.c', 'first'),
+                             {'snode.c': '1', 'mqttsuite': '1'})
+            self.assertEqual(publication.read(root / 'status.json')['counters'],
+                             {'snode.c': 1, 'mqttsuite': 2})
 
     def test_publication_orders_only_the_affected_project(self):
         for version in ['2.0.0-r128', '2.0.0-128~trixie', '2.0.0-128.el9']:

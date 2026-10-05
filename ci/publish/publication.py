@@ -110,15 +110,10 @@ def reserve(root, project, run_id):
     allocations = state.setdefault('allocations', {})
     selected = REPOSITORIES if project == 'snode.c' else (project,)
     if run_id not in allocations:
-        floors = {repo: int(os.environ.get('PACKAGE_REVISION_BASE', '0')) for repo in REPOSITORIES}
-        for values in [*allocations.values(), *(r['revisions'] for r in state.get('runs', {}).values())]:
-            for repo, value in values.items():
-                floors[repo] = max(floors[repo], int(value))
-        for row in targets():
-            info, _ = published(root, row)
-            for repo in REPOSITORIES:
-                floors[repo] = max(floors[repo], project_revision(info, repo))
-        allocations[run_id] = {repo: str(floors[repo] + 1) for repo in selected}
+        counters = state.setdefault('counters', {repo: 0 for repo in REPOSITORIES})
+        for repo in selected:
+            counters[repo] += 1
+        allocations[run_id] = {repo: str(counters[repo]) for repo in selected}
     if set(allocations[run_id]) != set(selected):
         raise RuntimeError('A retry cannot change its release project')
     write(path, state)
