@@ -224,16 +224,17 @@ def reconcile(state, run_id, attempt):
             if latest.get('run_id') != run_id:
                 continue
             publication = jobs.get(f'Publish {project} · {row["id"]}')
-            job = publication or jobs.get(f'Build and test {project} · {row["id"]}', {})
+            build = jobs.get(f'Build and test {project} · {row["id"]}', {})
+            job = publication if publication and publication.get('status') in {'in_progress', 'completed'} else build
             if latest['status'] not in {'pending', 'running', 'publishing'}:
                 update(state, row, generation, project, latest['status'], attempt, job.get('html_url'))
                 continue
-            status = 'pending'
+            status = 'running' if latest['status'] == 'running' else 'pending'
             if job.get('status') == 'in_progress':
-                status = 'publishing' if publication else 'running'
+                status = 'publishing' if job is publication else 'running'
             elif job.get('status') == 'completed':
                 conclusion = job.get('conclusion')
-                status = ('published' if publication else 'pending') if conclusion == 'success' else (
+                status = ('published' if job is publication else 'pending') if conclusion == 'success' else (
                     conclusion if conclusion in {'cancelled', 'skipped'} else 'failed')
             elif (project == 'mqttsuite' and generation['context']['release_project'] == 'snode.c'
                   and state['targets'].get(f"{row['id']}/snode.c", {}).get('status') in {'failed', 'skipped', 'superseded'}):
@@ -253,10 +254,10 @@ def main():
         return
     if command == 'scope':
         row = json.loads(args[0])
-        if row not in targets():
+        if row and row not in targets():
             raise ValueError('Unknown publication target')
         print('\n'.join(['**/build.json', '/README.md', '/docs/', '/install/', '/status.json', '/retention.json', '/status/', '/keys/']
-                        + [f'/{path}/' for path in feed_paths(row)]))
+                        + ([f'/{path}/' for path in feed_paths(row)] if row else [])))
         return
     root, bundle = (Path(p).resolve() for p in args[:2])
     state = read(root / 'status.json', dict(repository='SNodeC/Packages', branch='main', runs={}, targets={}))
@@ -266,14 +267,16 @@ def main():
     if context['destination'] != state['repository']:
         raise RuntimeError('Publication destination mismatch')
     result = 0
-    if command == 'finish':
+    if command == 'start':
+        record_run(bundle, state, context)
+    elif command in {'status', 'finish'}:
         generation = record_run(bundle, state, context)
         row = json.loads(args[2])
         project = args[5]
-        if row not in generation['targets']:
+        if row not in generation['targets'] or project not in generation['revisions']:
             raise RuntimeError('Unknown publication target')
         status = args[3]
-        if status not in {'success', 'failure', 'cancelled', 'skipped'}:
+        if status not in ({'running'} if command == 'status' else {'success', 'failure', 'cancelled', 'skipped'}):
             raise ValueError('Unknown job status')
         if status == 'success':
             try:
@@ -287,13 +290,14 @@ def main():
                 run('git', '-C', str(root), 'clean', '-fd')
                 status = 'superseded' if 'superseded' in str(error).lower() else 'failed'
                 result = 1
-        else:
+        elif command == 'finish':
             status = 'cancelled' if status == 'cancelled' else 'failed'
         update(state, row, generation, project, status, int(os.environ.get('GITHUB_RUN_ATTEMPT', '1')))
-        try:
-            reconcile(state, context['run_id'], int(os.environ.get('GITHUB_RUN_ATTEMPT', '1')))
-        except Exception as error:
-            print(f'Status refresh unavailable; keeping recorded results: {error}', file=sys.stderr)
+        if command == 'finish':
+            try:
+                reconcile(state, context['run_id'], int(os.environ.get('GITHUB_RUN_ATTEMPT', '1')))
+            except Exception as error:
+                print(f'Status refresh unavailable; keeping recorded results: {error}', file=sys.stderr)
     else:
         raise ValueError(f'Unknown publication operation: {command}')
     write(root / 'status.json', state)

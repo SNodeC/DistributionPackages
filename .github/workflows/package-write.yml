@@ -2,8 +2,11 @@ name: Serialized package snapshot writer
 on:
   workflow_call:
     inputs:
-      target:
+      operation:
         required: true
+        type: string
+      target:
+        default: '{}'
         type: string
       result:
         type: string
@@ -16,7 +19,7 @@ env:
   PYTHONPATH: ${{ github.workspace }}/feed
 jobs:
   write:
-    name: Publish ${{ inputs.project }} · ${{ fromJSON(inputs.target).id }}
+    name: ${{ inputs.operation == 'finish' && format('Publish {0} · {1}', inputs.project, fromJSON(inputs.target).id) || inputs.operation == 'status' && format('Mark {0} running · {1}', inputs.project, fromJSON(inputs.target).id) || 'Initialize package status' }}
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -31,7 +34,7 @@ jobs:
           name: source-pair
           path: bundle
       - uses: actions/download-artifact@v8
-        if: inputs.result == 'success'
+        if: inputs.operation == 'finish' && inputs.result == 'success'
         with:
           name: packages-${{ inputs.project }}-${{ fromJSON(inputs.target).id }}
           path: incoming
@@ -46,7 +49,7 @@ jobs:
           python3 -m ci.publish.publication scope "$TARGET" >> "$GITHUB_OUTPUT"
           echo EOF >> "$GITHUB_OUTPUT"
       - name: Authenticate package publication
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         id: publisher
         with:
           app-id: ${{ vars.PACKAGES_APP_ID }}
@@ -65,19 +68,20 @@ jobs:
       - name: Update the package snapshot
         id: write
         env:
+          OPERATION: ${{ inputs.operation }}
           TARGET: ${{ inputs.target }}
           RESULT: ${{ inputs.result }}
           BUILD_PROJECT: ${{ inputs.project }}
           GH_TOKEN: ${{ github.token }}
-          APT_SIGNING_KEY: ${{ inputs.result == 'success' && secrets.APT_SIGNING_KEY || '' }}
+          APT_SIGNING_KEY: ${{ inputs.operation == 'finish' && inputs.result == 'success' && secrets.APT_SIGNING_KEY || '' }}
         run: |
           set -euo pipefail
-          if [ "$RESULT" = success ] && [ "$(jq -r .family <<< "$TARGET")" != openwrt ]; then
+          if [ "$OPERATION" = finish ] && [ "$RESULT" = success ] && [ "$(jq -r .family <<< "$TARGET")" != openwrt ]; then
             sudo apt-get update
             sudo apt-get install -y apt-utils gnupg rpm
           fi
           previous=$(git -C published rev-parse HEAD)
           result=0
-          python3 -m ci.publish.publication finish published bundle "$TARGET" "$RESULT" incoming "$BUILD_PROJECT" || result=$?
-          bash feed/ci/publish/push.sh published "$previous" "Update packages: $BUILD_PROJECT"
+          python3 -m ci.publish.publication "$OPERATION" published bundle "$TARGET" "$RESULT" incoming "$BUILD_PROJECT" || result=$?
+          bash feed/ci/publish/push.sh published "$previous" "Update packages: $OPERATION $BUILD_PROJECT"
           exit "$result"

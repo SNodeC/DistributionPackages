@@ -12,6 +12,32 @@ from ci.publish import publication
 
 
 class PackagingTest(unittest.TestCase):
+    def test_pending_running_and_queued_publisher(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root, bundle = Path(directory) / 'public', Path(directory) / 'bundle'
+            root.mkdir()
+            row = publication.targets()[0]
+            context = dict(run_id='100', run_url='https://example.invalid/100', destination='SNodeC/Packages', release_project='snode.c')
+            for name, value in dict(context=context, targets=[row], revisions={'snode.c':'1','mqttsuite':'1'}, sources={}, profiles={}).items():
+                publication.write(bundle / f'{name}.json', value)
+            def call(*args):
+                with patch('sys.argv', ['publication', *map(str,args)]), patch.dict(os.environ, {'GITHUB_RUN_ATTEMPT':'1'}):
+                    with self.assertRaises(SystemExit) as result:
+                        publication.main()
+                    self.assertEqual(result.exception.code, 0)
+            call('start',root,bundle)
+            for project in ['snode.c','mqttsuite']:
+                self.assertIn('pending', (root/'status'/f"{row['id']}-{project}.svg").read_text())
+                call('status',root,bundle,json.dumps(row),'running','unused',project)
+                self.assertIn('running', (root/'status'/f"{row['id']}-{project}.svg").read_text())
+            state=publication.read(root/'status.json')
+            jobs=[dict(name=f"Build and test snode.c · {row['id']}",status='in_progress',conclusion=None),
+                  dict(name=f"Publish snode.c · {row['id']}",status='queued',conclusion=None)]
+            with patch.dict(os.environ, {'GITHUB_REPOSITORY':'SNodeC/DistributionPackages'}), patch.object(publication,'run',side_effect=[json.dumps(dict(run_attempt=1,status='in_progress')), '\n'.join(map(json.dumps,jobs))]):
+                publication.reconcile(state,'100',1)
+            self.assertEqual(state['targets'][f"{row['id']}/snode.c"]['status'],'running')
+
+
     def test_complete_matrix_and_dependency_files(self):
         rows = publication.targets()
         self.assertEqual(len(rows), 76)

@@ -45,7 +45,7 @@ jobs:
           ref: main
           path: feed
           persist-credentials: false
-      - uses: actions/create-github-app-token@v2
+      - uses: actions/create-github-app-token@v3
         if: github.run_attempt == 1
         id: allocator
         with:
@@ -100,9 +100,15 @@ jobs:
         run: |
           echo "revisions=$(jq -c . bundle/revisions.json)" >> "$GITHUB_OUTPUT"
           echo "value=$(jq -c '{include: .}' bundle/targets.json)" >> "$GITHUB_OUTPUT"
+  pending:
+    needs: prepare
+    uses: ./.github/workflows/package-write.yml
+    with:
+      operation: start
+    secrets: inherit
   target:
     name: ${{ matrix.distribution }} · ${{ matrix.suite }} · ${{ matrix.arch }}
-    needs: prepare
+    needs: [prepare, pending]
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}

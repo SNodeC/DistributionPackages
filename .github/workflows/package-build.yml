@@ -20,7 +20,16 @@ permissions:
 env:
   PYTHONPATH: ${{ github.workspace }}/feed
 jobs:
+  running:
+    uses: ./.github/workflows/package-write.yml
+    with:
+      operation: status
+      target: ${{ inputs.target }}
+      project: ${{ inputs.project }}
+      result: running
+    secrets: inherit
   build:
+    needs: running
     name: Build and test ${{ inputs.project }} · ${{ fromJSON(inputs.target).id }}
     runs-on: ${{ fromJSON(inputs.target).runner }}
     timeout-minutes: 360
@@ -103,9 +112,10 @@ jobs:
   finish:
     name: Publish ${{ inputs.project }} · ${{ fromJSON(inputs.target).id }}
     if: ${{ !cancelled() }}
-    needs: build
+    needs: [running, build]
     uses: ./.github/workflows/package-write.yml
     with:
+      operation: finish
       project: ${{ inputs.project }}
       target: ${{ inputs.target }}
       result: ${{ needs.build.result }}
