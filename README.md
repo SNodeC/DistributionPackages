@@ -46,14 +46,16 @@ Prefer manual setup? See your distribution guide.
 
 ## Distributions
 
-| Distribution | Releases | Architectures | Install guide | Package status |
+| Distribution | Releases | Architectures | Guide | Status |
 | --- | --- | --- | --- | --- |
-| OpenWrt | 24.10, 25.12 | 25 package architectures per release | [Install](docs/openwrt.md) | [Status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#openwrt) |
-| Raspberry Pi OS | bookworm, trixie | arm64; Pi 3, 4, 5 | [Install](docs/raspberrypi.md) | [Status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#raspberry-pi-os) |
+| OpenWrt | 24.10, 25.12 | 25 architectures | [Install](docs/openwrt.md) | [Status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#openwrt) |
+| Raspberry Pi OS | bookworm, trixie | arm64 | [Install](docs/raspberrypi.md) | [Status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#raspberry-pi-os) |
 | Debian | trixie, forky, sid | amd64, arm64, armhf, riscv64 | [Install](docs/debian.md) | [Status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#debian) |
 | Ubuntu | noble, resolute | amd64, arm64 | [Install](docs/ubuntu.md) | [Status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#ubuntu) |
 | Rocky Linux | 9, 10 | aarch64, x86_64 | [Install](docs/rocky.md) | [Status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#rocky-linux) |
 | Fedora | 43, 44 | aarch64, x86_64 | [Install](docs/fedora.md) | [Status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#fedora) |
+
+OpenWrt supports 25 package architectures per release. Raspberry Pi OS supports Pi 3, 4 and 5.
 
 ## Packages
 
