@@ -1,4 +1,6 @@
 """Check packaging boundaries without building applications or contacting GitHub."""
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
 import json
 import os
 from pathlib import Path
@@ -8,7 +10,7 @@ import unittest
 from unittest.mock import patch
 
 from ci import repository
-from ci.publish import publication
+from ci.publish import cleanup, publication
 
 
 class PackagingTest(unittest.TestCase):
@@ -321,12 +323,28 @@ class StatusEventsTest(unittest.TestCase):
 
     def test_feed_phase_preserves_original_capture_and_copies_documentation(self):
         original={name:(self.bundle/name).read_bytes() for name in ['context.json','sources.json']}
+        feed=self.seed/publication.feed_paths(self.rows[0])[0]
+        feed.mkdir(parents=True)
+        for name in ['Packages','Packages.gz','Packages.sig','retired.ipk']:
+            (feed/name).write_text(name)
+        publication.write(feed/'build.json',{'files':{name:repository.digest(feed/name)
+                          for name in ['Packages','Packages.gz','Packages.sig']}})
+        publication.write(self.seed/'retention.json',{str((feed/'retired.ipk').relative_to(self.seed)):
+                          {'sha256':repository.digest(feed/'retired.ipk'),'unreferenced_since':'2000-01-01T00:00:00+00:00'}})
+        stdout,stderr=StringIO(),StringIO()
         def publish(*args):
+            cleanup.cleanup(self.seed,self.rows[0])
             publication.write(self.bundle/'context.json',{'selected':'modified'})
             publication.write(self.bundle/'sources.json',{'selected':'modified'})
-        with patch('sys.argv',['publication','feed',str(self.seed),str(self.bundle),json.dumps(self.rows[0]),'snode.c','unused']), patch.object(publication,'publish',side_effect=publish):
+        with patch('sys.argv',['publication','feed',str(self.seed),str(self.bundle),json.dumps(self.rows[0]),'snode.c','unused']), patch.object(publication,'publish',side_effect=publish), redirect_stdout(stdout), redirect_stderr(stderr):
             self.assertEqual(publication.main(),0)
+        self.assertEqual(stdout.getvalue(),'published\n')
+        self.assertIn('Removed ',stderr.getvalue())
+        self.assertIn('Protected 3 files; retained 0 retired files; removed 1',stderr.getvalue())
+        self.assertFalse((feed/'retired.ipk').exists())
         self.assertEqual(publication.read(self.seed/'status.json')['targets'],{})
+        self.event(self.seed,stdout.getvalue().strip())
+        self.assertEqual(publication.read(self.seed/'status.json')['targets'][self.rows[0]['id']+'/snode.c']['status'],'published')
         for name,data in original.items():
             self.assertEqual((self.bundle/name).read_bytes(),data)
         self.assertEqual((self.seed/'README.md').read_bytes(),(repository.ROOT/'README.md').read_bytes())

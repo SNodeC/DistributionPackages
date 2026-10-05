@@ -69,11 +69,11 @@ def cleanup(root, row, now=None):
     # retirement date; replaced bytes start a fresh grace period.
     for path in expired:
         path.unlink()
-        print(f'Removed {path.relative_to(root)}')
+        print(f'Removed {path.relative_to(root)}', file=sys.stderr)
     contents = json.dumps(retired, indent=2, sort_keys=True) + '\n'
     if not state_path.exists() or state_path.read_text() != contents:
         state_path.write_text(contents)
-    print(f'Protected {len(protected)} files; retained {len(retired)} retired files; removed {len(expired)}')
+    print(f'Protected {len(protected)} files; retained {len(retired)} retired files; removed {len(expired)}', file=sys.stderr)
     return expired
 
 
