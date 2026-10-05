@@ -153,27 +153,30 @@ class PackagingTest(unittest.TestCase):
         item = state['targets'][row['id'] + '/snode.c']
         self.assertEqual((item['revision'], item['status'], item['run_id']), ('124', 'published', 'new'))
 
-    def test_status_initialization_refresh_and_retry_preserve_public_output(self):
+    def test_status_initialization_publication_and_retry_preserve_public_output(self):
         for project in ('snode.c', 'mqttsuite'):
             with self.subTest(project=project), tempfile.TemporaryDirectory() as directory:
                 root, bundle, row = self.capture(directory, project)
+                other_row = publication.targets()[1]
+                publication.write(bundle / 'targets.json', [row, other_row])
                 (root / 'README.md').write_text('Keep the public landing page')
                 self.operation('start', root, bundle)
                 state = publication.read(root / 'status.json')
                 selected = ('snode.c', 'mqttsuite') if project == 'snode.c' else ('mqttsuite',)
-                self.assertEqual(set(state['targets']), {f"{row['id']}/{p}" for p in selected})
+                self.assertEqual(set(state['targets']), {f"{r['id']}/{p}" for r in (row, other_row) for p in selected})
                 self.assertEqual({item['status'] for item in state['targets'].values()}, {'pending'})
-                # A status refresh must preserve installed versions and authored docs.
+                self.assertEqual((root / 'README.md').read_text(), 'Keep the public landing page')
+                # Another target's publication refreshes this running build without changing its feed.
                 manifest = root / publication.feed_paths(row)[0] / 'build.json'
                 publication.write(manifest, {'versions': {'mqttsuite': '1.0.2-r9'}})
                 original_manifest = manifest.read_bytes()
                 jobs = [dict(name=f"Build and test {project} · {row['id']}", status='in_progress',
                              conclusion=None, html_url='https://example.invalid/job', run_attempt=1)]
-                self.operation('refresh', root, '100', '1', jobs=jobs)
+                self.operation('finish', root, bundle, json.dumps(other_row), 'failure', 'unused', project, jobs=jobs)
                 self.assertIn('>running</text>', (root / 'status' / f"{row['id']}-{project}.svg").read_text())
                 self.assertIn('`1.0.2-r9`', (root / 'docs/status.md').read_text())
                 self.assertEqual(manifest.read_bytes(), original_manifest)
-                self.assertEqual((root / 'README.md').read_text(), 'Keep the public landing page')
+                self.assertEqual((root / 'README.md').read_bytes(), (repository.ROOT / 'README.md').read_bytes())
                 # Retry only the selected project and any dependent application.
                 state = publication.read(root / 'status.json')
                 for item in state['targets'].values():

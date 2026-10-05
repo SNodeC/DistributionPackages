@@ -13,7 +13,7 @@ on:
         type: string
 permissions:
   contents: read
-  actions: write
+  actions: read
 jobs:
   snodec:
     if: inputs.release_project == 'snode.c'

@@ -17,8 +17,9 @@ does not replace an available version. A dash means no version is recorded.
 - **Failed**, **cancelled**, **skipped**, **superseded:** the attempt did not publish.
 - **Not built:** neither a build result nor a published version is recorded.
 
-Badges update at preparation, build-start notifications, publication and workflow completion.
-GitHub scheduling and image caching can delay their display.
+Badges update during preparation and package publication, not continuously.
+Cancellation without a later publication can leave stale status. GitHub image
+caching can delay display after an update.
 **Published** shows the feed's latest publication date in UTC; click the date
 for the full timestamp and source record. Either project's publication can update
 that date. **Packages** opens the shared package directory; package managers use
