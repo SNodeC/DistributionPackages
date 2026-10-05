@@ -49,7 +49,7 @@ jobs:
         uses: actions/create-github-app-token@v3
         id: publisher
         with:
-          app-id: ${{ vars.PACKAGES_APP_ID }}
+          client-id: ${{ vars.PACKAGES_APP_CLIENT_ID }}
           private-key: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
           owner: SNodeC
           repositories: Packages

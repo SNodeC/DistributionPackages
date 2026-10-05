@@ -11,7 +11,7 @@ No GitHub Environment is used by these workflows.
 
 | Type | Name | Value or purpose |
 | --- | --- | --- |
-| Variable | `PACKAGES_APP_ID` | ID of the publishing GitHub App |
+| Variable | `PACKAGES_APP_CLIENT_ID` | Client ID of the publishing GitHub App (from its settings page) |
 | Secret | `PACKAGES_APP_PRIVATE_KEY` | The App's private key |
 | Variable | `PACKAGE_REVISION_BASE` | Fixed migration floor; see the migration record |
 | Secret | `APT_SIGNING_KEY` | Existing ASCII-armored private key for APT and RPM |
