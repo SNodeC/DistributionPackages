@@ -1,5 +1,4 @@
 menu "MQTTSuite build options"
-    visible if PACKAGE_mqttsuite-common
 
 comment "Select applications and mapping plugins in Network / MQTTSuite"
 comment "The mqttsuite package selects all applications and mapping plugins; transports are compile-time options"

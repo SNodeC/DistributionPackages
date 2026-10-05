@@ -72,9 +72,8 @@ both mapping plugins. Configure listeners, credentials and TLS before starting s
 
 DEB/RPM packages also include development files.
 
-Full catalogs: [SNode.C for OpenWrt](docs/snodec-package-options.md),
-[MQTTSuite for OpenWrt](docs/mqttsuite-package-options.md),
-and [DEB/RPM components](docs/linux.md#component-packages).
+Full catalogs: [SNode.C](docs/snodec-package-options.md) and
+[MQTTSuite](docs/mqttsuite-package-options.md), with shared package names across distributions.
 Find available versions and per-target results on [Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md).
 
 ## Signing keys

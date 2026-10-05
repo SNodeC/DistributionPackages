@@ -119,18 +119,6 @@ Update selected packages with `opkg upgrade <package> ...` or
 together. This does not upgrade firmware. After changing OpenWrt release series,
 configure the matching feed again.
 
-### Moving from the old package names
-
-Earlier feeds used `snode.c-*`, `snode.c-full` and `mqttsuite-full`. The complete
-install is now `snodec mqttsuite`; the small foundation packages are
-`snodec-common` and `mqttsuite-common`. Configuration paths remain `/etc/snode.c`.
-
-For an existing installation, wait until both projects have published the renamed
-packages for your target. Back up `/etc/snode.c`, stop the MQTT services, and remove
-the old SNode.C and MQTTSuite package selection before installing `snodec mqttsuite`.
-Restore configuration if necessary and restart the services. Do not treat this
-package-name migration as an ordinary in-place upgrade or force file overwrites.
-
 ## Manual repository setup
 
 Run the block for your release as `root`. These commands only configure the feed

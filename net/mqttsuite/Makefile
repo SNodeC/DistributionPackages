@@ -35,17 +35,8 @@ define Package/mqttsuite/Default
   URL:=https://github.com/SNodeC/mqttsuite
 endef
 
-define Package/mqttsuite-common
-  $(call Package/mqttsuite/Default)
-  TITLE:=MQTTSuite configuration and application base
-endef
-
-define Package/mqttsuite-common/config
+define Package/mqttsuite/config
   source "$(SOURCE)/Config.in"
-endef
-
-define Package/mqttsuite-common/install
-	true
 endef
 
 # Dependency conditions must survive DUMP=1, where .config is not loaded.
@@ -53,8 +44,7 @@ endef
 define Package/mqttsuite-broker
   $(call Package/mqttsuite/Default)
   TITLE:=MQTT broker
-  DEPENDS:=+mqttsuite-common \
-    +snodec-mqtt-server \
+  DEPENDS:=+snodec-mqtt-server \
     +MQTTSUITE_BROKER_TCP_IPV4:snodec-net-in-stream-legacy \
     +MQTTSUITE_BROKER_TCP_IPV4:snodec-http-server-express-legacy-in \
     +MQTTSUITE_BROKER_TLS_IPV4:snodec-net-in-stream-tls \
@@ -74,8 +64,7 @@ endef
 define Package/mqttsuite-integrator
   $(call Package/mqttsuite/Default)
   TITLE:=MQTT integrator
-  DEPENDS:=+mqttsuite-common \
-    +snodec-mqtt-client \
+  DEPENDS:=+snodec-mqtt-client \
     +snodec-http-server-express-legacy-in \
     +snodec-http-server-express-tls-in \
     +MQTTSUITE_INTEGRATOR_TCP_IPV4:snodec-net-in-stream-legacy \
@@ -91,8 +80,7 @@ endef
 define Package/mqttsuite-bridge
   $(call Package/mqttsuite/Default)
   TITLE:=MQTT bridge
-  DEPENDS:=+mqttsuite-common \
-    +snodec-mqtt-client \
+  DEPENDS:=+snodec-mqtt-client \
     +snodec-http-server-express-legacy-in \
     +snodec-http-server-express-tls-in \
     +MQTTSUITE_BRIDGE_TCP_IPV4:snodec-net-in-stream-legacy \
@@ -108,8 +96,7 @@ endef
 define Package/mqttsuite-cli
   $(call Package/mqttsuite/Default)
   TITLE:=MQTT cli
-  DEPENDS:=+mqttsuite-common \
-    +snodec-mqtt-client \
+  DEPENDS:=+snodec-mqtt-client \
     +MQTTSUITE_CLI_TCP_IPV4:snodec-net-in-stream-legacy \
     +MQTTSUITE_CLI_TLS_IPV4:snodec-net-in-stream-tls \
     +MQTTSUITE_CLI_TCP_IPV6:snodec-net-in6-stream-legacy \
@@ -123,8 +110,7 @@ endef
 define Package/mqttsuite-store
   $(call Package/mqttsuite/Default)
   TITLE:=MQTT store
-  DEPENDS:=+mqttsuite-common \
-    +snodec-mqtt-client \
+  DEPENDS:=+snodec-mqtt-client \
     +snodec-db-mariadb \
     +MQTTSUITE_STORE_TCP_IPV4:snodec-net-in-stream-legacy \
     +MQTTSUITE_STORE_TLS_IPV4:snodec-net-in-stream-tls \
@@ -175,7 +161,7 @@ define MQTTSuiteMappingPlugin
   define Package/mqttsuite-mapping-$(1)
     $$(call Package/mqttsuite/Default)
     TITLE:=MQTT mapping plugin: $(1)
-    DEPENDS:=+mqttsuite-common +libstdcpp
+    DEPENDS:=+libstdcpp
   endef
   define Package/mqttsuite-mapping-$(1)/install
 	$$(INSTALL_DIR) $$(1)/usr/lib
@@ -195,7 +181,6 @@ define Package/mqttsuite/install
 	true
 endef
 
-$(eval $(call BuildPackage,mqttsuite-common))
 $(foreach app,$(MQTTSUITE_APPS),$(eval $(call BuildPackage,mqttsuite-$(app))))
 $(eval $(call MQTTSuiteMappingPlugin,double))
 $(eval $(call MQTTSuiteMappingPlugin,storage))

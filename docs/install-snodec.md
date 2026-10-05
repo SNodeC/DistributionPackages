@@ -14,8 +14,7 @@ selective installation, manual setup, configuration and updates.
 
 ## Packages
 
-- [OpenWrt package catalog](snodec-package-options.md)
-- [DEB/RPM component catalog](linux.md#component-packages)
+- [Package catalog for all distributions](snodec-package-options.md)
 - [Published versions](https://github.com/SNodeC/Packages/blob/main/docs/status.md)
 
 [Installation overview](../README.md#installation).

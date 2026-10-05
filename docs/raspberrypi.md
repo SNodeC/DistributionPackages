@@ -68,7 +68,8 @@ preparation, install the complete-project packages listed below.
 | `mqttsuite-broker` | MQTT broker |
 | `mqttsuite-cli` | Publish/subscribe command-line client |
 
-See the [DEB/RPM component catalog](linux.md#component-packages) for all common choices.
+See the complete [SNode.C](snodec-package-options.md) and
+[MQTTSuite](mqttsuite-package-options.md) package catalogs.
 
 ```sh
 sudo apt-get install snodec mqttsuite
