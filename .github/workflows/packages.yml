@@ -1,0 +1,124 @@
+name: Unified distribution packages
+on:
+  workflow_call:
+    inputs:
+      release_project:
+        type: string
+      release_tag:
+        type: string
+permissions:
+  contents: read
+  actions: read
+env:
+  PYTHONPATH: ${{ github.workspace }}/feed
+jobs:
+  prepare:
+    concurrency:
+      group: package-publication
+      cancel-in-progress: false
+      queue: max
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.matrix.outputs.value }}
+      revisions: ${{ steps.matrix.outputs.revisions }}
+    steps:
+      - name: Check release configuration
+        env:
+          PACKAGES_APP_ID: ${{ vars.PACKAGES_APP_ID }}
+          PACKAGES_APP_PRIVATE_KEY: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+          OPENWRT_APK_KEY: ${{ secrets.OPENWRT_APK_KEY }}
+          OPENWRT_USIGN_KEY: ${{ secrets.OPENWRT_USIGN_KEY }}
+        run: |
+          for name in PACKAGES_APP_ID PACKAGES_APP_PRIVATE_KEY APT_SIGNING_KEY OPENWRT_APK_KEY OPENWRT_USIGN_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "Missing CI configuration: $name" >&2
+              exit 1
+            fi
+          done
+      - uses: actions/checkout@v6
+        if: github.run_attempt == 1
+        with:
+          ref: main
+          path: feed
+          persist-credentials: false
+      - uses: actions/create-github-app-token@v2
+        id: allocator
+        with:
+          app-id: ${{ vars.PACKAGES_APP_ID }}
+          private-key: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
+          owner: SNodeC
+          repositories: Packages
+          permission-contents: write
+      - uses: actions/checkout@v6
+        with:
+          repository: SNodeC/Packages
+          ref: main
+          path: published
+          token: ${{ steps.allocator.outputs.token }}
+          sparse-checkout: |
+            **/build.json
+            /status.json
+            /status/
+            /docs/status.md
+          sparse-checkout-cone-mode: false
+      - name: Reserve independent project revisions
+        if: github.run_attempt == 1
+        env:
+          RELEASE_PROJECT: ${{ inputs.release_project }}
+        run: |
+          previous=$(git -C published rev-parse HEAD)
+          python3 -m ci.publish.publication reserve published
+          bash feed/ci/publish/push.sh published "$previous" "Reserve package revisions"
+      - name: Reuse original capture (if missing, start a new run)
+        if: github.run_attempt > 1
+        uses: actions/download-artifact@v8
+        with:
+          name: source-pair
+          path: bundle
+      - name: Capture the source pair and full matrix
+        if: github.run_attempt == 1
+        env:
+          RELEASE_PROJECT: ${{ inputs.release_project }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          RECIPE_REF: main
+        run: |
+          export RELEASE_TAG="${RELEASE_TAG#refs/tags/}"
+          python3 -m ci.repository prepare published bundle
+      - uses: actions/upload-artifact@v7
+        if: github.run_attempt == 1
+        with:
+          name: source-pair
+          path: bundle/
+          if-no-files-found: error
+      - name: Publish pending status before starting builds
+        run: |
+          if [ "$GITHUB_RUN_ATTEMPT" != 1 ]; then
+            mkdir feed
+            tar -xzf bundle/feed.tar.gz -C feed
+          else
+            git -C published fetch origin main
+            git -C published reset --hard FETCH_HEAD
+          fi
+          previous=$(git -C published rev-parse HEAD)
+          python3 -m ci.publish.publication start published bundle
+          bash feed/ci/publish/push.sh published "$previous" "Initialize package status"
+      - name: Read the captured matrix and revisions
+        id: matrix
+        run: |
+          echo "revisions=$(jq -c . bundle/revisions.json)" >> "$GITHUB_OUTPUT"
+          echo "value=$(jq -c '{include: .}' bundle/targets.json)" >> "$GITHUB_OUTPUT"
+  target:
+    name: ${{ matrix.distribution }} · ${{ matrix.suite }} · ${{ matrix.arch }}
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    uses: ./.github/workflows/package-target.yml
+    with:
+      target: ${{ toJSON(matrix) }}
+      revisions: ${{ needs.prepare.outputs.revisions }}
+      release_project: ${{ inputs.release_project }}
+    secrets: inherit

@@ -60,10 +60,9 @@ The captured source bundle freezes the selected tags, resolved commits and
 matrix for a run. Tag changes during a build reject a superseded publication.
 Publication checks also prevent a build from replacing a newer counterpart.
 
-There are 19 build slots per run. Each project job publishes on its own runner.
+There are 19 build slots per run. Publications use one serialized writer because
 APT architectures share suite metadata and all targets share status and retention
-records, so every write uses a Git lease. A competing commit causes the operation
-to reload the latest snapshot and recompute before retrying.
+records. A successful build publishes as soon as its writer acquires that lock.
 
 A failed build leaves the previous feed intact. Packages/main is a generated
 snapshot: the writer uses a parentless commit and force-with-lease. Source history
@@ -80,13 +79,11 @@ and `build.json` records the files currently referenced by signed indexes.
 
 | Workflow | Responsibility |
 | --- | --- |
-| [release.yml](https://github.com/SNodeC/DistributionPackages/blob/main/.github/workflows/release.yml) | Capture releases, build/test each project and publish packages with synchronous badges |
-
-This is the only workflow. Each target has two explicit project jobs: MQTTSuite
-depends on that target's SNode.C job, whose final step publishes its packages.
-Application-only releases skip SNode.C. Shared YAML steps use an anchor; there
-are no reusable workflow calls or separate publication jobs. Keep the job pairs
-aligned with `ci/targets/`; the workflow graph test checks all supported targets.
+| [release.yml](https://github.com/SNodeC/DistributionPackages/blob/main/.github/workflows/release.yml) | Receive `release-tag-changed` repository dispatches |
+| [packages.yml](https://github.com/SNodeC/DistributionPackages/blob/main/.github/workflows/packages.yml) | Capture source releases and expand all targets |
+| [package-target.yml](https://github.com/SNodeC/DistributionPackages/blob/main/.github/workflows/package-target.yml) | Order the two projects independently for each target |
+| [package-build.yml](https://github.com/SNodeC/DistributionPackages/blob/main/.github/workflows/package-build.yml) | Build one project/target and request publication |
+| [package-write.yml](https://github.com/SNodeC/DistributionPackages/blob/main/.github/workflows/package-write.yml) | Update Packages/main using a GitHub App token |
 
 The ordinary workflow token reads this repository and its Actions jobs. A short-lived
 GitHub App token, scoped to Packages, writes the separate binary repository.
@@ -131,17 +128,12 @@ and badges from [the status template](https://github.com/SNodeC/DistributionPack
 latest attempted build; the version describes the available package. The publication
 date belongs to the feed and can change when either project publishes.
 
-Preparation publishes pending badges before starting the matrix. Each existing
-build job synchronously pushes its running and final build status; the publisher
-pushes publishing before assembly and published together with the packages.
-Build success is shown as built, not published. No status workflow is dispatched.
-All writes use the same snapshot push command and revision check. A competing
-commit causes the operation to run again against the latest snapshot, retaining
-other targets and rejecting superseded results. Final shell steps cover ordinary
-failure and cancellation when GitHub still permits them to execute. Force
-cancellation, runner loss, failures before credentials/tools are available, and
-an unavailable publication endpoint can leave the last recorded status visible.
-GitHub image caching can delay display even after a successful synchronous push.
+Preparation publishes pending badges before starting the matrix. Existing package
+publication jobs record their results and refresh the other targets from GitHub's
+job status, under the same publication lock. There is no separate status workflow.
+Between publications, badges retain the last recorded state. Cancellation or a
+failure before publication can leave stale status when no later publisher runs.
+GitHub image caching can delay display even after an update has been pushed.
 
 Guides and package catalogs are handwritten. Keep their architecture tables in
 agreement with the target files. Native component names follow upstream CPack;

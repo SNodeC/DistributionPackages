@@ -1,0 +1,36 @@
+name: Publish SNode.C before building MQTTSuite
+on:
+  workflow_call:
+    inputs:
+      target:
+        required: true
+        type: string
+      release_project:
+        required: true
+        type: string
+      revisions:
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  snodec:
+    if: inputs.release_project == 'snode.c'
+    uses: ./.github/workflows/package-build.yml
+    with:
+      target: ${{ inputs.target }}
+      project: snode.c
+      release_project: ${{ inputs.release_project }}
+      revisions: ${{ inputs.revisions }}
+    secrets: inherit
+  mqttsuite:
+    needs: snodec
+    if: ${{ !cancelled() && (needs.snodec.result == 'success' || inputs.release_project == 'mqttsuite') }}
+    uses: ./.github/workflows/package-build.yml
+    with:
+      target: ${{ inputs.target }}
+      project: mqttsuite
+      release_project: ${{ inputs.release_project }}
+      revisions: ${{ inputs.revisions }}
+    secrets: inherit
