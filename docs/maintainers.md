@@ -128,12 +128,14 @@ and badges from [the status template](https://github.com/SNodeC/DistributionPack
 latest attempted build; the version describes the available package. The publication
 date belongs to the feed and can change when either project publishes.
 
-Preparation publishes pending badges before starting the matrix. Existing package
-publication jobs record their results and refresh the other targets from GitHub's
-job status, under the same publication lock. There is no separate status workflow.
-Between publications, badges retain the last recorded state. Cancellation or a
-failure before publication can leave stale status when no later publisher runs.
-GitHub image caching can delay display even after an update has been pushed.
+Preparation publishes pending badges before starting the matrix. Build-start
+notifications and completion of `Distribution packages` invoke the same status
+refresh workflow, under the publication lock. Completion refreshes also cover
+cancelled runs and failures before the publisher could report its result. They
+update status only, without deploying documentation or regenerating signed indexes.
+Partial retries update only the jobs included in that attempt. GitHub scheduling
+and image caching delay visibility; if the refresh itself cannot push, the last
+committed status remains until a subsequent refresh succeeds.
 
 Guides and package catalogs are handwritten. Keep their architecture tables in
 agreement with the target files. Native component names follow upstream CPack;

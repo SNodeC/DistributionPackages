@@ -253,6 +253,11 @@ def main():
     state = read(root / 'status.json', dict(repository='SNodeC/Packages', branch='main', runs={}, targets={}))
     if state.get('repository') != 'SNodeC/Packages' or state['branch'] != 'main':
         raise RuntimeError('Publication destination mismatch')
+    if command == 'refresh':
+        reconcile(state, args[1], int(args[2]))
+        write(root / 'status.json', state)
+        render(root, state)
+        return
     bundle = Path(args[1]).resolve()
     context = read(bundle / 'context.json')
     if context['destination'] != state['repository']:

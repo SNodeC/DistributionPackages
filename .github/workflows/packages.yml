@@ -8,7 +8,7 @@ on:
         type: string
 permissions:
   contents: read
-  actions: read
+  actions: write
 env:
   PYTHONPATH: ${{ github.workspace }}/feed
 jobs:
