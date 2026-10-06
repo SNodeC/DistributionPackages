@@ -322,6 +322,9 @@ class StatusEventsTest(unittest.TestCase):
         self.assertEqual(publication.read(self.seed/'status.json')['targets'][self.rows[0]['id']+'/snode.c']['status'],'running')
 
     def test_feed_phase_preserves_original_capture_and_copies_documentation(self):
+        obsolete = self.seed / 'net/obsolete/Makefile'
+        obsolete.parent.mkdir(parents=True)
+        obsolete.write_text('removed recipe')
         original={name:(self.bundle/name).read_bytes() for name in ['context.json','sources.json']}
         feed=self.seed/publication.feed_paths(self.rows[0])[0]
         feed.mkdir(parents=True)
@@ -349,6 +352,11 @@ class StatusEventsTest(unittest.TestCase):
             self.assertEqual((self.bundle/name).read_bytes(),data)
         self.assertEqual((self.seed/'README.md').read_bytes(),(repository.ROOT/'README.md').read_bytes())
         self.assertEqual((self.seed/'install/install.sh').read_bytes(),(repository.ROOT/'install/install.sh').read_bytes())
+        expected = {p.relative_to(repository.ROOT/'net'): p.read_bytes()
+                    for p in (repository.ROOT/'net').rglob('*') if p.is_file()}
+        actual = {p.relative_to(self.seed/'net'): p.read_bytes()
+                  for p in (self.seed/'net').rglob('*') if p.is_file()}
+        self.assertEqual(actual, expected)
 
     def test_status_exhaustion_only_warns(self):
         # Exercise all retries without a network or real sleeps.

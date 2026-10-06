@@ -233,7 +233,7 @@ def main():
         row = json.loads(args[0])
         if row and row not in targets():
             raise ValueError('Unknown publication target')
-        print('\n'.join(['**/build.json', '/README.md', '/docs/', '/install/', '/status.json', '/retention.json', '/status/', '/keys/']
+        print('\n'.join(['**/build.json', '/README.md', '/docs/', '/install/', '/status.json', '/retention.json', '/status/', '/keys/', '/net/']
                         + ([f'/{path}/' for path in feed_paths(row)] if row else [])))
         return
     root, bundle = (Path(p).resolve() for p in args[:2])
@@ -272,6 +272,9 @@ def main():
             shutil.copy2(ROOT / 'README.md', root / 'README.md')
             shutil.copytree(ROOT / 'docs', root / 'docs', dirs_exist_ok=True)
             shutil.copytree(ROOT / 'install', root / 'install', dirs_exist_ok=True)
+            if (root / 'net').exists():
+                shutil.rmtree(root / 'net')
+            shutil.copytree(ROOT / 'net', root / 'net')
         except Exception as error:
             print(f'Publication rejected: {error}', file=sys.stderr)
             run('git', '-C', str(root), 'reset', '--hard', 'HEAD')

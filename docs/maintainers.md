@@ -7,9 +7,10 @@
 [SNodeC/DistributionPackages](https://github.com/SNodeC/DistributionPackages) owns
 recipes, build automation, installation instructions and public signing keys.
 [SNodeC/Packages](https://github.com/SNodeC/Packages) holds generated binary
-repositories, the public landing page, all documentation, the installer and package status. Both use `main`. No package branch or separate
+repositories, the public landing page, all documentation, the installer, package status
+and a published copy of the OpenWrt recipes in `net/`. Both use `main`. No package branch or separate
 SNode.C/MQTTSuite recipe branch is required. DistributionPackages can be private;
-installation and public documentation depend only on Packages. Source-code,
+installation, public documentation and published recipe access depend only on Packages. Canonical source-code,
 workflow and settings links in these maintainer guides require access to DistributionPackages.
 
 | Source path | Purpose |
@@ -68,6 +69,9 @@ status-only commits and aborts if any other remote files changed.
 A failed build leaves the previous feed intact. Packages/main is a generated
 snapshot: the writer uses a parentless commit and force-with-lease. Source history
 in DistributionPackages/main is normal Git history and is never rewritten by CI.
+Each successful package publication also replaces `Packages/net/` with the recipe
+copy captured for that run, including removal of obsolete files. Maintain recipes
+only in DistributionPackages; the public copy is not a separate source of truth.
 Do not edit generated files manually or protect Packages/main against the writer's
 required snapshot replacement.
 
