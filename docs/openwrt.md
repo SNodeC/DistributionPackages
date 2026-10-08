@@ -180,7 +180,7 @@ Then [choose packages](#choose-packages) to install.
 
 ## Reference
 
-Source recipes: [SNode.C](https://github.com/SNodeC/Packages/tree/main/net/snode.c) and [MQTTSuite](https://github.com/SNodeC/Packages/tree/main/net/mqttsuite).
+Source recipes: [SNode.C](https://github.com/SNodeC/snode.c/tree/master/supplement/openwrt) and [MQTTSuite](https://github.com/SNodeC/mqttsuite/tree/master/misc/openwrt).
 
 Both releases support the same platform variants. RISC-V is named `riscv64_riscv64` on 24.10 and `riscv64_generic` on 25.12.
 

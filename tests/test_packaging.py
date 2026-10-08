@@ -33,6 +33,91 @@ class PackagingTest(unittest.TestCase):
             self.assertTrue(repository.project_file(name, 'snode.c'))
             self.assertFalse(repository.project_file(name, 'mqttsuite'))
 
+    def test_openwrt_uses_captured_recipe_and_published_dependency_recipe(self):
+        import shutil
+        import sys
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            feed, bundle, dependencies = (root / name for name in ('feed', 'bundle', 'dependencies'))
+            shutil.copytree(repository.ROOT / 'ci', feed / 'ci')
+            (feed / 'keys').mkdir()
+            for name in ('snodec-usign.pub', 'snodec-apk.pem'):
+                (feed / 'keys' / name).write_text('test public key')
+            # A stale recipe next to the CI tools must never be selected.
+            (feed / 'net/snode.c').mkdir(parents=True)
+            (feed / 'net/snode.c/Makefile').write_text('wrong recipe')
+            bundle.mkdir()
+            dependencies.mkdir()
+            binary = root / 'bin'
+            binary.mkdir()
+            (binary / 'python3').write_text(
+                '#!/bin/sh\nif [ "$1 $2 $3" = "-m ci.repository check" ]; then exit 0; fi\n'
+                f'exec "{sys.executable}" "$@"\n')
+            # Stop at the SDK configuration boundary; no toolchain build or network.
+            (binary / 'make').write_text('#!/bin/sh\ntest "$1" = defconfig || exit 1\nexit 37\n')
+            for path in binary.iterdir():
+                path.chmod(0o755)
+            env = os.environ | {'PATH': str(binary) + ':' + os.environ['PATH'],
+                                'PACKAGE_RELEASE': '1', 'OPENWRT_USIGN_KEY': 'test', 'OPENWRT_APK_KEY': 'test',
+                                'PYTHONDONTWRITEBYTECODE': '1'}
+            info = dict(release='25.12.5', target='mediatek/filogic', arch='aarch64_cortex-a53', sha256='sdk')
+            baseline = {}
+            for project, parent in [('snode.c', 'supplement'), ('mqttsuite', 'misc')]:
+                with self.subTest(project=project):
+                    source, sdk = root / ('source-' + project), root / ('sdk-' + project)
+                    recipe = source / parent / 'openwrt'
+                    (recipe / 'files').mkdir(parents=True)
+                    (recipe / 'Makefile').write_text('captured ' + project)
+                    (recipe / 'Config.in').write_text('config for ' + project)
+                    (recipe / 'files/helper.sh').write_text('#!/bin/sh\nexit 0\n')
+                    (recipe / 'files/helper.sh').chmod(0o755)
+                    archive = bundle / (project + '-2.0.0.tar.gz')
+                    repository.run('tar', '-czf', str(archive), '--exclude=.git',
+                                   f'--transform=s,^,{project}-2.0.0/,', '-C', str(source), '.')
+                    (sdk / 'scripts').mkdir(parents=True)
+                    (sdk / 'staging_dir').mkdir()
+                    (sdk / 'feeds.conf.default').write_text('')
+                    (sdk / 'scripts/feeds').write_text(
+                        '#!/bin/sh\nset -eu\ntest -f "recipes/$BUILD_PROJECT/Makefile"\n'
+                        'if [ "$BUILD_PROJECT" = mqttsuite ]; then\n'
+                        '  test -f recipes/snode.c/Makefile\n'
+                        '  test -f staging_dir/target-test/usr/include/snodec.h\nfi\n')
+                    (sdk / 'scripts/feeds').chmod(0o755)
+                    publication.write(sdk / 'ci-sdk.json', info)
+                    publication.write(bundle / 'baseline.json', baseline)
+                    publication.write(bundle / 'context.json', dict(build_project=project,
+                                      versions={project: '2.0.0'}, source_tags={project: 'v2.0.0'}))
+                    result = subprocess.run(['bash', str(feed / 'ci/build/openwrt.sh'), str(feed),
+                                             str(bundle), str(sdk)], env=env | {'BUILD_PROJECT': project},
+                                            text=True, capture_output=True)
+                    self.assertEqual(result.returncode, 37, result.stderr)
+                    self.assertEqual((sdk / 'recipes' / project / 'Makefile').read_text(), 'captured ' + project)
+                    self.assertEqual((sdk / 'recipes' / project / 'Config.in').read_bytes(), (recipe / 'Config.in').read_bytes())
+                    self.assertEqual((sdk / 'recipes' / project / 'files/helper.sh').stat().st_mode & 0o777, 0o755)
+                    self.assertIn(f'src-link snodec {sdk}/recipes', (sdk / 'feeds.conf').read_text())
+                    selections = [line for line in (sdk / '.config').read_text().splitlines()
+                                  if line.startswith('CONFIG_PACKAGE_')]
+                    self.assertEqual(selections, ['CONFIG_PACKAGE_' + project.replace('.', '') + '=m'])
+                    self.assertFalse((sdk / 'key-build').exists())
+                    if project == 'snode.c':
+                        target = sdk / 'staging_dir/target-test'
+                        for name in ('usr/include', 'usr/lib', 'pkginfo'):
+                            (target / name).mkdir(parents=True)
+                        (target / 'usr/include/snodec.h').write_text('public header')
+                        (target / 'usr/lib/snodec.cmake').write_text(str(sdk) + '/staging_dir/target-test/usr/lib')
+                        (target / 'pkginfo/snodec.provides').write_text('libsnodec.so')
+                        with patch.dict(os.environ, {'PACKAGE_RELEASE': '1'}):
+                            repository.sdk_dependency(sdk, bundle, dependencies)
+                        archive, = sdk.glob('snodec-openwrt-build-deps-*.tar.zst')
+                        shutil.copy2(archive, dependencies / archive.name)
+                        baseline = info | {'files': {archive.name: repository.digest(archive)}}
+                    else:
+                        self.assertEqual((sdk / 'recipes/snode.c/Makefile').read_text(), 'captured snode.c')
+                        self.assertEqual((sdk / 'staging_dir/target-test/usr/lib/snodec.cmake').read_text(),
+                                         str(sdk) + '/staging_dir/target-test/usr/lib')
+                        self.assertEqual((sdk / 'staging_dir/target-test/pkginfo/snodec.provides').read_text(), 'libsnodec.so')
+                        self.assertEqual(sorted(p.name for p in (sdk / 'recipes').iterdir()), ['mqttsuite', 'snode.c'])
+
     def test_status_render_is_immutable_and_does_not_copy_documentation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -322,9 +407,6 @@ class StatusEventsTest(unittest.TestCase):
         self.assertEqual(publication.read(self.seed/'status.json')['targets'][self.rows[0]['id']+'/snode.c']['status'],'running')
 
     def test_feed_phase_preserves_original_capture_and_copies_documentation(self):
-        obsolete = self.seed / 'net/obsolete/Makefile'
-        obsolete.parent.mkdir(parents=True)
-        obsolete.write_text('removed recipe')
         obsolete_doc = self.seed / 'docs/removed/guide.md'
         obsolete_doc.parent.mkdir(parents=True)
         obsolete_doc.write_text('removed guide')
@@ -367,11 +449,7 @@ class StatusEventsTest(unittest.TestCase):
             self.assertEqual((self.bundle/name).read_bytes(),data)
         self.assertEqual((self.seed/'README.md').read_bytes(),(repository.ROOT/'README.md').read_bytes())
         self.assertEqual((self.seed/'install/install.sh').read_bytes(),(repository.ROOT/'install/install.sh').read_bytes())
-        expected = {p.relative_to(repository.ROOT/'net'): p.read_bytes()
-                    for p in (repository.ROOT/'net').rglob('*') if p.is_file()}
-        actual = {p.relative_to(self.seed/'net'): p.read_bytes()
-                  for p in (self.seed/'net').rglob('*') if p.is_file()}
-        self.assertEqual(actual, expected)
+        self.assertFalse((self.seed / 'net').exists())
 
     def test_status_exhaustion_only_warns(self):
         # Exercise all retries without a network or real sleeps.

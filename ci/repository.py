@@ -279,7 +279,7 @@ def sdk_dependency(sdk, bundle, dependencies):
             for path in (root / 'staging_dir').rglob('*'):
                 if path.is_file() and not path.is_symlink() and path.suffix in {'.cmake', '.pc', '.la'}:
                     path.write_text(path.read_text().replace(origin['path'] + '/', str(sdk) + '/'))
-            run('cp', '-a', str(root / 'staging_dir') + '/.', str(sdk / 'staging_dir'))
+            run('cp', '-a', str(root / 'staging_dir'), str(root / 'recipes'), str(sdk))
         shutil.copy2(archive, sdk / name)
     else:
         target, = sdk.glob('staging_dir/target-*')
@@ -288,7 +288,7 @@ def sdk_dependency(sdk, bundle, dependencies):
         with tempfile.TemporaryDirectory(dir=sdk) as tmp:
             (Path(tmp) / 'sdk-development.json').write_text(json.dumps(dict(sdk=info, path=str(sdk))))
             run('tar', '--zstd', '-cf', str(archive), '-C', tmp, 'sdk-development.json',
-                '-C', str(sdk), str(target.relative_to(sdk) / 'usr/include'),
+                '-C', str(sdk), 'recipes/snode.c', str(target.relative_to(sdk) / 'usr/include'),
                 str(target.relative_to(sdk) / 'usr/lib'),
                 *(str(p.relative_to(sdk)) for p in sorted((target / 'pkginfo').glob('*.provides'))))
 

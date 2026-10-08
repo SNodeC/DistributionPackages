@@ -14,7 +14,7 @@ Previously retired packages are not copied: no client has cached an index from t
 
 ## Repository ownership
 
-- DistributionPackages/main owns recipes, workflows, the installer and docs.
+- DistributionPackages/main owns workflows, the installer and docs. SNode.C and MQTTSuite own their OpenWrt recipes in `supplement/openwrt/` and `misc/openwrt/`, respectively.
 - Packages/main owns generated feeds and status. Actions is disabled there.
 - No old branches, device deployment scripts or credentials are imported.
 - Upstream source repositories, release workflows and version tags are untouched.

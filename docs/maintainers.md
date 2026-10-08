@@ -6,11 +6,10 @@
 
 ## Responsibilities
 
-[SNodeC/DistributionPackages](https://github.com/SNodeC/DistributionPackages) owns recipes, build automation, installation instructions and public signing keys. [SNodeC/Packages](https://github.com/SNodeC/Packages) holds generated binary repositories, the public landing page, all documentation, the installer, package status and a published copy of the OpenWrt recipes in `net/`. Both use `main`. No package branch or separate SNode.C/MQTTSuite recipe branch is required. DistributionPackages can be private; installation, public documentation and published recipe access depend only on Packages. Canonical source-code, workflow and settings links in these maintainer guides require access to DistributionPackages.
+[SNodeC/DistributionPackages](https://github.com/SNodeC/DistributionPackages) owns build automation, installation instructions and public signing keys. [SNodeC/Packages](https://github.com/SNodeC/Packages) holds generated binary repositories, the public landing page, all documentation, the installer and package status. Both use `main`. No package branch or separate SNode.C/MQTTSuite recipe branch is required. DistributionPackages can be private; installation and public documentation depend only on Packages. OpenWrt recipes belong to [SNode.C](https://github.com/SNodeC/snode.c/tree/master/supplement/openwrt) and [MQTTSuite](https://github.com/SNodeC/mqttsuite/tree/master/misc/openwrt) in their public source repositories. Canonical source-code, workflow and settings links in these maintainer guides require access to DistributionPackages.
 
 | Source path | Purpose |
 | --- | --- |
-| `net/snode.c/`, `net/mqttsuite/` | Canonical OpenWrt Makefiles, feature configuration and installation files |
 | `install/install.sh` | Standalone installer for every supported distribution |
 | `keys/` | Public signing keys; private keys belong in Actions secrets |
 | `ci/targets/` | OpenWrt SDKs, Linux containers and official Raspberry Pi OS images |
@@ -43,13 +42,15 @@ Only an upstream `vMAJOR.MINOR.PATCH` tag notification starts package CI. Creati
 
 For a SNode.C release, each target builds and tests SNode.C, publishes it, then builds MQTTSuite against that target's published SNode.C and publishes MQTTSuite. For a MQTTSuite release, only MQTTSuite builds, using the target's already-published SNode.C packages. No target waits for the full matrix to finish.
 
-The captured source bundle freezes the selected tags, resolved commits and matrix for a run. Tag changes during a build reject a superseded publication. Publication checks also prevent a build from replacing a newer counterpart.
+The captured source bundle freezes the selected tags, resolved commits, upstream OpenWrt recipes and matrix for a run. SNode.C’s development archive includes its recipe; an MQTTSuite build reuses that exact published dependency recipe alongside its own captured source recipe. Tag changes during a build reject a superseded publication. Publication checks also prevent a build from replacing a newer counterpart.
 
 There are 19 build slots per run. Feed publications use one serialized writer because APT architectures share suite metadata. Status events run independently in their originating jobs and use Git leases. A publisher merges intervening status-only commits and aborts if any other remote files changed.
 
-A failed build leaves the previous feed intact. Packages/main is a generated snapshot: the writer uses a parentless commit and force-with-lease. Source history in DistributionPackages/main is normal Git history and is never rewritten by CI. Each successful package publication also replaces `Packages/net/` with the recipe copy captured for that run, including removal of obsolete files. Maintain recipes only in DistributionPackages; the public copy is not a separate source of truth. Do not edit generated files manually or protect Packages/main against the writer's required snapshot replacement.
+A failed build leaves the previous feed intact. Packages/main is a generated snapshot: the writer uses a parentless commit and force-with-lease. Source history in DistributionPackages/main is normal Git history and is never rewritten by CI. Neither DistributionPackages nor Packages maintains a copy of the upstream OpenWrt recipes. Do not edit generated files manually or protect Packages/main against the writer's required snapshot replacement.
 
 Superseded files remain for 30 days after leaving the active index. Cleanup runs on the affected feed during publication, not on an independent schedule. Files in an idle feed can therefore remain longer. `retention.json` records retirement and `build.json` records the files currently referenced by signed indexes.
+
+Before the first run after the recipe move, both selected upstream release tags must contain their recipes, and SNode.C must be rebuilt and published first. Older development archives do not contain its recipe and cannot supply the new MQTTSuite build path.
 
 ## Workflow entry points
 

@@ -140,6 +140,8 @@ and architecture definitions throughout the refactor.
 
 ## Recipe ownership and branches
 
+Historical decision: the ownership described below was superseded by moving recipes into SNode.C’s `supplement/openwrt/` and MQTTSuite’s `misc/openwrt/`. DistributionPackages now consumes captured upstream recipes; Packages no longer publishes `net/`.
+
 Keep the canonical OpenWrt recipes together on `main`:
 
 - `net/snode.c/`

@@ -233,7 +233,7 @@ def main():
         row = json.loads(args[0])
         if row and row not in targets():
             raise ValueError('Unknown publication target')
-        print('\n'.join(['**/build.json', '/README.md', '/docs/', '/install/', '/status.json', '/retention.json', '/status/', '/keys/', '/net/']
+        print('\n'.join(['**/build.json', '/README.md', '/docs/', '/install/', '/status.json', '/retention.json', '/status/', '/keys/']
                         + ([f'/{path}/' for path in feed_paths(row)] if row else [])))
         return
     root, bundle = (Path(p).resolve() for p in args[:2])
@@ -270,7 +270,7 @@ def main():
         try:
             publish(root, bundle, Path(args[4]).resolve(), row, generation, project)
             shutil.copy2(ROOT / 'README.md', root / 'README.md')
-            for directory in ('docs', 'install', 'net'):
+            for directory in ('docs', 'install'):
                 if (root / directory).exists():
                     shutil.rmtree(root / directory)
                 shutil.copytree(ROOT / directory, root / directory)
