@@ -1,7 +1,6 @@
 # SNode.C package catalog
 
-Package names are shared by OpenWrt, Raspberry Pi OS, Debian, Ubuntu, Rocky Linux
-and Fedora. Architectures affect availability and binary contents, not names.
+Package names are shared by OpenWrt, Raspberry Pi OS, Debian, Ubuntu, Rocky Linux and Fedora. Architectures affect availability and binary contents, not names.
 
 ## Installation and build results
 
@@ -11,9 +10,7 @@ and Fedora. Architectures affect availability and binary contents, not names.
 
 ## Packages: 67
 
-Library `<version>` follows the published release; `<ABI>` identifies its binary
-interface. See [Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md)
-for current versions.
+Library `<version>` follows the published release; `<ABI>` identifies its binary interface. See [Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md) for current versions.
 
 | Package | Payload / role |
 | --- | --- |
@@ -85,9 +82,7 @@ for current versions.
 | `snodec-mqtt-server-websocket` | `libsnodec-mqtt-server-websocket.so.<ABI>` + `.so.<version>` |
 | `snodec-mqtt-client-websocket` | `libsnodec-mqtt-client-websocket.so.<ABI>` + `.so.<version>` |
 
-The `net-l2-*` rows are L2CAP; the `net-rc-*` rows are RFCOMM. Selecting their
-upper layers selects their own lower layers and BlueZ automatically. Express
-supports RFCOMM; upstream does not provide an Express/L2CAP module to package.
+The `net-l2-*` rows are L2CAP; the `net-rc-*` rows are RFCOMM. Selecting their upper layers selects their own lower layers and BlueZ automatically. Express supports RFCOMM; upstream does not provide an Express/L2CAP module to package.
 
 ## Distribution details
 

@@ -1,7 +1,6 @@
 # Install SNode.C
 
-Choose the distribution installed on your device. Each guide provides full and
-selective installation, manual setup, configuration and updates.
+Choose the distribution installed on your device. Each guide provides full and selective installation, manual setup, configuration and updates.
 
 ## Choose your distribution
 

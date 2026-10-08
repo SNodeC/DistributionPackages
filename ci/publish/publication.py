@@ -270,11 +270,11 @@ def main():
         try:
             publish(root, bundle, Path(args[4]).resolve(), row, generation, project)
             shutil.copy2(ROOT / 'README.md', root / 'README.md')
-            shutil.copytree(ROOT / 'docs', root / 'docs', dirs_exist_ok=True)
-            shutil.copytree(ROOT / 'install', root / 'install', dirs_exist_ok=True)
-            if (root / 'net').exists():
-                shutil.rmtree(root / 'net')
-            shutil.copytree(ROOT / 'net', root / 'net')
+            for directory in ('docs', 'install', 'net'):
+                if (root / directory).exists():
+                    shutil.rmtree(root / directory)
+                shutil.copytree(ROOT / directory, root / directory)
+            render(root, state)
         except Exception as error:
             print(f'Publication rejected: {error}', file=sys.stderr)
             run('git', '-C', str(root), 'reset', '--hard', 'HEAD')

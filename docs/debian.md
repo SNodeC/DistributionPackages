@@ -8,8 +8,7 @@
 
 Supported releases: `trixie`, `forky`, `sid`. Match the release and package architecture installed on your device. Keep official repositories enabled for dependencies.
 
-Use an account with `sudo`, or run administrative commands directly as root.
-Install `curl` and CA certificates before downloading the installer.
+Use an account with `sudo`, or run administrative commands directly as root. Install `curl` and CA certificates before downloading the installer.
 
 ```sh
 . /etc/os-release
@@ -22,11 +21,7 @@ sudo apt-get update
 sudo apt-get install ca-certificates curl
 ```
 
-The matrix covers Trixie (stable), Forky (testing) and Sid (unstable).
-Use the installed suite’s name, not a moving `stable` or `testing` alias. For
-Sid, append `--suite sid` to the installer command; `/etc/os-release` may report
-a testing codename. Use `--suite forky` if Forky is not detected. This selects a
-repository; it does not upgrade the operating system.
+The matrix covers Trixie (stable), Forky (testing) and Sid (unstable). Use the installed suite’s name, not a moving `stable` or `testing` alias. For Sid, append `--suite sid` to the installer command; `/etc/os-release` may report a testing codename. Use `--suite forky` if Forky is not detected. This selects a repository; it does not upgrade the operating system.
 
 ## Quick install
 
@@ -36,10 +31,7 @@ curl -fsSL https://raw.githubusercontent.com/SNodeC/Packages/main/install/instal
 sudo sh /tmp/snodec-install-feed.sh
 ```
 
-The installer detects the distribution, release and package architecture, checks
-that an index exists, installs the signing key, configures the repository
-and installs the complete package set. Configure applications before starting them.
-Prefer manual setup? Use [Manual repository setup](#manual-repository-setup).
+The installer detects the distribution, release and package architecture, checks that an index exists, installs the signing key, configures the repository and installs the complete package set. Configure applications before starting them. Prefer manual setup? Use [Manual repository setup](#manual-repository-setup).
 
 ## Choose packages
 
@@ -57,8 +49,7 @@ For only the broker and command-line client:
 sudo apt-get install mqttsuite-broker mqttsuite-cli
 ```
 
-Dependencies are installed automatically. For the full selection after manual
-preparation, install the complete-project packages listed below.
+Dependencies are installed automatically. For the full selection after manual preparation, install the complete-project packages listed below.
 
 | Package | Contents |
 | --- | --- |
@@ -69,8 +60,7 @@ preparation, install the complete-project packages listed below.
 | `mqttsuite-broker` | MQTT broker |
 | `mqttsuite-cli` | Publish/subscribe command-line client |
 
-See the complete [SNode.C](snodec-package-options.md) and
-[MQTTSuite](mqttsuite-package-options.md) package catalogs.
+See the complete [SNode.C](snodec-package-options.md) and [MQTTSuite](mqttsuite-package-options.md) package catalogs.
 
 ```sh
 sudo apt-get install snodec mqttsuite
@@ -78,22 +68,15 @@ sudo apt-get install snodec mqttsuite
 
 ## Configure and run
 
-Inspect `mqttbroker --help`, `mqttcli --help` and `snodec-control --help`. Configure
-listeners, credentials and TLS certificates before starting services. The store
-requires a configured database. Consult the [application documentation](https://github.com/SNodeC/mqttsuite#readme)
-and [framework documentation](https://github.com/SNodeC/snode.c#readme) for options.
+Inspect `mqttbroker --help`, `mqttcli --help` and `snodec-control --help`. Configure listeners, credentials and TLS certificates before starting services. The store requires a configured database. Consult the [application documentation](https://github.com/SNodeC/mqttsuite#project-overview) and [framework documentation](https://github.com/SNodeC/snode.c#project-overview) for options.
 
-Executables are installed in `/usr/bin`. Administrative configuration lives in
-`/etc/snode.c`; non-root processes use their per-user configuration directories.
-Installation creates the `snodec` system group but does not start network services.
-To start a foreground broker:
+Executables are installed in `/usr/bin`. Administrative configuration lives in `/etc/snode.c`; non-root processes use their per-user configuration directories. Installation creates the `snodec` system group but does not start network services. To start a foreground broker:
 
 ```sh
 mqttbroker --daemonize=false
 ```
 
-For persistent operation, configure a systemd service with the desired user and
-arguments; these packages do not supply systemd service units.
+For persistent operation, configure a systemd service with the desired user and arguments; these packages do not supply systemd service units.
 
 ## Updates
 
@@ -102,9 +85,7 @@ sudo apt-get update
 sudo apt-get install snodec mqttsuite
 ```
 
-For selective installations, name the installed components rather than adding
-the complete metapackages. After a distribution upgrade, configure the repository
-for its new supported release and refresh metadata.
+For selective installations, name the installed components rather than adding the complete metapackages. After a distribution upgrade, configure the repository for its new supported release and refresh metadata.
 
 ## Manual repository setup
 
@@ -131,8 +112,7 @@ Select your suite below (`trixie` is the example), then run the block:
 )
 ```
 
-APT selects packages from the index for your native architecture. Package files
-for all architectures share the suite’s `pool/` directory.
+APT selects packages from the index for your native architecture. Package files for all architectures share the suite’s `pool/` directory.
 
 Then [choose packages](#choose-packages) to install.
 
@@ -178,8 +158,7 @@ Then [choose packages](#choose-packages) to install.
 
 ## Troubleshooting
 
-See [common problems and fixes](troubleshooting.md) for download, signature,
-dependency and application errors.
+See [common problems and fixes](troubleshooting.md) for download, signature, dependency and application errors.
 
 | Symptom | What to check |
 | --- | --- |

@@ -8,9 +8,7 @@
 
 Supported releases: `24.10`, `25.12`. Match the release and package architecture installed on your device. Keep official feeds enabled for dependencies.
 
-Use official OpenWrt and log in as `root`. A matching CPU does not establish
-compatibility with a manufacturer’s modified firmware. Install CA certificates
-and provide HTTPS-capable `wget` (or `curl` for the installer’s downloads).
+Use official OpenWrt and log in as `root`. A matching CPU does not establish compatibility with a manufacturer’s modified firmware. Install CA certificates and provide HTTPS-capable `wget` (or `curl` for the installer’s downloads).
 
 ```sh
 cat /etc/openwrt_release
@@ -18,8 +16,7 @@ cat /etc/openwrt_release
 printf 'OpenWrt: %s\nPackage architecture: %s\n' "$DISTRIB_RELEASE" "$DISTRIB_ARCH"
 ```
 
-Use `DISTRIB_ARCH`, not `uname -m`. Several devices can share a package
-architecture. OpenWrt 24.10 uses `opkg`/IPK; 25.12 uses `apk`/APK.
+Use `DISTRIB_ARCH`, not `uname -m`. Several devices can share a package architecture. OpenWrt 24.10 uses `opkg`/IPK; 25.12 uses `apk`/APK.
 
 ## Quick install
 
@@ -29,10 +26,7 @@ wget -O /tmp/snodec-install-feed.sh \
 sh /tmp/snodec-install-feed.sh
 ```
 
-The installer detects the distribution, release and package architecture, checks
-that an index exists, installs the signing key, configures the feed
-and installs the complete package set. Configure applications before starting them.
-Prefer manual setup? Use [Manual repository setup](#manual-repository-setup).
+The installer detects the distribution, release and package architecture, checks that an index exists, installs the signing key, configures the feed and installs the complete package set. Configure applications before starting them. Prefer manual setup? Use [Manual repository setup](#manual-repository-setup).
 
 ## Choose packages
 
@@ -56,8 +50,7 @@ opkg install mqttsuite-broker mqttsuite-cli
 apk add mqttsuite-broker mqttsuite-cli
 ```
 
-Dependencies are installed automatically. For the full selection after manual
-preparation, install the complete-project packages listed below.
+Dependencies are installed automatically. For the full selection after manual preparation, install the complete-project packages listed below.
 
 | Package | Contents |
 | --- | --- |
@@ -82,10 +75,7 @@ apk add snodec mqttsuite
 
 ## Configure and run
 
-Inspect `mqttbroker --help`, `mqttcli --help` and `snodec-control --help`. Configure
-listeners, credentials and TLS certificates before starting services. The store
-requires a configured database. Consult the [application documentation](https://github.com/SNodeC/mqttsuite#readme)
-and [framework documentation](https://github.com/SNodeC/snode.c#readme) for options.
+Inspect `mqttbroker --help`, `mqttcli --help` and `snodec-control --help`. Configure listeners, credentials and TLS certificates before starting services. The store requires a configured database. Consult the [application documentation](https://github.com/SNodeC/mqttsuite#project-overview) and [framework documentation](https://github.com/SNodeC/snode.c#project-overview) for options.
 
 Configure `/etc/snode.c/mqttbroker.conf`, then enable and start the broker:
 
@@ -96,9 +86,7 @@ pidof mqttbroker
 logread -e mqttbroker
 ```
 
-After configuration changes, run `/etc/init.d/mqttbroker restart`. The bridge
-and integrator provide `mqttbridge` and `mqttintegrator` services. Configure
-each before enabling it.
+After configuration changes, run `/etc/init.d/mqttbroker restart`. The bridge and integrator provide `mqttbridge` and `mqttintegrator` services. Configure each before enabling it.
 
 ## Updates
 
@@ -114,16 +102,11 @@ apk update
 apk list --upgradable
 ```
 
-Update selected packages with `opkg upgrade <package> ...` or
-`apk upgrade <package> ...`. Review related library and application updates
-together. This does not upgrade firmware. After changing OpenWrt release series,
-configure the matching feed again.
+Update selected packages with `opkg upgrade <package> ...` or `apk upgrade <package> ...`. Review related library and application updates together. This does not upgrade firmware. After changing OpenWrt release series, configure the matching feed again.
 
 ## Manual repository setup
 
-Run the block for your release as `root`. These commands only configure the feed
-and refresh its index; package installation is a separate step. Existing feeds
-are preserved. The public keys can also be inspected in [keys](../keys).
+Run the block for your release as `root`. These commands only configure the feed and refresh its index; package installation is a separate step. Existing feeds are preserved. The public keys can also be inspected in [keys](../keys).
 
 ### OpenWrt 24.10: opkg
 
@@ -168,8 +151,7 @@ are preserved. The public keys can also be inspected in [keys](../keys).
 
 This device uses `aarch64_cortex-a53`.
 
-On **24.10**, the entry in
-`/etc/opkg/customfeeds.conf` is:
+On **24.10**, the entry in `/etc/opkg/customfeeds.conf` is:
 
 ```text
 src/gz snodec https://raw.githubusercontent.com/SNodeC/Packages/main/openwrt/24.10/aarch64_cortex-a53
@@ -181,19 +163,15 @@ On **25.12**, `/etc/apk/repositories.d/snodec.list` contains:
 https://raw.githubusercontent.com/SNodeC/Packages/main/openwrt/25.12/aarch64_cortex-a53/packages.adb
 ```
 
-Import the corresponding signing key as shown above. For other devices, use
-their `DISTRIB_ARCH`; each architecture has its own directory. After an OpenWrt
-release-series upgrade, reconfigure this feed for the new series.
+Import the corresponding signing key as shown above. For other devices, use their `DISTRIB_ARCH`; each architecture has its own directory. After an OpenWrt release-series upgrade, reconfigure this feed for the new series.
 
 Then [choose packages](#choose-packages) to install.
 
 ## Reference
 
-Source recipes: [SNode.C](https://github.com/SNodeC/Packages/tree/main/net/snode.c)
-and [MQTTSuite](https://github.com/SNodeC/Packages/tree/main/net/mqttsuite).
+Source recipes: [SNode.C](https://github.com/SNodeC/Packages/tree/main/net/snode.c) and [MQTTSuite](https://github.com/SNodeC/Packages/tree/main/net/mqttsuite).
 
-Both releases support the same platform variants. RISC-V is named
-`riscv64_riscv64` on 24.10 and `riscv64_generic` on 25.12.
+Both releases support the same platform variants. RISC-V is named `riscv64_riscv64` on 24.10 and `riscv64_generic` on 25.12.
 
 <details>
 <summary>Supported releases, package architectures and indexes</summary>
@@ -262,8 +240,7 @@ Both releases support the same platform variants. RISC-V is named
 
 ## Troubleshooting
 
-See [common problems and fixes](troubleshooting.md) for download, signature,
-dependency and application errors.
+See [common problems and fixes](troubleshooting.md) for download, signature, dependency and application errors.
 
 | Symptom | What to check |
 | --- | --- |

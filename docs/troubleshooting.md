@@ -24,9 +24,7 @@
 - [Rocky Linux](rocky.md#troubleshooting)
 - [Fedora](fedora.md#troubleshooting)
 
-If the problem remains, [open an issue](https://github.com/SNodeC/Packages/issues).
-Include the distribution, release, package architecture, package name and error
-message. Remove passwords and other credentials from logs.
+If the problem remains, [open an issue](https://github.com/SNodeC/Packages/issues). Include the distribution, release, package architecture, package name and error message. Remove passwords and other credentials from logs.
 
 ## Terms
 

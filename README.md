@@ -6,17 +6,13 @@ Signed binary packages for OpenWrt, Raspberry Pi OS, Debian, Ubuntu, Rocky Linux
 
 ## What's inside
 
-[SNode.C](https://github.com/SNodeC/snode.c) provides a C++ networking framework,
-runtime libraries and tools. [MQTTSuite](https://github.com/SNodeC/mqttsuite)
-provides an MQTT broker, bridge, integrator, command-line client, store and mapping
-plugins. Install binaries with your package manager; no compilation is needed.
+[SNode.C](https://github.com/SNodeC/snode.c#project-overview) provides a C++ networking framework, runtime libraries and tools. [MQTTSuite](https://github.com/SNodeC/mqttsuite#project-overview) provides an MQTT broker, bridge, integrator, command-line client, store and mapping plugins. Install binaries with your package manager; no compilation is needed.
 
 ## Quick start
 
 ### Installation
 
-Check your [distribution guide](#distributions) for prerequisites, especially
-CRB/EPEL on Rocky Linux. Keep official repositories enabled for dependencies.
+Check your [distribution guide](#distributions) for prerequisites, especially CRB/EPEL on Rocky Linux. Keep official repositories enabled for dependencies.
 
 **Linux — Raspberry Pi OS, Debian, Ubuntu, Rocky Linux or Fedora:**
 
@@ -40,9 +36,7 @@ sh /tmp/snodec-install-feed.sh
 # sh /tmp/snodec-install-feed.sh --prepare
 ```
 
-The installer checks the target, configures its signed package source and installs
-both complete project sets; `--prepare` only configures the source and refreshes indexes.
-Prefer manual setup? See your distribution guide.
+The installer checks the target, configures its signed package source and installs both complete project sets; `--prepare` only configures the source and refreshes indexes. Prefer manual setup? See your distribution guide.
 
 ## Distributions
 
@@ -59,9 +53,7 @@ OpenWrt supports 25 package architectures per release. Raspberry Pi OS supports 
 
 ## Packages
 
-The default install includes all framework components offered by the distribution,
-demonstration applications, the configuration tool, all five MQTT applications and
-both mapping plugins. Configure listeners, credentials and TLS before starting services.
+The default install includes all framework components offered by the distribution, demonstration applications, the configuration tool, all five MQTT applications and both mapping plugins. Configure listeners, credentials and TLS before starting services.
 
 | Package | Contents |
 | --- | --- |
@@ -72,29 +64,36 @@ both mapping plugins. Configure listeners, credentials and TLS before starting s
 
 DEB/RPM packages also include development files.
 
-Full catalogs: [SNode.C](docs/snodec-package-options.md) and
-[MQTTSuite](docs/mqttsuite-package-options.md), with shared package names across distributions.
-Find available versions and per-target results on [Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md).
+Full catalogs: [SNode.C](docs/snodec-package-options.md) and [MQTTSuite](docs/mqttsuite-package-options.md), with shared package names across distributions. Find available versions and per-target results on [Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md).
 
 ## Signing keys
 
-| Format | Public-key fingerprint |
-| --- | --- |
-| opkg / usign | `f6fd78dca70698e8` |
-| apk / SHA-256 of DER public key | `293fb661ae75b821a15fa14f1399cd432d2f444bec138ba0e9ac397c81dbe645` |
-| APT / OpenPGP | `8BBFD49E3C826FDB1416C79E60046744B15B0E05` |
-| RPM / OpenPGP | `8BBFD49E3C826FDB1416C79E60046744B15B0E05` |
+### opkg / usign
 
-[Download public keys](https://github.com/SNodeC/Packages/tree/main/keys).
-APT and RPM use the same key. Keep signature verification enabled.
+```text
+f6fd78dca70698e8
+```
+
+### apk / SHA-256 of DER public key
+
+```text
+293fb661ae75b821a15fa14f1399cd432d2f444bec138ba0e9ac397c81dbe645
+```
+
+### APT and RPM / OpenPGP
+
+```text
+8BBFD49E3C826FDB1416C79E60046744B15B0E05
+```
+
+[Download public keys](https://github.com/SNodeC/Packages/tree/main/keys). APT and RPM use the same key. Keep signature verification enabled.
 
 ## Help
 
 ### Repository troubleshooting
 
-See [Troubleshooting](docs/troubleshooting.md) for common errors and packaging
-terms, or [open an issue](https://github.com/SNodeC/Packages/issues).
+See [Troubleshooting](docs/troubleshooting.md) for common errors and packaging terms, or [open an issue](https://github.com/SNodeC/Packages/issues).
 
 ---
 
-[How this repository works](docs/maintainers.md) · [SNode.C](https://github.com/SNodeC/snode.c) · [MQTTSuite](https://github.com/SNodeC/mqttsuite)
+[How this repository works](docs/maintainers.md) · [SNode.C](https://github.com/SNodeC/snode.c#project-overview) · [MQTTSuite](https://github.com/SNodeC/mqttsuite#project-overview)

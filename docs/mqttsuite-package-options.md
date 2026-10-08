@@ -1,7 +1,6 @@
 # MQTTSuite package catalog
 
-Package names are shared by OpenWrt, Raspberry Pi OS, Debian, Ubuntu, Rocky Linux
-and Fedora. Architectures affect availability and binary contents, not names.
+Package names are shared by OpenWrt, Raspberry Pi OS, Debian, Ubuntu, Rocky Linux and Fedora. Architectures affect availability and binary contents, not names.
 
 ## Installation and build results
 
@@ -11,9 +10,7 @@ and Fedora. Architectures affect availability and binary contents, not names.
 
 ## Packages: 8
 
-Library `<version>` follows the published release; `<ABI>` identifies its binary
-interface. See [Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md)
-for current versions.
+Library `<version>` follows the published release; `<ABI>` identifies its binary interface. See [Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md) for current versions.
 
 | Package | Payload / role |
 | --- | --- |
@@ -26,8 +23,7 @@ for current versions.
 | `mqttsuite-mapping-storage` | libmqtt-mapping-plugin-storage.so |
 | `mqttsuite` | Metapackage: all five applications and both mapping plugins |
 
-Application libraries also include the real `.so.<version>` file. Each enabled
-MQTT WebSocket plugin contains its `.so.<ABI>` ABI symlink and `.so.<version>` real file.
+Application libraries also include the real `.so.<version>` file. Each enabled MQTT WebSocket plugin contains its `.so.<ABI>` ABI symlink and `.so.<version>` real file.
 
 ## Distribution details
 

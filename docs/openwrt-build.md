@@ -1,25 +1,12 @@
 # SNode.C and MQTTSuite for GL-MT3000
 
-This maintainer guide requires access to the private DistributionPackages repository.
-For binary installation, use the [OpenWrt installation guide](openwrt.md).
+Build from the public recipes in [Packages/net](https://github.com/SNodeC/Packages/tree/main/net). DistributionPackages maintains these recipes; access to the CI repository is not required to use the published copy. For binary installation, use the [OpenWrt installation guide](openwrt.md).
 
-The [SNode.C recipe](https://github.com/SNodeC/DistributionPackages/blob/main/net/snode.c/Makefile) and
-[MQTTSuite recipe](https://github.com/SNodeC/DistributionPackages/blob/main/net/mqttsuite/Makefile) declare the default source releases.
-For a release build, export `SNODEC_SOURCE_TAG=vX.Y.Z` and
-`MQTTSUITE_SOURCE_TAG=vA.B.C` before running the SDK commands; each recipe derives
-its package version from its selected release tag. CI selects and records these
-versions automatically.
+The [SNode.C recipe](https://github.com/SNodeC/Packages/blob/main/net/snode.c/Makefile) and [MQTTSuite recipe](https://github.com/SNodeC/Packages/blob/main/net/mqttsuite/Makefile) declare the default source releases. For a release build, export `SNODEC_SOURCE_TAG=vX.Y.Z` and `MQTTSUITE_SOURCE_TAG=vA.B.C` before running the SDK commands; each recipe derives its package version from its selected release tag. CI selects and records these versions automatically.
 
-The recipes use the upstream build systems without source patches. See
-[Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#openwrt)
-for published versions. The SDK commands below are a recorded GL-MT3000 example.
+The recipes use the upstream build systems without source patches. See [Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#openwrt) for published versions. The SDK commands below are a recorded GL-MT3000 example.
 
-The build uses the official OpenWrt 25.12.5 `mediatek/filogic` SDK with GCC
-14.3.0 and musl, producing `aarch64_cortex-a53` APK packages. The release's
-`glinet_gl-mt3000` profile identifies this target. These packages require the
-matching OpenWrt userspace and, for Bluetooth dependencies, matching kernel
-ABI. They are not a claim of compatibility with GL.iNet's vendor firmware or
-with an older OpenWrt release using opkg/IPK.
+The build uses the official OpenWrt 25.12.5 `mediatek/filogic` SDK with GCC 14.3.0 and musl, producing `aarch64_cortex-a53` APK packages. The release's `glinet_gl-mt3000` profile identifies this target. These packages require the matching OpenWrt userspace and, for Bluetooth dependencies, matching kernel ABI. They are not a claim of compatibility with GL.iNet's vendor firmware or with an older OpenWrt release using opkg/IPK.
 
 SDK: <https://downloads.openwrt.org/releases/25.12.5/targets/mediatek/filogic/>
 
@@ -29,53 +16,26 @@ SHA256: `ff4a38a397caa2cfe1c39e18f84ddede14878221b3593c3f2c4cfe24e3ec4c25`
 
 ## Package selection
 
-Build-time defaults are listed under [SNode.C](#snodec-build-defaults) and
-[MQTTSuite](#mqttsuite-transport-defaults) below. They apply when compiling
-packages from source, not when installing pre-built packages.
+Build-time defaults are listed under [SNode.C](#snodec-build-defaults) and [MQTTSuite](#mqttsuite-transport-defaults) below. They apply when compiling packages from source, not when installing pre-built packages.
 
-Use **Network / SNode.C** and **Network / MQTTSuite** in `make menuconfig`.
-OpenWrt generates a `CONFIG_PACKAGE_<package>` tristate for each package in
-these recipes. `m` builds an installable package; `y` also selects it for an
-image build; `n` omits it unless a selected consumer requires it. Required
-lower layers are selected automatically at the consumer's selection level.
-No second set of module booleans overrides these package selectors.
-The complete package tables are:
-[SNode.C package catalog](snodec-package-options.md) and
-[MQTTSuite package catalog](mqttsuite-package-options.md).
+Use **Network / SNode.C** and **Network / MQTTSuite** in `make menuconfig`. OpenWrt generates a `CONFIG_PACKAGE_<package>` tristate for each package in these recipes. `m` builds an installable package; `y` also selects it for an image build; `n` omits it unless a selected consumer requires it. Required lower layers are selected automatically at the consumer's selection level. No second set of module booleans overrides these package selectors. The complete package tables are: [SNode.C package catalog](snodec-package-options.md) and [MQTTSuite package catalog](mqttsuite-package-options.md).
 
-`snodec` selects all 63 shared runtime modules, the demonstration
-applications (`snodec-apps`) and the control tool (`snodec-control`). Static/internal
-CMake targets have no separate runtime payload and therefore no empty module
-packages. Both RFCOMM (`net-rc`) and L2CAP (`net-l2`) have six separate layers:
-address/configuration, physical socket, physical stream, stream configuration,
-legacy stream and TLS stream. RFCOMM also has legacy/TLS Express packages.
+`snodec` selects all 63 shared runtime modules, the demonstration applications (`snodec-apps`) and the control tool (`snodec-control`). Static/internal CMake targets have no separate runtime payload and therefore no empty module packages. Both RFCOMM (`net-rc`) and L2CAP (`net-l2`) have six separate layers: address/configuration, physical socket, physical stream, stream configuration, legacy stream and TLS stream. RFCOMM also has legacy/TLS Express packages.
 
-`mqttsuite` selects all five applications and both mapping plugins.
-Each application has eight existing-style transport options, including the
-new MQTTStore menu. TLS depends on its base socket family; WSS depends on WS
-and an enabled TLS family. WS requires a socket family. If both IPv6 and Unix
-sockets are disabled, IPv4 TCP is retained so the application remains usable.
-Bridge/integrator retain their upstream unconditional IPv4 HTTP/HTTPS admin
-servers, even when their MQTT TLS transport is disabled.
+`mqttsuite` selects all five applications and both mapping plugins. Each application has eight existing-style transport options, including the new MQTTStore menu. TLS depends on its base socket family; WSS depends on WS and an enabled TLS family. WS requires a socket family. If both IPv6 and Unix sockets are disabled, IPv4 TCP is retained so the application remains usable. Bridge/integrator retain their upstream unconditional IPv4 HTTP/HTTPS admin servers, even when their MQTT TLS transport is disabled.
 
-SNode.C compiles a shared set of library targets, then packages only the
-selected modules. Demonstrations compile only when their package is selected.
-MQTTSuite compiles only selected applications; application WebSocket plugins
-compile and ship only when WS is enabled. The mapping plugins are selected
-individually for packaging.
+SNode.C compiles a shared set of library targets, then packages only the selected modules. Demonstrations compile only when their package is selected. MQTTSuite compiles only selected applications; application WebSocket plugins compile and ship only when WS is enabled. The mapping plugins are selected individually for packaging.
 
 ## Reproduce the build
 
-Extract the SDK and run the following inside it. Replace `/path/to/DistributionPackages`
-with this repository's absolute path. The SDK's default feed revisions are
-retained.
+Extract the SDK and run the following inside it. Replace `/path/to/Packages` with the absolute path of your `SNodeC/Packages` checkout. The SDK's default feed revisions are retained.
 
 ```sh
 ./scripts/feeds update base packages
 ./scripts/feeds install nlohmannjson libopenssl libmagic bluez-libs libmariadb
 mkdir -p package/local
-ln -s /path/to/DistributionPackages/net/snode.c package/local/snode.c
-ln -s /path/to/DistributionPackages/net/mqttsuite package/local/mqttsuite
+ln -s /path/to/Packages/net/snode.c package/local/snode.c
+ln -s /path/to/Packages/net/mqttsuite package/local/mqttsuite
 cat > .config <<'EOF'
 # CONFIG_ALL is not set
 # CONFIG_ALL_NONSHARED is not set
@@ -89,71 +49,29 @@ make defconfig
 make -j16 package/local/mqttsuite/compile V=s
 ```
 
-This selects all publication packages and uses the feature defaults from the
-package Makefiles and `Config.in` files. In particular, MQTTSuite's Unix-socket
-TLS options retain their default of disabled. The example creates unsigned
-packages for local use.
+This selects all publication packages and uses the feature defaults from the package Makefiles and `Config.in` files. In particular, MQTTSuite's Unix-socket TLS options retain their default of disabled. The example creates unsigned packages for local use.
 
-MQTTSuite's build dependency builds and stages SNode.C first. MQTTSuite uses
-a separate CMake build directory so its private `lib/Log.h` cannot shadow
-SNode.C's public `Log.h` through a generated-header include path. spdlog 1.17.0 is
-a checked OpenWrt download, supplied to FetchContent locally. No configure-time
-network fetch is needed. Every recipe configuration option participates in
-OpenWrt's reconfiguration stamp; SNode.C's derived CMake cache is reset when
-configuring to avoid stale defaults.
+MQTTSuite's build dependency builds and stages SNode.C first. MQTTSuite uses a separate CMake build directory so its private `lib/Log.h` cannot shadow SNode.C's public `Log.h` through a generated-header include path. spdlog 1.17.0 is a checked OpenWrt download, supplied to FetchContent locally. No configure-time network fetch is needed. Every recipe configuration option participates in OpenWrt's reconfiguration stamp; SNode.C's derived CMake cache is reset when configuring to avoid stale defaults.
 
 ## WebSocket loading and RPATH
 
-The HTTP loader opens
-`/usr/lib/snode.c/web/http/upgrade/libsnodec-websocket-{server,client}.so.<ABI>`.
-The WebSocket subprotocol loader then opens the application-specific
-`/usr/lib/snode.c/web/http/upgrade/websocket/mqtt<app>/libsnodec-websocket-mqtt-{server,client}.so.<ABI>`.
-MQTTSuite's plugin SONAME follows SNode.C's ABI major, while the real plugin
-filename follows MQTTSuite's release version. Both the real file and ABI symlink
-are packaged. Ordinary MQTTSuite libraries use MQTTSuite's ABI major.
+The HTTP loader opens `/usr/lib/snode.c/web/http/upgrade/libsnodec-websocket-{server,client}.so.<ABI>`. The WebSocket subprotocol loader then opens the application-specific `/usr/lib/snode.c/web/http/upgrade/websocket/mqtt<app>/libsnodec-websocket-mqtt-{server,client}.so.<ABI>`. MQTTSuite's plugin SONAME follows SNode.C's ABI major, while the real plugin filename follows MQTTSuite's release version. Both the real file and ABI symlink are packaged. Ordinary MQTTSuite libraries use MQTTSuite's ABI major.
 
-The plugin directory identifies the `dlopen` object; its dependencies still
-need the correct ELF library search paths. Before OpenWrt runs `rstrip`, the
-MQTTSuite recipe removes only the literal staging-directory prefix from each
-RPATH/RUNPATH entry. It preserves target subdirectories, `$ORIGIN`, unrelated
-entries, permissions, and the original tag type; patchelf errors fail the
-build. It does not delete or shrink all RPATHs. OpenWrt may subsequently remove
-ordinary system-directory entries; the packaged libraries retain the remaining
-paths on each ELF file against that package's dependency closure.
+The plugin directory identifies the `dlopen` object; its dependencies still need the correct ELF library search paths. Before OpenWrt runs `rstrip`, the MQTTSuite recipe removes only the literal staging-directory prefix from each RPATH/RUNPATH entry. It preserves target subdirectories, `$ORIGIN`, unrelated entries, permissions, and the original tag type; patchelf errors fail the build. It does not delete or shrink all RPATHs. OpenWrt may subsequently remove ordinary system-directory entries; the packaged libraries retain the remaining paths on each ELF file against that package's dependency closure.
 
 ## Services and device verification
 
-The three existing services (`mqttbroker`, `mqttintegrator`, `mqttbridge`) run
-in the foreground under procd and send logs to logd. They load SNode.C's
-existing `/etc/snode.c/<application>.conf` configuration files. The recipe
-preserves `/etc/snode.c/` across upgrades. The bridge service starts only once
-`/etc/snode.c/mqttbridge.conf` exists; configure its `bridge.definition` with a
-valid bridge JSON file. Its packaged web assets are supplied through
-`bridge --html-dir /usr/var/www/mqttsuite/mqttbridge`. No site-specific remote
-brokers are built into the service.
+The three existing services (`mqttbroker`, `mqttintegrator`, `mqttbridge`) run in the foreground under procd and send logs to logd. They load SNode.C's existing `/etc/snode.c/<application>.conf` configuration files. The recipe preserves `/etc/snode.c/` across upgrades. The bridge service starts only once `/etc/snode.c/mqttbridge.conf` exists; configure its `bridge.definition` with a valid bridge JSON file. Its packaged web assets are supplied through `bridge --html-dir /usr/var/www/mqttsuite/mqttbridge`. No site-specific remote brokers are built into the service.
 
-MQTTStore and the CLI are independent executable packages. Configure database
-credentials/storage projections and MQTT endpoints before running MQTTStore.
-TLS endpoints need suitable certificates, keys and trust settings.
+MQTTStore and the CLI are independent executable packages. Configure database credentials/storage projections and MQTT endpoints before running MQTTStore. TLS endpoints need suitable certificates, keys and trust settings.
 
-On the matching router firmware, install the desired APKs with their
-dependencies (`apk add --allow-untrusted ./<package>.apk` for these unsigned
-local builds). Supply all referenced local SNode.C packages or a local feed;
-installing a single meta-package alone cannot discover unpublished packages.
-Then check application help/configuration, native MQTT, WS and WSS connections,
-service restart/logging, bridge forwarding, integrator mappings, and MQTTStore
-writes.
+On the matching router firmware, install the desired APKs with their dependencies (`apk add --allow-untrusted ./<package>.apk` for these unsigned local builds). Supply all referenced local SNode.C packages or a local feed; installing a single meta-package alone cannot discover unpublished packages. Then check application help/configuration, native MQTT, WS and WSS connections, service restart/logging, bridge forwarding, integrator mappings, and MQTTStore writes.
 
 ## SNode.C build defaults
 
-For source builds, package selection uses `CONFIG_PACKAGE_<name>` with
-ordinary n/m/y semantics and automatic dependency selection. Build defaults
-do not replace package selectors.
+For source builds, package selection uses `CONFIG_PACKAGE_<name>` with ordinary n/m/y semantics and automatic dependency selection. Build defaults do not replace package selectors.
 
-Every symbol below has the `CONFIG_` prefix in `.config`. Defaults shown are
-menu defaults. A choice uses exactly one of its alternative symbols. Values
-are passed into the existing upstream CMake settings; they are runtime defaults
-that the application's existing configuration system can override.
+Every symbol below has the `CONFIG_` prefix in `.config`. Defaults shown are menu defaults. A choice uses exactly one of its alternative symbols. Values are passed into the existing upstream CMake settings; they are runtime defaults that the application's existing configuration system can override.
 
 | Config.in symbol | Meaning | Default |
 | --- | --- | --- |
@@ -202,27 +120,15 @@ that the application's existing configuration system can override.
 | `SNODEC_TLS_SHUTDOWN_TIMEOUT` | SSL/TLS teardown timeout in seconds | `2` |
 | `SNODEC_HTTP_REQUEST_PIPELINED` | Pipelined requests | `y` |
 
-Read/write sizes, timeouts, retry/reconnect settings and write-queue limits
-configure `snodec-net`. IPv4/IPv6 stream flags configure their stream layers;
-name-resolution flags configure their address layers. TLS defaults are shared
-by TLS endpoints. HTTP pipelining configures the HTTP client. The I/O choice
-controls the core's linked default multiplexer and its package dependency;
-selecting extra multiplexer packages does not change that default.
+Read/write sizes, timeouts, retry/reconnect settings and write-queue limits configure `snodec-net`. IPv4/IPv6 stream flags configure their stream layers; name-resolution flags configure their address layers. TLS defaults are shared by TLS endpoints. HTTP pipelining configures the HTTP client. The I/O choice controls the core's linked default multiplexer and its package dependency; selecting extra multiplexer packages does not change that default.
 
-All 44 SNode.C default/choice symbols and the demo selector participate in
-recipe reconfiguration. Other module selectors govern package emission and
-dependency closure; they do not prune the shared library compilation pass.
+All 44 SNode.C default/choice symbols and the demo selector participate in recipe reconfiguration. Other module selectors govern package emission and dependency closure; they do not prune the shared library compilation pass.
 
 ## MQTTSuite transport defaults
 
-For source builds, package selection uses `CONFIG_PACKAGE_<name>` with
-ordinary n/m/y semantics and automatic dependency selection. Build defaults
-do not replace package selectors.
+For source builds, package selection uses `CONFIG_PACKAGE_<name>` with ordinary n/m/y semantics and automatic dependency selection. Build defaults do not replace package selectors.
 
-All rows have the `CONFIG_` prefix in `.config`. Enabling a row compiles that
-application's endpoint support and selects the matching SNode.C packages.
-WS/WSS select the appropriate client/server WebSocket MQTT modules. Both share
-one application plugin; it is absent when WS is disabled.
+All rows have the `CONFIG_` prefix in `.config`. Enabling a row compiles that application's endpoint support and selects the matching SNode.C packages. WS/WSS select the appropriate client/server WebSocket MQTT modules. Both share one application plugin; it is absent when WS is disabled.
 
 | Config.in symbol | Default | Required options |
 | --- | --- | --- |
@@ -267,10 +173,6 @@ one application plugin; it is absent when WS is disabled.
 | `MQTTSUITE_STORE_WS` | `y` | MQTTSUITE_STORE_TCP_IPV4 or MQTTSUITE_STORE_TCP_IPV6 or MQTTSUITE_STORE_UNIX |
 | `MQTTSUITE_STORE_WSS` | `y` | MQTTSUITE_STORE_WS; MQTTSUITE_STORE_TLS_IPV4 or MQTTSUITE_STORE_TLS_IPV6 or MQTTSUITE_STORE_UNIX_TLS |
 
-The IPv4 TCP switch is mandatory when both IPv6 TCP and Unix sockets are off.
-Integrator and bridge have upstream unconditional IPv4 HTTP and HTTPS admin
-servers, so disabling MQTT TLS does not remove their admin TLS dependency.
+The IPv4 TCP switch is mandatory when both IPv6 TCP and Unix sockets are off. Integrator and bridge have upstream unconditional IPv4 HTTP and HTTPS admin servers, so disabling MQTT TLS does not remove their admin TLS dependency.
 
-All 40 transport symbols and the five application selectors participate in
-recipe reconfiguration. Mapping plugin selectors govern separate package
-emission. SNode.C is a build/runtime dependency.
+All 40 transport symbols and the five application selectors participate in recipe reconfiguration. Mapping plugin selectors govern separate package emission. SNode.C is a build/runtime dependency.

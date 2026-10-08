@@ -325,6 +325,13 @@ class StatusEventsTest(unittest.TestCase):
         obsolete = self.seed / 'net/obsolete/Makefile'
         obsolete.parent.mkdir(parents=True)
         obsolete.write_text('removed recipe')
+        obsolete_doc = self.seed / 'docs/removed/guide.md'
+        obsolete_doc.parent.mkdir(parents=True)
+        obsolete_doc.write_text('removed guide')
+        (self.seed / 'docs/status.md').write_text('stale generated status')
+        self.event(self.seed, 'running', row=self.rows[1])
+        status_before = (self.seed / 'status.json').read_bytes()
+        badges_before = {p.name: p.read_bytes() for p in (self.seed / 'status/badges').iterdir()}
         original={name:(self.bundle/name).read_bytes() for name in ['context.json','sources.json']}
         feed=self.seed/publication.feed_paths(self.rows[0])[0]
         feed.mkdir(parents=True)
@@ -345,7 +352,15 @@ class StatusEventsTest(unittest.TestCase):
         self.assertIn('Removed ',stderr.getvalue())
         self.assertIn('Protected 3 files; retained 0 retired files; removed 1',stderr.getvalue())
         self.assertFalse((feed/'retired.ipk').exists())
-        self.assertEqual(publication.read(self.seed/'status.json')['targets'],{})
+        self.assertEqual((self.seed / 'status.json').read_bytes(), status_before)
+        self.assertFalse((self.seed / 'docs/removed').exists())
+        self.assertIn('![snode.c: running]', (self.seed / 'docs/status.md').read_text())
+        self.assertEqual(badges_before, {p.name: p.read_bytes() for p in (self.seed / 'status/badges').iterdir()})
+        expected_docs = {p.relative_to(repository.ROOT / 'docs'): p.read_bytes()
+                         for p in (repository.ROOT / 'docs').rglob('*') if p.is_file()}
+        actual_docs = {p.relative_to(self.seed / 'docs'): p.read_bytes()
+                       for p in (self.seed / 'docs').rglob('*') if p.is_file() and p.name != 'status.md'}
+        self.assertEqual(actual_docs, expected_docs)
         self.event(self.seed,stdout.getvalue().strip())
         self.assertEqual(publication.read(self.seed/'status.json')['targets'][self.rows[0]['id']+'/snode.c']['status'],'published')
         for name,data in original.items():
