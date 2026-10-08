@@ -2,7 +2,7 @@
 
 Signed binary packages for OpenWrt, Raspberry Pi OS, Debian, Ubuntu, Rocky Linux and Fedora.
 
-<p align="center">
+<p>
   <a href="#quick-start" title="Quick start"><img src="docs/media/menu/quick-start-120.svg" alt="Quick start" width="120" height="24"></a>
   <a href="#distributions" title="Distributions"><img src="docs/media/menu/distributions-120.svg" alt="Distributions" width="120" height="24"></a>
   <a href="#packages" title="Packages"><img src="docs/media/menu/packages-120.svg" alt="Packages" width="120" height="24"></a>
@@ -102,7 +102,7 @@ See [Troubleshooting](docs/troubleshooting.md) for common errors and packaging t
 
 ---
 
-<p align="center">
+<p>
   <a href="docs/maintainers.md" title="How this repository works"><img src="docs/media/menu/how-this-repository-works-188.svg" alt="How this repository works" width="188" height="24"></a>
   <a href="https://github.com/SNodeC/snode.c#project-overview" title="SNode.C"><img src="docs/media/menu/snode-c-188.svg" alt="SNode.C" width="188" height="24"></a>
   <a href="https://github.com/SNodeC/mqttsuite#project-overview" title="MQTTSuite"><img src="docs/media/menu/mqttsuite-188.svg" alt="MQTTSuite" width="188" height="24"></a>

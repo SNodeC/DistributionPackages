@@ -4,7 +4,7 @@
   <a href="../README.md#distributions"><img src="media/menu/back-all-distributions.svg" alt="← All distributions" width="140" height="24"></a>
 </p>
 
-<p align="center">
+<p>
   <a href="#requirements" title="Requirements"><img src="media/menu/requirements-102.svg" alt="Requirements" width="102" height="24"></a>
   <a href="#quick-install" title="Quick install"><img src="media/menu/install-102.svg" alt="Quick install" width="102" height="24"></a>
   <a href="#choose-packages" title="Choose packages"><img src="media/menu/packages-102.svg" alt="Choose packages" width="102" height="24"></a>
@@ -175,7 +175,7 @@ See [common problems and fixes](troubleshooting.md) for download, signature, dep
 | --- | --- |
 | Sid selects a testing suite | Pass `--suite sid` to the installer on an installed Sid system. |
 
-<p align="center">
+<p>
   <a href="#debian" title="Back to top"><img src="media/menu/back-to-top-124.svg" alt="Back to top" width="124" height="24"></a>
   <a href="../README.md#distributions" title="All distributions"><img src="media/menu/all-distributions-124.svg" alt="All distributions" width="124" height="24"></a>
   <a href="https://github.com/SNodeC/Packages/blob/main/docs/status.md#debian" title="Package status"><img src="media/menu/package-status-124.svg" alt="Package status" width="124" height="24"></a>

@@ -4,7 +4,7 @@
   <a href="../README.md#distributions"><img src="media/menu/back-all-distributions.svg" alt="← All distributions" width="140" height="24"></a>
 </p>
 
-<p align="center">
+<p>
   <a href="#requirements" title="Requirements"><img src="media/menu/requirements-102.svg" alt="Requirements" width="102" height="24"></a>
   <a href="#quick-install" title="Quick install"><img src="media/menu/install-102.svg" alt="Quick install" width="102" height="24"></a>
   <a href="#choose-packages" title="Choose packages"><img src="media/menu/packages-102.svg" alt="Choose packages" width="102" height="24"></a>
@@ -158,7 +158,7 @@ See [common problems and fixes](troubleshooting.md) for download, signature, dep
 | Dependencies are missing | Enable CRB and EPEL as shown in Requirements. |
 | Illegal instruction on x86 | Check the x86-64-v3 requirement for Rocky Linux 10. |
 
-<p align="center">
+<p>
   <a href="#rocky-linux" title="Back to top"><img src="media/menu/back-to-top-124.svg" alt="Back to top" width="124" height="24"></a>
   <a href="../README.md#distributions" title="All distributions"><img src="media/menu/all-distributions-124.svg" alt="All distributions" width="124" height="24"></a>
   <a href="https://github.com/SNodeC/Packages/blob/main/docs/status.md#rocky-linux" title="Package status"><img src="media/menu/package-status-124.svg" alt="Package status" width="124" height="24"></a>
