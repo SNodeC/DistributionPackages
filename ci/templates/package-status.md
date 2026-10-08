@@ -58,4 +58,8 @@ Jobs report build start, build end and publication directly. Each state has an i
 
 ## Help
 
-[Troubleshooting](https://github.com/SNodeC/Packages/blob/main/docs/troubleshooting.md) · [Repository maintenance](https://github.com/SNodeC/Packages/blob/main/docs/maintainers.md) · [Back to installation](https://github.com/SNodeC/Packages/blob/main/README.md#quick-start)
+<p align="center">
+  <a href="https://github.com/SNodeC/Packages/blob/main/docs/troubleshooting.md" title="Troubleshooting"><img src="https://raw.githubusercontent.com/SNodeC/Packages/main/docs/media/menu/troubleshooting-176.svg" alt="Troubleshooting" width="176" height="24"></a>
+  <a href="https://github.com/SNodeC/Packages/blob/main/docs/maintainers.md" title="Repository maintenance"><img src="https://raw.githubusercontent.com/SNodeC/Packages/main/docs/media/menu/repository-maintenance-176.svg" alt="Repository maintenance" width="176" height="24"></a>
+  <a href="https://github.com/SNodeC/Packages/blob/main/README.md#quick-start" title="Back to installation"><img src="https://raw.githubusercontent.com/SNodeC/Packages/main/docs/media/menu/back-to-installation-176.svg" alt="Back to installation" width="176" height="24"></a>
+</p>

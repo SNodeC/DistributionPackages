@@ -2,7 +2,16 @@
 
 [← All distributions](../README.md#distributions)
 
-[Requirements](#requirements) · [Quick install](#quick-install) · [Choose packages](#choose-packages) · [Configure and run](#configure-and-run) · [Updates](#updates) · [Manual repository setup](#manual-repository-setup) · [Reference](#reference) · [Troubleshooting](#troubleshooting)
+<p align="center">
+  <a href="#requirements" title="Requirements"><img src="media/menu/requirements-102.svg" alt="Requirements" width="102" height="24"></a>
+  <a href="#quick-install" title="Quick install"><img src="media/menu/install-102.svg" alt="Quick install" width="102" height="24"></a>
+  <a href="#choose-packages" title="Choose packages"><img src="media/menu/packages-102.svg" alt="Choose packages" width="102" height="24"></a>
+  <a href="#configure-and-run" title="Configure and run"><img src="media/menu/configure-102.svg" alt="Configure and run" width="102" height="24"></a>
+  <a href="#updates" title="Updates"><img src="media/menu/updates-102.svg" alt="Updates" width="102" height="24"></a>
+  <a href="#manual-repository-setup" title="Manual repository setup"><img src="media/menu/manual-setup-102.svg" alt="Manual repository setup" width="102" height="24"></a>
+  <a href="#reference" title="Reference"><img src="media/menu/reference-102.svg" alt="Reference" width="102" height="24"></a>
+  <a href="#troubleshooting" title="Troubleshooting"><img src="media/menu/help-102.svg" alt="Troubleshooting" width="102" height="24"></a>
+</p>
 
 ## Requirements
 
@@ -142,4 +151,8 @@ See [common problems and fixes](troubleshooting.md) for download, signature, dep
 | Installer identifies the Pi as Debian | Check `/etc/rpi-issue`; the installer uses it to identify Raspberry Pi OS. Use the Pi repository only on Raspberry Pi OS. |
 | Architecture is `armhf` | This repository supports 64-bit Raspberry Pi OS (`arm64`) only. |
 
-[Back to top](#raspberry-pi-os) · [All distributions](../README.md#distributions) · [Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md#raspberry-pi-os)
+<p align="center">
+  <a href="#raspberry-pi-os" title="Back to top"><img src="media/menu/back-to-top-124.svg" alt="Back to top" width="124" height="24"></a>
+  <a href="../README.md#distributions" title="All distributions"><img src="media/menu/all-distributions-124.svg" alt="All distributions" width="124" height="24"></a>
+  <a href="https://github.com/SNodeC/Packages/blob/main/docs/status.md#raspberry-pi-os" title="Package status"><img src="media/menu/package-status-124.svg" alt="Package status" width="124" height="24"></a>
+</p>

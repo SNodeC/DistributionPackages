@@ -2,7 +2,13 @@
 
 Signed binary packages for OpenWrt, Raspberry Pi OS, Debian, Ubuntu, Rocky Linux and Fedora.
 
-[Quick start](#quick-start) · [Distributions](#distributions) · [Packages](#packages) · [Package status](https://github.com/SNodeC/Packages/blob/main/docs/status.md) · [Help](#help)
+<p align="center">
+  <a href="#quick-start" title="Quick start"><img src="docs/media/menu/quick-start-120.svg" alt="Quick start" width="120" height="24"></a>
+  <a href="#distributions" title="Distributions"><img src="docs/media/menu/distributions-120.svg" alt="Distributions" width="120" height="24"></a>
+  <a href="#packages" title="Packages"><img src="docs/media/menu/packages-120.svg" alt="Packages" width="120" height="24"></a>
+  <a href="https://github.com/SNodeC/Packages/blob/main/docs/status.md" title="Package status"><img src="docs/media/menu/package-status-120.svg" alt="Package status" width="120" height="24"></a>
+  <a href="#help" title="Help"><img src="docs/media/menu/help-120.svg" alt="Help" width="120" height="24"></a>
+</p>
 
 ## What's inside
 
@@ -96,4 +102,8 @@ See [Troubleshooting](docs/troubleshooting.md) for common errors and packaging t
 
 ---
 
-[How this repository works](docs/maintainers.md) · [SNode.C](https://github.com/SNodeC/snode.c#project-overview) · [MQTTSuite](https://github.com/SNodeC/mqttsuite#project-overview)
+<p align="center">
+  <a href="docs/maintainers.md" title="How this repository works"><img src="docs/media/menu/how-this-repository-works-188.svg" alt="How this repository works" width="188" height="24"></a>
+  <a href="https://github.com/SNodeC/snode.c#project-overview" title="SNode.C"><img src="docs/media/menu/snode-c-188.svg" alt="SNode.C" width="188" height="24"></a>
+  <a href="https://github.com/SNodeC/mqttsuite#project-overview" title="MQTTSuite"><img src="docs/media/menu/mqttsuite-188.svg" alt="MQTTSuite" width="188" height="24"></a>
+</p>
