@@ -1,6 +1,8 @@
 # Repository maintenance
 
-[← Installation overview](../README.md)
+<p>
+  <a href="../README.md"><img src="media/menu/back-installation-overview.svg" alt="← Installation overview" width="170" height="24"></a>
+</p>
 
 ## Responsibilities
 

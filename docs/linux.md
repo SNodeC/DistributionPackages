@@ -1,6 +1,8 @@
 # DEB and RPM component packages
 
-[← All distributions](../README.md#distributions)
+<p>
+  <a href="../README.md#distributions"><img src="media/menu/back-all-distributions.svg" alt="← All distributions" width="140" height="24"></a>
+</p>
 
 ## Component packages
 

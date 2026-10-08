@@ -1,6 +1,8 @@
 # CI setup and activation
 
-[← Repository maintenance](maintainers.md)
+<p>
+  <a href="maintainers.md"><img src="media/menu/back-repository-maintenance.svg" alt="← Repository maintenance" width="192" height="24"></a>
+</p>
 
 ## Configure DistributionPackages
 

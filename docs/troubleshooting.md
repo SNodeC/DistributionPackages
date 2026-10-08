@@ -1,6 +1,8 @@
 # Troubleshooting
 
-[← Installation overview](../README.md#installation)
+<p>
+  <a href="../README.md#installation"><img src="media/menu/back-installation-overview.svg" alt="← Installation overview" width="170" height="24"></a>
+</p>
 
 ## Common problems
 
@@ -36,4 +38,6 @@ If the problem remains, [open an issue](https://github.com/SNodeC/Packages/issue
 - **Index:** the file the package manager reads to find packages and verify their metadata.
 - **Browse:** a GitHub directory view for people; it is not an index URL.
 
-[Back to installation](../README.md#installation).
+<p>
+  <a href="../README.md#installation"><img src="media/menu/back-to-installation.svg" alt="Back to installation" width="144" height="24"></a>
+</p>
