@@ -110,4 +110,4 @@ APT and RPM use the same OpenPGP key. The APK fingerprint is SHA-256 of the DER 
 
 Use short-lived development branches and merge into main. The predecessor's device scripts and obsolete branches have not been imported. Its archived development feed is not a publication destination here.
 
-See the [migration record](migration.md), [historical design notes](history/distribution-packages-plan.md) and [OpenWrt build guide](openwrt-build.md). Existing repositories remain unchanged.
+See the [migration record](migration.md) and [historical design notes](history/distribution-packages-plan.md). Existing repositories remain unchanged.
