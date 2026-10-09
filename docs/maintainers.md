@@ -108,9 +108,3 @@ gpg --batch --show-keys --with-colons keys/snodec-apt.asc |
 ```
 
 APT and RPM use the same OpenPGP key. The APK fingerprint is SHA-256 of the DER public key. Keep existing private signing keys when migrating; do not silently replace the trust identity.
-
-## Branches and history
-
-Use short-lived development branches and merge into main. The predecessor's device scripts and obsolete branches have not been imported. Its archived development feed is not a publication destination here.
-
-See the [migration record](migration.md) and [historical design notes](history/distribution-packages-plan.md). Existing repositories remain unchanged.
