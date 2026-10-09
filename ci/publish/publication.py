@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import importlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import sys
@@ -92,6 +93,21 @@ def render(root, state):
                 title = 'SNode.C' if project == 'snode.c' else 'MQTTSuite'
                 tables.append(f'#### {title}\n\n| Architecture | Version | Status | Published | Packages |\n| --- | --- | --- | --- | --- |\n' + '\n'.join(lines))
         text = text.replace(f'<!-- targets:{distribution} -->', '\n\n'.join(tables))
+    contents, anchors = [], {}
+    for level, title in re.findall(r'^(#{1,6}) (.+)$', text, re.MULTILINE):
+        slug = re.sub(r'[^\w\- ]', '', title.lower()).replace(' ', '-')
+        occurrence = anchors.get(slug, 0)
+        anchors[slug] = occurrence + 1
+        anchor = f'{slug}-{occurrence}' if occurrence else slug
+        if level == '##':
+            distribution_link = f'[{title}](#{anchor})'
+            releases = []
+        elif level == '###':
+            if not releases:
+                contents.append((distribution_link, releases))
+            releases.append(f'[{title}](#{anchor})')
+    text = text.replace('<!-- contents -->', '\n'.join(
+        f'- **{distribution}** ({" · ".join(releases)})' for distribution, releases in contents))
     (root / 'docs').mkdir(exist_ok=True)
     (root / 'docs/status.md').write_text(text)
 

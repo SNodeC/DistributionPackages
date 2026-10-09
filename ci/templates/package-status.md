@@ -2,6 +2,8 @@
 
 To install, see [Quick start](https://github.com/SNodeC/Packages/blob/main/README.md#quick-start).
 
+<!-- contents -->
+
 ## Reading the matrix
 
 **Version** is what is available to install. **Status** describes the latest build attempt; click its badge to inspect the job (repository access required for private build logs). An unfinished or failed rebuild does not replace an available version. A dash means no version is recorded.
