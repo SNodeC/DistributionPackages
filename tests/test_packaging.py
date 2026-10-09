@@ -126,6 +126,10 @@ class PackagingTest(unittest.TestCase):
             publication.render(root, {'targets': {}})
             before = {p.name: p.read_bytes() for p in (root / 'status/badges').iterdir()}
             self.assertEqual(len(before), 9)
+            for svg in before.values():
+                self.assertIn(b'width="86" height="20"', svg)
+                self.assertIn(b'<text x="43.0"', svg)
+            (root / 'status/badges/pending.svg').write_text('previous badge design')
             self.assertFalse((root / 'status/old-target.svg').exists())
             state = dict(targets={})
             row = publication.targets()[0]

@@ -58,14 +58,11 @@ def render(root, state):
     sections = {}
     colors = {'pending': '#57606a', 'running': '#0969da', 'publishing': '#0969da', 'published': '#1a7f37',
               'failed': '#cf222e', 'cancelled': '#57606a', 'skipped': '#57606a', 'superseded': '#9a6700', 'not built': '#57606a'}
+    width = max(map(len, colors)) * 7 + 16
     for label, color in colors.items():
-        width = len(label) * 7 + 16
         badge = badges / (label.replace(' ', '-') + '.svg')
         svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="20" role="img" aria-label="{label}"><rect width="{width}" height="20" rx="3" fill="{color}"/><text x="{width / 2}" y="14" text-anchor="middle" fill="white" font-family="Verdana,sans-serif" font-size="11">{label}</text></svg>\n'
-        if not badge.exists():
-            badge.write_text(svg)
-        elif badge.read_text() != svg:
-            raise RuntimeError(f'Immutable badge differs: {badge.name}')
+        badge.write_text(svg)
     for obsolete in (root / 'status').glob('*.svg'):
         obsolete.unlink()
     for row in sorted(targets(), key=lambda item: item['arch']):
