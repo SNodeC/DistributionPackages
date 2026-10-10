@@ -107,7 +107,7 @@ def render(root, state):
             old = f'{old}-{count}' if count else old
             tables.append(f'<a id="{old}"></a>\n\n### {title} {suite}\n\n'
                           '| Architecture | SNode.C | MQTTSuite | Published (UTC) | Packages |\n'
-                          '| --- | --- | --- | --- | --- |\n' + '\n'.join(lines))
+                          '| --- | :---: | :---: | --- | --- |\n' + '\n'.join(lines))
             if (distribution, suite) in attention:
                 issues.append(f"- [{title} {suite}](#{anchor}): " + '; '.join(attention[distribution, suite]))
         contents.append(f'- **[{title}](#{slug})** ({" · ".join(releases)})')
