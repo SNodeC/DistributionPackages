@@ -55,7 +55,7 @@ ORDER = {'not built': 0, 'pending': 1, 'running': 2, 'publishing': 3, **dict.fro
 def render(root, state):
     badges = root / 'status/badges'
     badges.mkdir(parents=True, exist_ok=True)
-    sections = {}
+    sections, attention = {}, {}
     colors = {'pending': '#57606a', 'running': '#0969da', 'publishing': '#0969da', 'published': '#1a7f37',
               'failed': '#cf222e', 'cancelled': '#57606a', 'skipped': '#57606a', 'superseded': '#9a6700', 'not built': '#57606a'}
     width = max(map(len, colors)) * 7 + 16
@@ -72,6 +72,7 @@ def render(root, state):
         date = f"[{info['published_at'][:10]}](../{feed}/build.json)" if info.get('published_at') else '—'
         packages = f"{row['distribution']}/pool/{row['suite']}" if row['distribution'] in {'debian', 'ubuntu', 'raspberrypios'} else f'{feed}/Packages' if row['distribution'] in {'rocky', 'fedora'} else feed
         links = f'[Packages](../{packages}/)' if info else '—'
+        cells = []
         for project, version in zip(REPOSITORIES, (snodec, versions.get('mqttsuite'))):
             item = state['targets'].get(f"{row['id']}/{project}", {})
             status = item.get('status', 'published' if version else 'not built')
@@ -80,31 +81,42 @@ def render(root, state):
             url = item.get('job_url', item.get('run_url'))
             badge = f'[{badge}]({url})' if url else badge
             version = f'`{version}`' if version else '—'
-            sections.setdefault(row['distribution'], {}).setdefault(row['suite'], {}).setdefault(project, []).append(f"| `{row['arch']}` | {version} | {badge} | {date} | {links} |")
-    text = (ROOT / 'ci/templates/package-status.md').read_text()
-    for distribution, suites in sections.items():
-        tables = []
-        for suite, projects in suites.items():
-            tables.append(f'### {suite}')
-            for project, lines in projects.items():
+            cells.append(f'{version}<br>{badge}')
+            if status != 'published':
                 title = 'SNode.C' if project == 'snode.c' else 'MQTTSuite'
-                tables.append(f'#### {title}\n\n| Architecture | Version | Status | Published | Packages |\n| --- | --- | --- | --- | --- |\n' + '\n'.join(lines))
+                attention.setdefault((row['distribution'], row['suite']), []).append(f"`{row['arch']}` {title}: {status}")
+        sections.setdefault(row['distribution'], {}).setdefault(row['suite'], []).append(
+            f"| `{row['arch']}` | {' | '.join(cells)} | {date} | {links} |")
+    text = (ROOT / 'ci/templates/package-status.md').read_text()
+    contents, issues, old_anchors = [], [], {}
+    for section in text.split('\n## ')[1:]:
+        marker = re.search(r'<!-- targets:(\w+) -->', section)
+        if not marker:
+            continue
+        distribution = marker[1]
+        title = section.split('\n', 1)[0]
+        slug = title.lower().replace(' ', '-')
+        tables, releases = [], []
+        for suite, lines in sections.get(distribution, {}).items():
+            anchor = f"{slug}-{suite.replace('.', '')}"
+            releases.append(f'[{suite}](#{anchor})')
+            # Keep existing release links working after adding explicit headings.
+            old = suite.replace('.', '')
+            count = old_anchors.get(old, 0)
+            old_anchors[old] = count + 1
+            old = f'{old}-{count}' if count else old
+            tables.append(f'<a id="{old}"></a>\n\n### {title} {suite}\n\n'
+                          '| Architecture | SNode.C | MQTTSuite | Published (UTC) | Packages |\n'
+                          '| --- | --- | --- | --- | --- |\n' + '\n'.join(lines))
+            if (distribution, suite) in attention:
+                issues.append(f"- [{title} {suite}](#{anchor}): " + '; '.join(attention[distribution, suite]))
+        contents.append(f'- **[{title}](#{slug})** ({" · ".join(releases)})')
         text = text.replace(f'<!-- targets:{distribution} -->', '\n\n'.join(tables))
-    contents, anchors = [], {}
-    for level, title in re.findall(r'^(#{1,6}) (.+)$', text, re.MULTILINE):
-        slug = re.sub(r'[^\w\- ]', '', title.lower()).replace(' ', '-')
-        occurrence = anchors.get(slug, 0)
-        anchors[slug] = occurrence + 1
-        anchor = f'{slug}-{occurrence}' if occurrence else slug
-        if level == '##':
-            distribution_link = f'[{title}](#{anchor})'
-            releases = []
-        elif level == '###':
-            if not releases:
-                contents.append((distribution_link, releases))
-            releases.append(f'[{title}](#{anchor})')
-    text = text.replace('<!-- contents -->', '\n'.join(
-        f'- **{distribution}** ({" · ".join(releases)})' for distribution, releases in contents))
+    summary = ('<details>\n<summary>Unfinished or unsuccessful attempts</summary>\n\n' +
+               '\n'.join(issues) + '\n\n</details>') if issues else 'All targets published for both projects.'
+    text = text.replace('<!-- attention -->', summary)
+    text = text.replace('<!-- generated -->', datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'))
+    text = text.replace('<!-- contents -->', '\n'.join(contents))
     (root / 'docs').mkdir(exist_ok=True)
     (root / 'docs/status.md').write_text(text)
 

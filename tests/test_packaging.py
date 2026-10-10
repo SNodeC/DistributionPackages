@@ -139,6 +139,15 @@ class PackagingTest(unittest.TestCase):
             self.assertEqual(before,{p.name:p.read_bytes() for p in (root/'status/badges').iterdir()})
             text=(root/'docs/status.md').read_text()
             self.assertIn('![snode.c: running](../status/badges/running.svg)',text)
+            self.assertEqual(text.count('| Architecture | SNode.C | MQTTSuite |'),
+                             len({(r['distribution'], r['suite']) for r in publication.targets()}))
+            self.assertEqual(sum(line.startswith('| `') for line in text.splitlines()),
+                             len(publication.targets()))
+            self.assertIn('[trixie](#debian-trixie)', text)
+            self.assertIn('### Debian trixie', text)
+            self.assertIn('<a id="trixie-1"></a>', text)
+            self.assertIn('Unfinished or unsuccessful attempts', text)
+            self.assertIn('SNode.C: running', text)
             self.assertNotIn('../status/'+row['id'],text)
             self.assertFalse((root/'README.md').exists())
             self.assertFalse((root/'install').exists())

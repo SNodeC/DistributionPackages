@@ -2,11 +2,15 @@
 
 To install, see [Quick start](https://github.com/SNodeC/Packages/blob/main/README.md#quick-start).
 
+Page generated <!-- generated -->.
+
+<!-- attention -->
+
 <!-- contents -->
 
 ## Reading the matrix
 
-**Version** is what is available to install. **Status** describes the latest build attempt; click its badge to inspect the job (repository access required for private build logs). An unfinished or failed rebuild does not replace an available version. A dash means no version is recorded.
+**Each project cell** shows the available version above the latest build badge; click its badge to inspect the job (repository access required for private build logs). An unfinished or failed rebuild does not replace an available version. A dash means no version is recorded.
 
 <details>
 <summary>Status legend and links</summary>
@@ -18,7 +22,7 @@ To install, see [Quick start](https://github.com/SNodeC/Packages/blob/main/READM
 - **Failed**, **cancelled**, **skipped**, **superseded:** the attempt did not publish.
 - **Not built:** neither a build result nor a published version is recorded.
 
-Jobs report build start, build end and publication directly. Each state has an immutable badge image; the table selects the current state. GitHub may cache the page, so refresh it to see newly committed transitions. **Published** shows the feed's latest publication date in UTC; click the date for the full timestamp and source record. Either project's publication can update that date. **Packages** opens the shared package directory; package managers use its signed index to select the current files.
+Jobs report build start, build end and publication directly. Each state has an immutable badge image; the table selects the current state. GitHub may cache the page, so refresh it to see newly committed transitions. **Published (UTC)** shows this architecture's latest feed publication date; click the date for the full timestamp and source record. Either project's publication can update that date. **Packages** opens the shared package directory; package managers use its signed index to select the current files.
 
 </details>
 
