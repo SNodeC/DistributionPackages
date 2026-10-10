@@ -343,6 +343,30 @@ class StatusEventsTest(unittest.TestCase):
         self.assertEqual(self.git('rev-parse','main~20',cwd=self.remote),
                          self.git('rev-parse','HEAD',cwd=self.seed))
 
+    def test_concurrent_upstream_allocations_are_unique_and_retry_idempotent(self):
+        jobs=[]
+        for index in range(12):
+            clone=self.clone('allocator'+str(index), sparse=True)
+            env=self.env | {'GITHUB_RUN_ID':str(200+index), 'RELEASE_PROJECT':'snode.c' if index % 2 == 0 else 'mqttsuite'}
+            command=['bash',str(self.status_script),str(clone),'reserve']
+            jobs.append((subprocess.Popen(command,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True),command,env))
+        for process,command,env in jobs:
+            output,error=process.communicate(timeout=180)
+            self.assertEqual(process.returncode,0,error)
+            self.assertNotIn('::warning::',output)
+        state=self.snapshot()
+        self.assertEqual(state['counters'],{'snode.c':7,'mqttsuite':13})
+        self.assertEqual(len(state['allocations']),12)
+        for project,count in [('snode.c',6),('mqttsuite',12)]:
+            values=[entry[project] for entry in state['allocations'].values() if project in entry]
+            self.assertEqual(len(set(values)),count)
+        subprocess.run(jobs[0][1],env=jobs[0][2],check=True,capture_output=True)
+        self.assertEqual(self.snapshot(),state)
+        self.assertEqual(self.git('show','main:feed',cwd=self.remote),'original feed')
+        # Required allocations fail closed; best-effort status events still never fail builds.
+        result=subprocess.run(jobs[0][1],env=jobs[0][2] | {'RELEASE_PROJECT':'invalid'},capture_output=True)
+        self.assertNotEqual(result.returncode,0)
+
     def test_terminal_order_attempts_and_dependency_skip(self):
         self.event(self.seed,'failed')
         self.event(self.seed,'running')
@@ -482,6 +506,13 @@ class StatusEventsTest(unittest.TestCase):
         self.assertIn('::warning::Package status update exhausted',result.stdout)
         self.assertEqual(len((self.root/'pushes').read_text().splitlines()),30)
         self.assertEqual(self.snapshot()['targets'],{})
+        result=subprocess.run(['bash',str(self.status_script),str(self.seed),'reserve'],
+                              env=self.env | {'PATH':str(binary)+':'+self.env['PATH'],
+                                              'RELEASE_PROJECT':'mqttsuite','GITHUB_RUN_ID':'500'},
+                              capture_output=True,text=True)
+        self.assertNotEqual(result.returncode,0)
+        self.assertEqual(len((self.root/'pushes').read_text().splitlines()),60)
+        self.assertEqual(self.snapshot()['counters'],{'snode.c':1,'mqttsuite':1})
 
     def test_status_errors_only_warn(self):
         result=subprocess.run(['bash',str(self.status_script),str(self.seed),'status',str(self.bundle),'{}','snode.c','invalid'],env=self.env,capture_output=True,text=True)

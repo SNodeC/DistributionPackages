@@ -6,7 +6,7 @@
 
 ## Responsibilities
 
-[SNodeC/DistributionPackages](https://github.com/SNodeC/DistributionPackages) owns release capture, signing, serialized publication, installation instructions and public signing keys. Build workflows execute in [SNode.C](https://github.com/SNodeC/snode.c/actions) and [MQTTSuite](https://github.com/SNodeC/mqttsuite/actions). [SNodeC/Packages](https://github.com/SNodeC/Packages) holds generated binary repositories, the public landing page, all documentation, the installer and package status. Both use `main`. No package branch or separate SNode.C/MQTTSuite recipe branch is required. DistributionPackages can be private; installation and public documentation depend only on Packages. OpenWrt recipes belong to [SNode.C](https://github.com/SNodeC/snode.c/tree/master/supplement/openwrt) and [MQTTSuite](https://github.com/SNodeC/mqttsuite/tree/master/misc/openwrt) in their public source repositories. Canonical source-code, workflow and settings links in these maintainer guides require access to DistributionPackages.
+[SNodeC/DistributionPackages](https://github.com/SNodeC/DistributionPackages) owns signing, serialized publication, installation instructions and public signing keys. Release preparation and build workflows execute in [SNode.C](https://github.com/SNodeC/snode.c/actions) and [MQTTSuite](https://github.com/SNodeC/mqttsuite/actions). [SNodeC/Packages](https://github.com/SNodeC/Packages) holds generated binary repositories, the public landing page, all documentation, the installer and package status. Both use `main`. No package branch or separate SNode.C/MQTTSuite recipe branch is required. DistributionPackages can be private; installation and public documentation depend only on Packages. OpenWrt recipes belong to [SNode.C](https://github.com/SNodeC/snode.c/tree/master/supplement/openwrt) and [MQTTSuite](https://github.com/SNodeC/mqttsuite/tree/master/misc/openwrt) in their public source repositories. Canonical source-code, workflow and settings links in these maintainer guides require access to DistributionPackages.
 
 | Source path | Purpose |
 | --- | --- |
@@ -39,7 +39,7 @@ GitHub tree links browse files. Package managers use raw file URLs, which do not
 
 ## Publication model
 
-Only an upstream `vMAJOR.MINOR.PATCH` tag notification starts package CI. Creating or moving a tag is supported; deleting it is ignored. Pushing ordinary commits, documentation or generated packages does not start a build.
+Only an upstream `vMAJOR.MINOR.PATCH` tag push starts package CI. Creating or moving a tag is supported; deleting it is ignored. Pushing ordinary commits, documentation or generated packages does not start a build.
 
 For a SNode.C release, each target builds and tests in SNode.C and uploads an unsigned artifact. DistributionPackages signs and publishes it, then explicitly dispatches that target to MQTTSuite. MQTTSuite downloads the exact published SNode.C snapshot and uploads its unsigned build for signing and publication. For a MQTTSuite release, only MQTTSuite builds, using the target's already-published SNode.C packages. No target waits for the full matrix to finish.
 
@@ -55,13 +55,11 @@ Superseded files remain for 30 days after leaving the active index. Cleanup runs
 
 | Workflow | Responsibility |
 | --- | --- |
-| [SNode.C packages.yml](https://github.com/SNodeC/snode.c/blob/master/.github/workflows/packages.yml) | Notify version-tag changes, build/test unsigned packages, report state and request publication |
+| [SNode.C packages.yml](https://github.com/SNodeC/snode.c/blob/master/.github/workflows/packages.yml) | Capture version-tag releases, allocate revisions, build/test unsigned packages and request publication |
 | [MQTTSuite packages.yml](https://github.com/SNodeC/mqttsuite/blob/master/.github/workflows/packages.yml) | Same lifecycle, using the corresponding published SNode.C dependency |
-| [release.yml](https://github.com/SNodeC/DistributionPackages/blob/main/.github/workflows/release.yml) | Receive release notifications and completed-build handoffs |
-| [packages.yml](https://github.com/SNodeC/DistributionPackages/blob/main/.github/workflows/packages.yml) | Allocate revisions, capture source releases, initialize pending status and dispatch the source build |
-| [package-write.yml](https://github.com/SNodeC/DistributionPackages/blob/main/.github/workflows/package-write.yml) | Validate the upstream artifact, sign, publish and dispatch a dependent target |
+| [release.yml](https://github.com/SNodeC/DistributionPackages/blob/main/.github/workflows/release.yml) | Validate completed upstream artifacts, sign, publish and dispatch dependent targets |
 
-There are no workflows in Packages. Shared platform scripts have one implementation in DistributionPackages; the source repositories own and execute the build jobs. The central publisher executes only trusted tools from its original captured bundle, never scripts supplied by a build artifact. Signing secrets exist only in DistributionPackages. OpenWrt index signing and RPM package/index signing happen there after upload; APT metadata is also signed there. Builds need no private signing key.
+There are no workflows in Packages. Shared platform scripts have one implementation in DistributionPackages; the source repositories own and execute the build jobs. The central publisher executes only tools checked out from its own Git history at the captured packaging commit, never scripts supplied by an uploaded artifact. Signing secrets exist only in DistributionPackages. OpenWrt index signing and RPM package/index signing happen there after upload; APT metadata is also signed there. Builds need no private signing key.
 
 The GitHub App needs Contents write for dispatch/status/publication and Actions read for cross-repository artifacts. Each step requests a token scoped to its required repositories. See [CI setup and activation](setup.md).
 
@@ -73,7 +71,7 @@ Each SNode.C publication dispatches its exact Packages commit to MQTTSuite. The 
 
 SNode.C and MQTTSuite have independent package revision counters. A SNode.C release reserves the next number for both projects; an MQTTSuite-only release advances only MQTTSuite. Numbers are shared across targets of the same project.
 
-`Packages/status.json` holds the authoritative integer counters at `counters["snode.c"]` and `counters["mqttsuite"]`. Preparation increments each selected counter once and saves its run allocation in the same snapshot under the publication lock. Retries reuse that allocation without incrementing; cancelled runs leave gaps. History and feed versions never determine the next number. With both counters at zero, the next SNode.C release allocates r1 for both projects. Reset counters only while CI is stopped and preparing a fresh feed; existing feeds retain protection against older publications. Source versions still come from upstream version tags.
+`Packages/status.json` holds the authoritative integer counters at `counters["snode.c"]` and `counters["mqttsuite"]`. Source preparation increments each selected counter once and saves its run allocation with a Git lease. Competing metadata or feed commits cause a fresh read and retry; allocation failure stops preparation before any build can use an unreserved number. Retries reuse that allocation without incrementing; cancelled runs leave gaps. History and feed versions never determine the next number. With both counters at zero, the next SNode.C release allocates r1 for both projects. Reset counters only while CI is stopped and preparing a fresh feed; existing feeds retain protection against older publications. Source versions still come from upstream version tags.
 
 ## Coverage and tests
 

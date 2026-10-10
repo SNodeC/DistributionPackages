@@ -143,7 +143,7 @@ def update(state, row, generation, project, status, attempt, job_url=None):
 
 
 def reserve(root, project, run_id):
-    """Called under the same publication lock as every snapshot writer."""
+    """Applied and retried against Packages/main by the metadata writer."""
     if project not in REPOSITORIES:
         raise ValueError('Unknown release project')
     path = root / 'status.json'

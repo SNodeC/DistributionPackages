@@ -24,7 +24,7 @@ Packages needs no Actions secrets, workflows or build system. Its main branch is
 
 ## Connect upstream releases
 
-The upstream notification workflows target DistributionPackages. Configure the App installation and signing credentials before creating or moving a version tag.
+Configure the App installation and central signing credentials before creating or moving a version tag. Preparation and unsigned builds run directly in the source repository.
 
 Both upstream projects use the same `Build distribution packages` workflow, with their own project identity. In **each source repository**, set:
 
@@ -35,7 +35,7 @@ Both upstream projects use the same `Build distribution packages` workflow, with
 
 The legacy App credential name does not select a distribution. No package-signing private key is required in either source repository. Keep all three package-signing secrets in DistributionPackages only.
 
-A version-tag push sends `release-tag-changed` to DistributionPackages. That repository captures the release and sends `package-build` to the source repository. Successful source jobs upload unsigned artifacts and send `package-built` back to DistributionPackages. After each SNode.C publication, the publisher sends `package-build` for that target to MQTTSuite, including the exact Packages commit. These dispatches implement one release chain; ordinary commits do not enter it.
+A version-tag push captures sources, allocates revisions and prepares the build matrix in that same source workflow. Successful source jobs upload unsigned artifacts and send `package-built` back to DistributionPackages. After each SNode.C publication, the publisher sends `package-build` for that target to MQTTSuite, including the exact Packages commit. These dispatches implement one release chain; ordinary commits do not enter it.
 
 Only version-tag creation or movement starts builds. No ordinary push or README change starts package CI. README automation, if present upstream, remains independent. The migration never creates or moves upstream tags automatically.
 
@@ -45,7 +45,7 @@ Only version-tag creation or movement starts builds. No ordinary push or README 
 2. Verify signing keys match the original feed and configure all credentials above.
 3. Verify the two counters in `Packages/status.json` match the last allocated revisions; use zero for a fresh package repository.
 4. Review the source scripts and workflow validation results.
-5. With explicit approval, connect upstream notifications and exercise a version-tag event.
+5. With explicit approval, exercise a version-tag event.
 6. Confirm each target publishes SNode.C before its MQTTSuite build starts, and an application-only event does not rebuild SNode.C.
 7. Update devices using the new installer or documented manual repository URLs.
 

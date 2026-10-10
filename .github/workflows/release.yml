@@ -1,25 +1,114 @@
-name: Package release and publication
-run-name: ${{ github.event.action == 'package-built' && format('Publish {0} · {1}', github.event.client_payload.project, github.event.client_payload.target) || format('Capture {0} · {1}', github.event.client_payload.repository, github.event.client_payload.ref) }}
+name: Sign and publish distribution packages
+run-name: Publish ${{ github.event.client_payload.project }} · ${{ github.event.client_payload.target }}
 on:
   repository_dispatch:
-    types: [release-tag-changed, package-built]
+    types: [package-built]
 permissions:
   contents: read
   actions: read
+env:
+  PYTHONPATH: ${{ github.workspace }}/feed
 jobs:
-  capture:
-    if: >-
-      github.event.action == 'release-tag-changed' &&
-      startsWith(github.event.client_payload.ref, 'refs/tags/v') &&
-      github.event.client_payload.deleted == false &&
-      (github.event.client_payload.repository == 'SNodeC/snode.c' ||
-       github.event.client_payload.repository == 'SNodeC/mqttsuite')
-    uses: ./.github/workflows/packages.yml
-    with:
-      release_project: ${{ github.event.client_payload.repository == 'SNodeC/snode.c' && 'snode.c' || 'mqttsuite' }}
-      release_tag: ${{ github.event.client_payload.ref }}
-    secrets: inherit
-  publish:
-    if: github.event.action == 'package-built'
-    uses: ./.github/workflows/package-write.yml
-    secrets: inherit
+  write:
+    name: Publish ${{ github.event.client_payload.project }} · ${{ github.event.client_payload.target }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    concurrency:
+      group: package-publication
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: feed
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/create-github-app-token@v3
+        id: publisher
+        with:
+          client-id: ${{ vars.PACKAGES_APP_CLIENT_ID }}
+          private-key: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
+          owner: SNodeC
+          repositories: Packages,snode.c,mqttsuite
+          permission-contents: write
+          permission-actions: read
+      - name: Validate upstream build identity
+        id: source
+        env:
+          GH_TOKEN: ${{ steps.publisher.outputs.token }}
+        run: python3 -m ci.dispatch receive
+      - uses: actions/download-artifact@v8
+        with:
+          repository: ${{ steps.source.outputs.capture_repository }}
+          run-id: ${{ steps.source.outputs.capture }}
+          github-token: ${{ steps.publisher.outputs.token }}
+          name: source-pair
+          path: bundle
+      - name: Restore trusted publication tools and select feed
+        id: scope
+        env:
+          TARGET: ${{ steps.source.outputs.target }}
+        run: |
+          # Execute only code from this repository's history, never an uploaded script.
+          commit=$(jq -er '.recipe_commit | select(test("^[0-9a-f]{40}$"))' bundle/context.json)
+          git -C feed merge-base --is-ancestor "$commit" HEAD
+          git -C feed checkout --detach "$commit"
+          echo 'paths<<EOF' >> "$GITHUB_OUTPUT"
+          python3 -m ci.publish.publication scope "$TARGET" >> "$GITHUB_OUTPUT"
+          echo EOF >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v8
+        with:
+          repository: SNodeC/${{ steps.source.outputs.project }}
+          run-id: ${{ steps.source.outputs.run }}
+          github-token: ${{ steps.publisher.outputs.token }}
+          name: ${{ steps.source.outputs.artifact }}
+          path: incoming
+      - uses: actions/checkout@v6
+        with:
+          repository: SNodeC/Packages
+          ref: main
+          token: ${{ steps.publisher.outputs.token }}
+          path: published
+          sparse-checkout: ${{ steps.scope.outputs.paths }}
+          sparse-checkout-cone-mode: false
+      - name: Install signing tools
+        env:
+          FAMILY: ${{ fromJSON(steps.source.outputs.target).family }}
+        run: bash feed/ci/publish/tools.sh "$FAMILY"
+      - name: Sign and publish the package snapshot
+        id: write
+        env:
+          TARGET: ${{ steps.source.outputs.target }}
+          BUILD_PROJECT: ${{ steps.source.outputs.project }}
+          BUILD_ATTEMPT: ${{ steps.source.outputs.attempt }}
+          BUILD_RUN_URL: ${{ steps.source.outputs.run_url }}
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+          OPENWRT_USIGN_KEY: ${{ secrets.OPENWRT_USIGN_KEY }}
+          OPENWRT_APK_KEY: ${{ secrets.OPENWRT_APK_KEY }}
+        run: |
+          previous=$(git -C published rev-parse HEAD)
+          result=0
+          status=$(python3 -m ci.publish.publication feed published bundle "$TARGET" "$BUILD_PROJECT" incoming) || result=$?
+          bash feed/ci/publish/push.sh published "$previous" "Update packages: $BUILD_PROJECT" \
+            bash -c 'python3 -m ci.publish.publication status "$@" || echo "::warning::Publication status could not be rendered"' -- \
+            published bundle "$TARGET" "$BUILD_PROJECT" "$status"
+          exit "$result"
+      - name: Dispatch dependent project after successful publication
+        if: steps.source.outputs.project == 'snode.c'
+        env:
+          GH_TOKEN: ${{ steps.publisher.outputs.token }}
+          TARGET_ID: ${{ github.event.client_payload.target }}
+          PUBLICATION: ${{ steps.write.outputs.snapshot }}
+        run: python3 -m ci.dispatch build bundle mqttsuite "$TARGET_ID" "$PUBLICATION"
+      - name: Report publication failure
+        if: ${{ always() && steps.source.outcome == 'success' && steps.write.outcome != 'success' }}
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          PACKAGES_TOKEN: ${{ steps.publisher.outputs.token }}
+          TARGET: ${{ steps.source.outputs.target }}
+          BUILD_PROJECT: ${{ steps.source.outputs.project }}
+          BUILD_ATTEMPT: ${{ steps.source.outputs.attempt }}
+          BUILD_RUN_URL: ${{ steps.source.outputs.run_url }}
+          FINAL_STATUS: ${{ job.status == 'cancelled' && 'cancelled' || 'failed' }}
+        run: bash feed/ci/publish/status.sh failure-status status bundle "$TARGET" "$BUILD_PROJECT" "$FINAL_STATUS"

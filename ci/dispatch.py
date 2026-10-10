@@ -17,8 +17,8 @@ def api(path, payload=None):
     return json.loads(result) if result else None
 
 
-def build(bundle, project, target='-', publication=''):
-    if project not in REPOSITORIES or (target != '-' and target not in {row['id'] for row in targets()}):
+def build(bundle, project, target, publication):
+    if project != 'mqttsuite' or target not in {row['id'] for row in targets()}:
         raise ValueError('Unknown build project/target')
     capture = read(bundle / 'context.json')['run_id']
     # Retry a handoff, not a completed build. GitHub remains the run authority.
@@ -41,15 +41,21 @@ def receive(payload):
     if not all(value.isdecimal() and int(value) > 0 for value in (capture, build_run, attempt)):
         raise ValueError('Invalid run identity')
     origin = api(f'repos/SNodeC/{project}/actions/runs/{build_run}')
-    if (origin['event'] != 'repository_dispatch' or origin['path'] != '.github/workflows/packages.yml'
+    if (origin['event'] not in {'push', 'repository_dispatch'} or origin['path'] != '.github/workflows/packages.yml'
             or origin['head_repository']['full_name'] != f'SNodeC/{project}'
             or origin['run_attempt'] < int(attempt)):
         raise ValueError('Artifact must come from the current upstream package build attempt')
     if origin['display_title'] not in {f'Packages · {capture} · -', f'Packages · {capture} · {row["id"]}'}:
         raise ValueError('Build belongs to a different captured release')
+    if origin['event'] == 'push':
+        if capture != build_run or not re.fullmatch(r'v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', origin['head_branch']):
+            raise ValueError('Capture must be the originating version-tag run')
+    elif project != 'mqttsuite' or origin['display_title'] != f'Packages · {capture} · {row["id"]}':
+        raise ValueError('Only a published SNode.C target dispatches a dependent build')
     name = f'packages-{project}-{row["id"]}-{attempt}'
     return dict(project=project, target=json.dumps(row), capture=capture, run=build_run,
-                attempt=attempt, artifact=name, run_url=origin['html_url'])
+                attempt=attempt, artifact=name, run_url=origin['html_url'],
+                capture_repository='SNodeC/' + (project if origin['event'] == 'push' else 'snode.c'))
 
 
 def baseline(bundle, target, ref):
@@ -79,7 +85,7 @@ if __name__ == '__main__':
     elif command == 'plan':
         bundle, project, target = Path(args[0]), args[1], args[2]
         context = read(bundle / 'context.json')
-        if (context['run_id'] != str(json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())['client_payload']['capture'])
+        if (context['run_id'] != os.environ['CAPTURE_RUN']
                 or (target == '-' and project != context['release_project'])
                 or (target != '-' and (project != 'mqttsuite' or context['release_project'] != 'snode.c'))):
             raise ValueError('Build request does not match capture')
