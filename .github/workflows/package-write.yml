@@ -1,14 +1,6 @@
-name: Serialized package snapshot writer
+name: Sign and publish one target
 on:
   workflow_call:
-    inputs:
-      target:
-        required: true
-        type: string
-      result:
-        type: string
-      project:
-        type: string
 permissions:
   contents: read
   actions: read
@@ -16,8 +8,7 @@ env:
   PYTHONPATH: ${{ github.workspace }}/feed
 jobs:
   write:
-    name: Publish ${{ inputs.project }} · ${{ fromJSON(inputs.target).id }}
-    if: ${{ !cancelled() }}
+    name: Publish ${{ github.event.client_payload.project }} · ${{ github.event.client_payload.target }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     concurrency:
@@ -25,35 +16,48 @@ jobs:
       cancel-in-progress: false
       queue: max
     steps:
-      - uses: actions/download-artifact@v8
-        id: bundle
+      - uses: actions/checkout@v6
         with:
-          name: source-pair
-          path: bundle
-      - uses: actions/download-artifact@v8
-        if: inputs.result == 'success'
-        with:
-          name: packages-${{ inputs.project }}-${{ fromJSON(inputs.target).id }}
-          path: incoming
-      - name: Select the affected feed
-        id: scope
-        env:
-          TARGET: ${{ inputs.target }}
-        run: |
-          mkdir feed
-          tar -xzf bundle/feed.tar.gz -C feed
-          echo 'paths<<EOF' >> "$GITHUB_OUTPUT"
-          python3 -m ci.publish.publication scope "$TARGET" >> "$GITHUB_OUTPUT"
-          echo EOF >> "$GITHUB_OUTPUT"
-      - name: Authenticate package publication
-        uses: actions/create-github-app-token@v3
+          path: feed
+          persist-credentials: false
+      - uses: actions/create-github-app-token@v3
         id: publisher
         with:
           client-id: ${{ vars.PACKAGES_APP_CLIENT_ID }}
           private-key: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
           owner: SNodeC
-          repositories: Packages
+          repositories: Packages,snode.c,mqttsuite
           permission-contents: write
+          permission-actions: read
+      - name: Validate upstream build identity
+        id: source
+        env:
+          GH_TOKEN: ${{ steps.publisher.outputs.token }}
+        run: python3 -m ci.dispatch receive
+      - uses: actions/download-artifact@v8
+        with:
+          run-id: ${{ steps.source.outputs.capture }}
+          github-token: ${{ github.token }}
+          name: source-pair
+          path: bundle
+      - name: Restore trusted publication tools and select feed
+        id: scope
+        env:
+          TARGET: ${{ steps.source.outputs.target }}
+        run: |
+          rm -rf feed
+          mkdir feed
+          tar -xzf bundle/feed.tar.gz -C feed
+          echo 'paths<<EOF' >> "$GITHUB_OUTPUT"
+          python3 -m ci.publish.publication scope "$TARGET" >> "$GITHUB_OUTPUT"
+          echo EOF >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v8
+        with:
+          repository: SNodeC/${{ steps.source.outputs.project }}
+          run-id: ${{ steps.source.outputs.run }}
+          github-token: ${{ steps.publisher.outputs.token }}
+          name: ${{ steps.source.outputs.artifact }}
+          path: incoming
       - uses: actions/checkout@v6
         with:
           repository: SNodeC/Packages
@@ -62,28 +66,44 @@ jobs:
           path: published
           sparse-checkout: ${{ steps.scope.outputs.paths }}
           sparse-checkout-cone-mode: false
-      - name: Update the package snapshot
+      - name: Install signing tools
+        env:
+          FAMILY: ${{ fromJSON(steps.source.outputs.target).family }}
+        run: bash feed/ci/publish/tools.sh "$FAMILY"
+      - name: Sign and publish the package snapshot
         id: write
         env:
-          TARGET: ${{ inputs.target }}
-          RESULT: ${{ inputs.result }}
-          BUILD_PROJECT: ${{ inputs.project }}
-          GH_TOKEN: ${{ github.token }}
-          APT_SIGNING_KEY: ${{ inputs.result == 'success' && secrets.APT_SIGNING_KEY || '' }}
+          TARGET: ${{ steps.source.outputs.target }}
+          BUILD_PROJECT: ${{ steps.source.outputs.project }}
+          BUILD_ATTEMPT: ${{ steps.source.outputs.attempt }}
+          BUILD_RUN_URL: ${{ steps.source.outputs.run_url }}
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+          OPENWRT_USIGN_KEY: ${{ secrets.OPENWRT_USIGN_KEY }}
+          OPENWRT_APK_KEY: ${{ secrets.OPENWRT_APK_KEY }}
         run: |
-          set -euo pipefail
-          if [ "$RESULT" = success ] && [ "$(jq -r .family <<< "$TARGET")" != openwrt ]; then
-            sudo apt-get update
-            sudo apt-get install -y apt-utils gnupg rpm
-          fi
           previous=$(git -C published rev-parse HEAD)
           result=0
-          if [ "$RESULT" = success ]; then
-            status=$(python3 -m ci.publish.publication feed published bundle "$TARGET" "$BUILD_PROJECT" incoming) || result=$?
-          else
-            status=$([ "$RESULT" = cancelled ] && echo cancelled || { [ "$RESULT" = skipped ] && echo skipped || echo failed; })
-          fi
+          status=$(python3 -m ci.publish.publication feed published bundle "$TARGET" "$BUILD_PROJECT" incoming) || result=$?
           bash feed/ci/publish/push.sh published "$previous" "Update packages: $BUILD_PROJECT" \
             bash -c 'python3 -m ci.publish.publication status "$@" || echo "::warning::Publication status could not be rendered"' -- \
             published bundle "$TARGET" "$BUILD_PROJECT" "$status"
           exit "$result"
+      - name: Dispatch dependent project after successful publication
+        if: steps.source.outputs.project == 'snode.c'
+        env:
+          GH_TOKEN: ${{ steps.publisher.outputs.token }}
+          TARGET_ID: ${{ github.event.client_payload.target }}
+          PUBLICATION: ${{ steps.write.outputs.snapshot }}
+        run: python3 -m ci.dispatch build bundle mqttsuite "$TARGET_ID" "$PUBLICATION"
+      - name: Report publication failure
+        if: ${{ always() && steps.source.outcome == 'success' && steps.write.outcome != 'success' }}
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          PACKAGES_TOKEN: ${{ steps.publisher.outputs.token }}
+          TARGET: ${{ steps.source.outputs.target }}
+          BUILD_PROJECT: ${{ steps.source.outputs.project }}
+          BUILD_ATTEMPT: ${{ steps.source.outputs.attempt }}
+          BUILD_RUN_URL: ${{ steps.source.outputs.run_url }}
+          FINAL_STATUS: ${{ job.status == 'cancelled' && 'cancelled' || 'failed' }}
+        run: bash feed/ci/publish/status.sh failure-status status bundle "$TARGET" "$BUILD_PROJECT" "$FINAL_STATUS"

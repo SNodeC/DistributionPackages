@@ -238,12 +238,13 @@ def publish(root, bundle, incoming, row, generation, project):
 def event(state, generation, row, project, status, attempt):
     if row not in generation['targets'] or project not in generation['revisions']:
         raise ValueError('Unknown build target or project')
-    update(state, row, generation, project, status, attempt)
+    update(state, row, generation, project, status, attempt, os.environ.get('BUILD_RUN_URL'))
     current = state['targets'].get(f"{row['id']}/{project}", {})
     if (project == 'snode.c' and generation['context']['release_project'] == 'snode.c'
             and current.get('run_id') == generation['run_id'] and current.get('attempt') == attempt
             and current.get('status') in {'failed', 'cancelled', 'skipped', 'superseded'}):
-        update(state, row, generation, 'mqttsuite', 'skipped', attempt)
+        # No application job has run yet. Its own attempt 1 supersedes this dependency placeholder.
+        update(state, row, generation, 'mqttsuite', 'skipped', 0)
 
 
 def main():
@@ -269,13 +270,14 @@ def main():
     if context['destination'] != state['repository']:
         raise RuntimeError('Publication destination mismatch')
     generation = record_run(bundle, state, context)
-    attempt = int(os.environ.get('GITHUB_RUN_ATTEMPT', '1'))
+    attempt = int(os.environ.get('BUILD_ATTEMPT') or os.environ.get('GITHUB_RUN_ATTEMPT', '1'))
     if command == 'status':
         target, project, status = args[2:5]
         if target == '-' and project == '-' and status == 'pending':
             for row in generation['targets']:
                 for project in generation['revisions']:
-                    event(state, generation, row, project, status, attempt)
+                    event(state, generation, row, project, status,
+                          attempt if project == context['release_project'] else 0)
         else:
             event(state, generation, json.loads(target), project, status, attempt)
     elif command == 'finalize':
@@ -283,16 +285,27 @@ def main():
         if status not in {'cancelled', 'failed'}:
             raise ValueError('Invalid final status')
         for key, item in list(state['targets'].items()):
-            if (item['run_id'] == generation['run_id'] and item['attempt'] == attempt
-                    and item['status'] not in TERMINAL):
+            if (item['run_id'] == generation['run_id'] and item['attempt'] in {0, attempt}
+                    and item['status'] not in TERMINAL
+                    and (not os.environ.get('BUILD_PROJECT') or (key.endswith('/' + os.environ['BUILD_PROJECT'])
+                         and item['status'] != 'publishing'
+                         and os.environ.get('TARGET_ID', '-') in {'-', item['target']['id']}))):
                 project = key.rsplit('/', 1)[1]
-                update(state, item['target'], generation, project, status, attempt)
+                event(state, generation, item['target'], project, status, attempt)
     elif command == 'feed':
         row, project = json.loads(args[2]), args[3]
         original_context = (bundle / 'context.json').read_bytes()
         original_sources = (bundle / 'sources.json').read_bytes()
         result, status = 0, 'published'
         try:
+            previous = state['targets'].get(f"{row['id']}/{project}", {})
+            if (int(generation['revisions'][project]), attempt) < (int(previous.get('revision', 0)), previous.get('attempt', 0)):
+                raise RuntimeError('Superseded build attempt')
+            if (previous.get('status') == 'published' and previous.get('run_id') == generation['run_id']
+                    and previous.get('attempt') == attempt and os.environ.get('BUILD_RUN_URL')
+                    and previous.get('job_url') == os.environ['BUILD_RUN_URL']):
+                print('published')  # This immutable upstream artifact was already committed.
+                return 0
             publish(root, bundle, Path(args[4]).resolve(), row, generation, project)
             shutil.copy2(ROOT / 'README.md', root / 'README.md')
             for directory in ('docs', 'install'):

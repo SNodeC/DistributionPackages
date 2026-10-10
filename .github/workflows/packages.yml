@@ -1,4 +1,4 @@
-name: Unified distribution packages
+name: Capture package release
 on:
   workflow_call:
     inputs:
@@ -20,9 +20,6 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-    outputs:
-      matrix: ${{ steps.matrix.outputs.value }}
-      revisions: ${{ steps.matrix.outputs.revisions }}
     steps:
       - name: Check release configuration
         env:
@@ -78,6 +75,11 @@ jobs:
         with:
           name: source-pair
           path: bundle
+      - name: Unpack original capture tools
+        if: github.run_attempt > 1
+        run: |
+          mkdir feed
+          tar -xzf bundle/feed.tar.gz -C feed
       - name: Capture the source pair and full matrix
         if: github.run_attempt == 1
         env:
@@ -93,67 +95,24 @@ jobs:
           name: source-pair
           path: bundle/
           if-no-files-found: error
-      - name: Read the captured matrix and revisions
-        id: matrix
-        run: |
-          echo "revisions=$(jq -c . bundle/revisions.json)" >> "$GITHUB_OUTPUT"
-          echo "value=$(jq -c '{include: .}' bundle/targets.json)" >> "$GITHUB_OUTPUT"
-  pending:
-    needs: prepare
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    env:
-      STATUS_OPERATION: status
-      FINAL_STATUS: pending
-    steps: &status_steps
-      - uses: actions/download-artifact@v8
-        with:
-          name: source-pair
-          path: bundle
-      - name: Unpack captured status tools
-        run: |
-          mkdir feed
-          tar -xzf bundle/feed.tar.gz -C feed
       - uses: actions/create-github-app-token@v3
-        id: status
-        continue-on-error: true
-        timeout-minutes: 1
+        id: dispatch
         with:
           client-id: ${{ vars.PACKAGES_APP_CLIENT_ID }}
           private-key: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
           owner: SNodeC
-          repositories: Packages
+          repositories: Packages,snode.c,mqttsuite
           permission-contents: write
-      - name: Publish status event
+          permission-actions: read
+      - name: Initialize pending status
         continue-on-error: true
         timeout-minutes: 3
         env:
-          PACKAGES_TOKEN: ${{ steps.status.outputs.token }}
-        run: |
-          if [ "$STATUS_OPERATION" = finalize ]; then
-            bash feed/ci/publish/status.sh published finalize bundle "$FINAL_STATUS"
-          else
-            bash feed/ci/publish/status.sh published status bundle - - pending
-          fi
-  target:
-    name: ${{ matrix.distribution }} · ${{ matrix.suite }} · ${{ matrix.arch }}
-    needs: [prepare, pending]
-    if: ${{ !cancelled() && needs.prepare.result == 'success' }}
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
-    uses: ./.github/workflows/package-target.yml
-    with:
-      target: ${{ toJSON(matrix) }}
-      revisions: ${{ needs.prepare.outputs.revisions }}
-      release_project: ${{ inputs.release_project }}
-    secrets: inherit
-  finalize:
-    needs: target
-    if: ${{ always() }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    env:
-      STATUS_OPERATION: finalize
-      FINAL_STATUS: ${{ needs.target.result == 'cancelled' && 'cancelled' || 'failed' }}
-    steps: *status_steps
+          PACKAGES_TOKEN: ${{ steps.dispatch.outputs.token }}
+          BUILD_ATTEMPT: 1
+        run: bash feed/ci/publish/status.sh status-checkout status bundle - - pending
+      - name: Dispatch the upstream build matrix
+        env:
+          GH_TOKEN: ${{ steps.dispatch.outputs.token }}
+          BUILD_PROJECT: ${{ inputs.release_project }}
+        run: python3 -m ci.dispatch build bundle "$BUILD_PROJECT"

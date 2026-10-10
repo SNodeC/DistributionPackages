@@ -58,7 +58,7 @@ class PackagingTest(unittest.TestCase):
             for path in binary.iterdir():
                 path.chmod(0o755)
             env = os.environ | {'PATH': str(binary) + ':' + os.environ['PATH'],
-                                'PACKAGE_RELEASE': '1', 'OPENWRT_USIGN_KEY': 'test', 'OPENWRT_APK_KEY': 'test',
+                                'PACKAGE_RELEASE': '1',
                                 'PYTHONDONTWRITEBYTECODE': '1'}
             info = dict(release='25.12.5', target='mediatek/filogic', arch='aarch64_cortex-a53', sha256='sdk')
             baseline = {}
@@ -99,6 +99,8 @@ class PackagingTest(unittest.TestCase):
                                   if line.startswith('CONFIG_PACKAGE_')]
                     self.assertEqual(selections, ['CONFIG_PACKAGE_' + project.replace('.', '') + '=m'])
                     self.assertFalse((sdk / 'key-build').exists())
+                    self.assertFalse((sdk / 'private-key.pem').exists())
+                    self.assertIn('# CONFIG_SIGNED_PACKAGES is not set', (sdk / '.config').read_text())
                     if project == 'snode.c':
                         target = sdk / 'staging_dir/target-test'
                         for name in ('usr/include', 'usr/lib', 'pkginfo'):
@@ -336,7 +338,10 @@ class StatusEventsTest(unittest.TestCase):
         self.assertEqual(len(state['targets']),20)
         self.assertTrue(all(v['status']=='running' for v in state['targets'].values()))
         self.assertEqual(self.git('show','main:feed',cwd=self.remote),'original feed')
-        self.assertEqual(self.git('rev-list','--count','main',cwd=self.remote),'1')
+        # Status commits retain parents; the next feed publication creates the new orphan.
+        self.assertEqual(self.git('rev-list','--count','main',cwd=self.remote),'21')
+        self.assertEqual(self.git('rev-parse','main~20',cwd=self.remote),
+                         self.git('rev-parse','HEAD',cwd=self.seed))
 
     def test_terminal_order_attempts_and_dependency_skip(self):
         self.event(self.seed,'failed')

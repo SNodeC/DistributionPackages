@@ -4,17 +4,9 @@ feed=$(realpath "$1")
 export PYTHONPATH="$feed"
 bundle=$(realpath "$2")
 sdk=$(realpath "$3")
-: "${PACKAGE_RELEASE:?}" "${OPENWRT_USIGN_KEY:?}" "${OPENWRT_APK_KEY:?}"
+: "${PACKAGE_RELEASE:?}"
 python3 -m ci.repository check "$bundle"
 cd "$sdk"
-umask 077
-printf '%s\n' "$OPENWRT_USIGN_KEY" > key-build
-printf '%s\n' "$OPENWRT_APK_KEY" > private-key.pem
-unset OPENWRT_USIGN_KEY OPENWRT_APK_KEY
-trap 'rm -f key-build private-key.pem' EXIT
-umask 022
-cp "$feed/keys/snodec-usign.pub" key-build.pub
-cp "$feed/keys/snodec-apk.pem" public-key.pem
 # Archives include submodules and come from the captured tag pair.
 mkdir -p dl "recipes/$BUILD_PROJECT"
 cp "$bundle/$BUILD_PROJECT-"*.tar.gz dl/
@@ -41,7 +33,7 @@ cat > .config <<EOF
 # CONFIG_ALL_NONSHARED is not set
 # CONFIG_ALL_KMODS is not set
 # CONFIG_AUTOREMOVE is not set
-CONFIG_SIGNED_PACKAGES=y
+# CONFIG_SIGNED_PACKAGES is not set
 CONFIG_PACKAGE_${BUILD_PROJECT//./}=m
 EOF
 make defconfig
@@ -58,10 +50,4 @@ arch=$(sed -n 's/^CONFIG_TARGET_ARCH_PACKAGES="\(.*\)"/\1/p' .config)
 repository="bin/packages/$arch/snodec"
 find "$feed/../dependencies" -maxdepth 1 -type f \( -name '*.ipk' -o -name '*.apk' \) -exec cp -t "$repository" {} +
 make package/index V=s
-if [ -f "$repository/packages.adb" ]; then
-    staging_dir/host/bin/apk verify --keys-dir "$feed/keys" "$repository/packages.adb"
-else
-    staging_dir/host/bin/usign -V -p "$feed/keys/snodec-usign.pub" \
-        -m "$repository/Packages" -x "$repository/Packages.sig"
-fi
 python3 -m ci.repository check "$bundle"

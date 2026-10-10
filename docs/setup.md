@@ -18,7 +18,7 @@ Set the following **repository** variables and secrets in [SNodeC/DistributionPa
 
 GitHub does not reveal existing secret values through its API. Obtain them from their original secure storage. Do not commit private keys or place them in logs.
 
-The GitHub App needs **Contents: read and write** and an installation covering Packages. To reuse that App for upstream release notifications, also grant it access to DistributionPackages. The writer requests a token scoped only to Packages.
+The GitHub App needs **Contents: read and write** and **Actions: read-only**. Its installation must cover **snode.c, mqttsuite, DistributionPackages and Packages**. Approve any permission update on the installation after saving the App settings. Artifact transfers use Actions read; dispatches and package/status commits use Contents write. Tokens are scoped per step.
 
 Packages needs no Actions secrets, workflows or build system. Its main branch is written by the publisher, including force-with-lease snapshot replacement. Restrict write access to the publisher and repository administrators.
 
@@ -26,24 +26,16 @@ Packages needs no Actions secrets, workflows or build system. Its main branch is
 
 The upstream notification workflows target DistributionPackages. Configure the App installation and signing credentials before creating or moving a version tag.
 
-Both upstream projects use the same `Package release tag changed` workflow. Both retain their existing upstream App credential names:
+Both upstream projects use the same `Build distribution packages` workflow, with their own project identity. In **each source repository**, set:
 
-```yaml
-# actions/create-github-app-token inputs:
-app-id: ${{ vars.OPENWRT_APP_ID }}
-private-key: ${{ secrets.OPENWRT_APP_PRIVATE_KEY }}
-owner: SNodeC
-repositories: DistributionPackages
-permission-contents: write
-```
+| Type | Name | Value |
+| --- | --- | --- |
+| Variable | `PACKAGES_APP_CLIENT_ID` | The same App client ID as DistributionPackages |
+| Secret | `OPENWRT_APP_PRIVATE_KEY` | Existing App private key; retained credential name |
 
-The existing dispatch command then targets:
+The legacy App credential name does not select a distribution. No package-signing private key is required in either source repository. Keep all three package-signing secrets in DistributionPackages only.
 
-```sh
-gh api --method POST repos/SNodeC/DistributionPackages/dispatches --input -
-```
-
-Keep its existing strict version-tag validation and JSON payload fields: `repository`, `ref`, `before`, `after`, and `deleted`. The event type stays `release-tag-changed`. Set the App variable/secret in each upstream repository or share them using organization settings. These existing `OPENWRT_APP_*` names identify credentials only; they do not select the destination or an OpenWrt tag. The publisher uses `PACKAGES_APP_*` in DistributionPackages. Do not send each event to both old and new destinations.
+A version-tag push sends `release-tag-changed` to DistributionPackages. That repository captures the release and sends `package-build` to the source repository. Successful source jobs upload unsigned artifacts and send `package-built` back to DistributionPackages. After each SNode.C publication, the publisher sends `package-build` for that target to MQTTSuite, including the exact Packages commit. These dispatches implement one release chain; ordinary commits do not enter it.
 
 Only version-tag creation or movement starts builds. No ordinary push or README change starts package CI. README automation, if present upstream, remains independent. The migration never creates or moves upstream tags automatically.
 
@@ -57,6 +49,6 @@ Only version-tag creation or movement starts builds. No ordinary push or README 
 6. Confirm each target publishes SNode.C before its MQTTSuite build starts, and an application-only event does not rebuild SNode.C.
 7. Update devices using the new installer or documented manual repository URLs.
 
-This repository has no timer or manual build entry point. Creation of the new repositories and pushing source files do not trigger package builds. A CI run cannot be claimed validated until it has actually executed with the signing and GitHub App credentials.
+There is no timer or additional Packages workflow. Creation of the new repositories and pushing source files do not trigger package builds. A CI run cannot be claimed validated until it has actually executed with the signing and GitHub App credentials.
 
 Existing device feeds remain on the original URLs until explicitly updated. No redirect, deletion, or change to the original repositories is part of this setup.

@@ -1,5 +1,6 @@
 """Capture a release-tag generation; commit IDs are evidence, not pinned refs."""
 from contextlib import contextmanager
+from datetime import datetime, timezone
 import tempfile
 import hashlib
 import json
@@ -86,9 +87,9 @@ def prepare(published_root, bundle):
     revisions = json.loads((published_root / 'status.json').read_text())['allocations'][os.environ['GITHUB_RUN_ID']]
     if set(revisions) != (set(REPOSITORIES) if changed == 'snode.c' else {changed}):
         raise RuntimeError('Reserved revisions do not match the release project')
-    context = dict(recipe_ref=os.environ.get('RECIPE_REF', 'main'),
+    context = dict(captured_at=datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'), recipe_ref=os.environ.get('RECIPE_REF', 'main'),
                    recipe_commit=run('git', '-C', str(ROOT), 'rev-parse', 'HEAD'),
-                   destination='SNodeC/Packages',
+                   destination='SNodeC/Packages', packages_commit=run('git', '-C', str(published_root), 'rev-parse', 'HEAD'),
                    release_project=changed, run_id=os.environ.get('GITHUB_RUN_ID', 'local'),
                    run_url=f'https://github.com/{os.environ.get("GITHUB_REPOSITORY", "SNodeC/DistributionPackages")}/actions/runs/{os.environ.get("GITHUB_RUN_ID", "local")}')
     mqtt_tag = None
@@ -193,7 +194,8 @@ def reuse(bundle, target, destination):
             continue
         directory = f'{row["distribution"]}/pool/{row["suite"]}' if filename.endswith('.deb') else profile['directory']
         path = destination / filename
-        urllib.request.urlretrieve(f'https://raw.githubusercontent.com/SNodeC/Packages/main/{directory}/{name}', path)
+        ref = os.environ.get('PUBLISHED_REF') or profile['context']['packages_commit']
+        urllib.request.urlretrieve(f'https://raw.githubusercontent.com/SNodeC/Packages/{ref}/{directory}/{name}', path)
         if digest(path) != checksum:
             raise RuntimeError(f'Published dependency checksum mismatch: {name}')
     if row['family'] != 'openwrt':
@@ -230,14 +232,14 @@ def download_sdk(row, destination):
 
 
 def stage(sdk, bundle, output):
-    """Stage project packages and signed indexes; official feeds supply other dependencies."""
+    """Stage project packages and unsigned indexes; official feeds supply other dependencies."""
     info = json.loads((sdk / 'ci-sdk.json').read_text())
     feed = sdk / 'bin/packages' / info['arch'] / 'snodec'
     extension = '.ipk' if info['series'] == '24.10' else '.apk'
     packages = sorted(feed.glob('*' + extension))
     destination = output / 'openwrt' / info['series'] / info['arch']
     destination.mkdir(parents=True)
-    indexes = ['Packages', 'Packages.gz', 'Packages.sig'] if extension == '.ipk' else ['packages.adb']
+    indexes = ['Packages', 'Packages.gz'] if extension == '.ipk' else ['packages.adb']
     development = list(sdk.glob('snodec-openwrt-build-deps-*.tar.zst'))
     if len(development) != 1:
         raise RuntimeError('Expected one SNode.C development archive')
@@ -315,7 +317,8 @@ def publication_needed(previous, incoming):
     if old > new:
         raise RuntimeError('Superseded publication: a newer project revision is already published')
     if old == new:
-        if all(previous.get(key) == incoming.get(key) for key in ('sources', 'context', 'files')):
+        if (all(previous.get(key) == incoming.get(key) for key in ('sources', 'context'))
+                and previous.get('unsigned_files', previous.get('files')) == incoming.get('files')):
             return False
         raise RuntimeError('Different package content under the same publication revision')
     return True
@@ -338,6 +341,8 @@ def publish(incoming, checkout, bundle):
         destination = checkout / 'openwrt' / series / arch
         if not publication_needed(destination / 'build.json', metadata):
             continue
+        from ci.publish.openwrt import sign
+        sign(directory, metadata)
         destination.mkdir(parents=True, exist_ok=True)
         shutil.copytree(directory, destination, dirs_exist_ok=True)
     unchanged(bundle)

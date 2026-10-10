@@ -10,14 +10,21 @@ git -C "$root" config user.email '41898282+github-actions[bot]@users.noreply.git
 for attempt in {1..30}; do
     if [ "$#" != 0 ]; then "$@"; fi
     git -C "$root" add .
-    if git -C "$root" diff --cached --quiet; then exit 0; fi
+    if git -C "$root" diff --cached --quiet; then
+        [ -z "${GITHUB_OUTPUT:-}" ] || echo "snapshot=$previous" >> "$GITHUB_OUTPUT"
+        exit 0
+    fi
     snapshot=$(git -C "$root" commit-tree "$(git -C "$root" write-tree)" -m "$message")
     if git -C "$root" push --force-with-lease="refs/heads/main:$previous" origin "$snapshot:refs/heads/main"; then
+        [ -z "${GITHUB_OUTPUT:-}" ] || echo "snapshot=$snapshot" >> "$GITHUB_OUTPUT"
         exit 0
     fi
     git -C "$root" fetch --quiet origin main
     remote=$(git -C "$root" rev-parse FETCH_HEAD)
-    if [ "$remote" = "$snapshot" ]; then exit 0; fi
+    if [ "$remote" = "$snapshot" ]; then
+        [ -z "${GITHUB_OUTPUT:-}" ] || echo "snapshot=$snapshot" >> "$GITHUB_OUTPUT"
+        exit 0
+    fi
     if [ "$remote" = "$previous" ]; then exit 1; fi
     if ! git -C "$root" diff --quiet "$previous" "$remote" -- . ':!status.json' ':!docs/status.md' ':!status'; then
         echo 'Remote feed changed; refusing to replace it' >&2
