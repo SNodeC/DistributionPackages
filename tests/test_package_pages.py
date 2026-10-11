@@ -180,7 +180,7 @@ class PackagePagesTest(unittest.TestCase):
             publication.render(self.root, self.state)
         self.assertTrue((self.root / 'status/new-package.md').exists())
         self.assertNotIn('alt="Catalog"', self.text('new-package'))
-        (self.root / 'docs/new-package-package-options.md').write_text('New catalog')
+        (self.root / 'docs/catalogs/new-package.md').write_text('New catalog')
         with patch.dict(repository.PROJECTS, {'new-project': dict(title='New project', package='new-package', depends_on=())}):
             publication.render(self.root, self.state)
         self.assertIn('src="../docs/media/menu/catalog.svg" alt="Catalog"', self.text('new-package'))
@@ -189,9 +189,9 @@ class PackagePagesTest(unittest.TestCase):
 
     def test_distribution_guides_choose_before_install_and_match_the_menu(self):
         headings = ['Requirements', 'Choose packages', 'Quick install', 'Manual repository setup', 'Updates', 'Source records', 'Troubleshooting']
-        for name in ['debian', 'ubuntu', 'fedora', 'rocky', 'raspberrypi', 'openwrt']:
+        for name in ['debian', 'ubuntu', 'fedora', 'rocky-linux', 'raspberry-pi-os', 'openwrt']:
             with self.subTest(guide=name):
-                text = (repository.ROOT / f'site/docs/{name}.md').read_text()
+                text = (repository.ROOT / f'site/docs/installation/{name}.md').read_text()
                 self.assertEqual([line[3:] for line in text.splitlines() if line.startswith('## ')], headings)
                 menu = text.split('<p>', 1)[1].split('</p>', 1)[0]
                 anchors = ['requirements', 'choose-packages', 'quick-install', 'manual-repository-setup', 'updates']
@@ -206,16 +206,16 @@ class PackagePagesTest(unittest.TestCase):
 
     def test_catalogs_have_buttons_and_queries_for_all_package_managers(self):
         for package in ['snodec', 'mqttsuite']:
-            text = (repository.ROOT / f'site/docs/{package}-package-options.md').read_text()
+            text = (repository.ROOT / f'site/docs/catalogs/{package}.md').read_text()
             self.assertNotIn('## Installation and availability', text)
-            self.assertIn('[![Use](media/menu/use.svg)](#after-installation)', text)
+            self.assertIn('[![Use](../media/menu/use.svg)](#after-installation)', text)
             self.assertIn('## After installation', text)
             for label in ['Install', 'Status', 'Catalog', 'Details', 'Query', 'Use']:
                 self.assertIn(f'[![{label}]', text)
             self.assertIn(f"opkg list '{package}*'", text)
             self.assertIn(f"apk search '{package}*'", text)
-        mqtt = (repository.ROOT / 'site/docs/mqttsuite-package-options.md').read_text()
-        self.assertIn('mqttsuite/blob/HEAD/docs/readme/deployment.md#page-overview', mqtt)
+        mqtt = (repository.ROOT / 'site/docs/catalogs/mqttsuite.md').read_text()
+        self.assertIn('mqttsuite/blob/HEAD/docs/guides/deployment.md#page-overview', mqtt)
 
     def test_hub_and_keys_have_one_fingerprint_authority_and_consistent_apt_setup(self):
         hub = (repository.ROOT / 'site/README.md').read_text()
@@ -228,8 +228,8 @@ class PackagePagesTest(unittest.TestCase):
         self.assertIn('snodec-opkg.pub', keys)
         self.assertIn('snodec-usign.pub', keys)
         self.assertIn('architecture-independent', keys)
-        for name in ['debian', 'ubuntu', 'raspberrypi']:
-            guide = (repository.ROOT / f'site/docs/{name}.md').read_text()
+        for name in ['debian', 'ubuntu', 'raspberry-pi-os']:
+            guide = (repository.ROOT / f'site/docs/installation/{name}.md').read_text()
             self.assertIn('sudo install -m 644 "$tmp/key" /etc/apt/keyrings/snodec.asc', guide)
             self.assertNotIn('tee /etc/apt/keyrings/snodec.asc', guide)
             self.assertIn('signed-by=/etc/apt/keyrings/snodec.asc', guide)
@@ -375,7 +375,7 @@ class PackagePagesTest(unittest.TestCase):
 
     def test_direct_selection_routes_lossless_catalog_and_truthful_references(self):
         import re
-        catalog = (repository.ROOT / 'site/docs/snodec-package-options.md').read_text()
+        catalog = (repository.ROOT / 'site/docs/catalogs/snodec.md').read_text()
         names = set('''snodec-common snodec snodec-apps snodec-control snodec-logger
 snodec-utils snodec-core-mux-epoll snodec-core-mux-poll snodec-core-mux-select snodec-core
 snodec-core-socket snodec-core-socket-stream snodec-core-socket-stream-legacy snodec-core-socket-stream-tls snodec-db-mariadb
@@ -392,14 +392,14 @@ snodec-websocket-server snodec-websocket-client snodec-mqtt snodec-mqtt-server s
 snodec-mqtt-server-websocket snodec-mqtt-client-websocket'''.split())
         self.assertEqual(len(names), 67)
         self.assertEqual(names, set(re.findall(r'`(snodec(?:-[a-z0-9-]+)?)`', catalog)))
-        for name in ['debian', 'ubuntu', 'raspberrypi', 'fedora', 'rocky', 'openwrt']:
-            text = (repository.ROOT / f'site/docs/{name}.md').read_text()
+        for name in ['debian', 'ubuntu', 'raspberry-pi-os', 'fedora', 'rocky-linux', 'openwrt']:
+            text = (repository.ROOT / f'site/docs/installation/{name}.md').read_text()
             self.assertIn('<a id="install-selected-components"></a>\n\n```sh', text)
             self.assertIn('href="#install-selected-components"', text)
             self.assertEqual(text.count('href="#selected-packages"'), 1)
             self.assertEqual(text.count('**Check**'), 3)
             self.assertEqual(text.count('Next: '), 3)
-            self.assertIn('../keys/README.md#installed-keys', text)
+            self.assertIn('../../keys/README.md#installed-keys', text)
             records = text.split('## Source records')[1].split('## Troubleshooting')[0]
             self.assertIn('`build.json`', records)
             self.assertIn('**Build log**', records)

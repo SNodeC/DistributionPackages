@@ -1,16 +1,16 @@
 <!-- Published from DistributionPackages/site; edit that source, not this snapshot. -->
 <a id="page-overview"></a>
 
-[![Packages](media/page-banner.svg)](../README.md#project-overview)
+[![Packages](../media/page-banner.svg)](../../README.md#project-overview)
 
 # MQTTSuite package catalog
 
-[![Install](media/menu/install.svg)](../README.md#install) [![Status](media/menu/status.svg)](../status/mqttsuite.md#page-overview) [![Catalog](media/menu/catalog.svg)](#package-catalog) [![Details](media/menu/details.svg)](#distribution-details) [![Query](media/menu/query.svg)](#query-available-packages) [![Use](media/menu/use.svg)](#after-installation)
+[![Install](../media/menu/install.svg)](../../README.md#install) [![Status](../media/menu/status.svg)](../../status/mqttsuite.md#page-overview) [![Catalog](../media/menu/catalog.svg)](#package-catalog) [![Details](../media/menu/details.svg)](#distribution-details) [![Query](../media/menu/query.svg)](#query-available-packages) [![Use](../media/menu/use.svg)](#after-installation)
 Package names are shared by OpenWrt, Raspberry Pi OS, Debian, Ubuntu, Rocky Linux and Fedora. Architectures affect availability and binary contents, not names.
 
 ## Package catalog
 
-Library `<version>` follows the published release; `<ABI>` identifies its binary interface. See [Package status](../status/mqttsuite.md#page-overview) for current versions.
+Library `<version>` follows the published release; `<ABI>` identifies its binary interface. See [Package status](../../status/mqttsuite.md#page-overview) for current versions.
 
 | Package | Payload / role |
 | --- | --- |
@@ -55,7 +55,7 @@ apk search 'mqttsuite*'
 
 Inspect `mqttbroker --help` and `mqttcli --help`. Configure listeners, credentials and TLS certificates before starting services. MQTTStore needs a configured database. Before exposing management interfaces, review the deployment guide.
 
-[![Deploy safely](media/menu/deploy.svg)](https://github.com/SNodeC/mqttsuite/blob/HEAD/docs/readme/deployment.md#page-overview)
+[![Deploy safely](../media/menu/deploy.svg)](https://github.com/SNodeC/mqttsuite/blob/HEAD/docs/guides/deployment.md#page-overview)
 
 ### Native Linux
 

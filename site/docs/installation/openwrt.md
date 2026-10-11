@@ -1,18 +1,18 @@
 <!-- Published from DistributionPackages/site; edit that source, not this snapshot. -->
 <a id="page-overview"></a>
 
-[![Packages](media/page-banner.svg)](../README.md#project-overview)
+[![Packages](../media/page-banner.svg)](../../README.md#project-overview)
 
 # OpenWrt
 
 <p>
-<a href="#requirements"><img src="media/menu/requirements.svg" alt="Requirements"></a>
-<a href="#choose-packages"><img src="media/menu/choose-packages.svg" alt="Choose packages"></a>
-<a href="#quick-install"><img src="media/menu/install.svg" alt="Install"></a>
-<a href="#manual-repository-setup"><img src="media/menu/manual.svg" alt="Manual setup"></a>
-<a href="#updates"><img src="media/menu/updates.svg" alt="Updates"></a>
-<a href="../status/README.md#page-overview"><img src="media/menu/status.svg" alt="Status"></a>
-<a href="#troubleshooting"><img src="media/menu/troubleshoot.svg" alt="Troubleshoot"></a>
+<a href="#requirements"><img src="../media/menu/requirements.svg" alt="Requirements"></a>
+<a href="#choose-packages"><img src="../media/menu/choose-packages.svg" alt="Choose packages"></a>
+<a href="#quick-install"><img src="../media/menu/install.svg" alt="Install"></a>
+<a href="#manual-repository-setup"><img src="../media/menu/manual.svg" alt="Manual setup"></a>
+<a href="#updates"><img src="../media/menu/updates.svg" alt="Updates"></a>
+<a href="../../status/README.md#page-overview"><img src="../media/menu/status.svg" alt="Status"></a>
+<a href="#troubleshooting"><img src="../media/menu/troubleshoot.svg" alt="Troubleshoot"></a>
 </p>
 
 ## Requirements
@@ -33,11 +33,11 @@ Use `DISTRIB_ARCH`, not `uname -m`. Several devices can share a package architec
 
 ## Choose packages
 
-See the [SNode.C catalog](snodec-package-options.md#page-overview) and [MQTTSuite catalog](mqttsuite-package-options.md#page-overview) for package roles and after-install configuration.
+See the [SNode.C catalog](../catalogs/snodec.md#page-overview) and [MQTTSuite catalog](../catalogs/mqttsuite.md#page-overview) for package roles and after-install configuration.
 
-<a href="#complete-sets"><img src="media/menu/complete-sets.svg" alt="Complete sets" align="absmiddle"></a> Install all components of the currently offered projects.
+<a href="#complete-sets"><img src="../media/menu/complete-sets.svg" alt="Complete sets" align="absmiddle"></a> Install all components of the currently offered projects.
 
-<a href="#selected-packages"><img src="media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> Configure the signed source, then install only the components you need.
+<a href="#selected-packages"><img src="../media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> Configure the signed source, then install only the components you need.
 
 ## Quick install
 
@@ -68,7 +68,7 @@ opkg list-installed | grep -E '^(snodec|mqttsuite)( |-)'
 apk info -e snodec mqttsuite
 ```
 
-On 24.10, installed package names and versions are listed; on 25.12, both requested names are printed and the command succeeds. Next: [SNode.C configuration](snodec-package-options.md#after-installation) or [MQTTSuite configuration and deployment](mqttsuite-package-options.md#after-installation).
+On 24.10, installed package names and versions are listed; on 25.12, both requested names are printed and the command succeeds. Next: [SNode.C configuration](../catalogs/snodec.md#after-installation) or [MQTTSuite configuration and deployment](../catalogs/mqttsuite.md#after-installation).
 
 ### Selected packages
 
@@ -113,11 +113,11 @@ opkg list-installed | grep -E '^mqttsuite-(broker|cli) '
 apk info -e mqttsuite-broker mqttsuite-cli
 ```
 
-On 24.10, installed package names and versions are listed; on 25.12, both requested names are printed and the command succeeds. Next: [SNode.C configuration](snodec-package-options.md#after-installation) or [MQTTSuite configuration and deployment](mqttsuite-package-options.md#after-installation).
+On 24.10, installed package names and versions are listed; on 25.12, both requested names are printed and the command succeeds. Next: [SNode.C configuration](../catalogs/snodec.md#after-installation) or [MQTTSuite configuration and deployment](../catalogs/mqttsuite.md#after-installation).
 
 ## Manual repository setup
 
-Run the block for your release as `root`. These commands only configure the feed and refresh its index; package installation is a separate step. Existing feeds are preserved. The public keys can also be inspected in [keys](../keys).
+Run the block for your release as `root`. These commands only configure the feed and refresh its index; package installation is a separate step. Existing feeds are preserved. The public keys can also be inspected in [keys](../../keys).
 
 ### OpenWrt 24.10: opkg
 
@@ -185,7 +185,7 @@ printf '%s/packages.adb\n' "$base/openwrt/25.12/$arch"
 
 Import the corresponding signing key as shown above. For other devices, use their `DISTRIB_ARCH`; each architecture has its own directory. After an OpenWrt release-series upgrade, reconfigure this feed for the new series.
 
-Verify the [installed signing key](../keys/README.md#installed-keys) before installing packages.
+Verify the [installed signing key](../../keys/README.md#installed-keys) before installing packages.
 
 Install the complete sets after manual setup:
 
@@ -211,9 +211,9 @@ opkg list-installed | grep -E '^(snodec|mqttsuite)( |-)'
 apk info -e snodec mqttsuite
 ```
 
-On 24.10, installed package names and versions are listed; on 25.12, both requested names are printed and the command succeeds. Next: [SNode.C configuration](snodec-package-options.md#after-installation) or [MQTTSuite configuration and deployment](mqttsuite-package-options.md#after-installation).
+On 24.10, installed package names and versions are listed; on 25.12, both requested names are printed and the command succeeds. Next: [SNode.C configuration](../catalogs/snodec.md#after-installation) or [MQTTSuite configuration and deployment](../catalogs/mqttsuite.md#after-installation).
 
-<a href="#install-selected-components"><img src="media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> The repository is ready; name only the components you need.
+<a href="#install-selected-components"><img src="../media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> The repository is ready; name only the components you need.
 
 ## Updates
 
@@ -233,15 +233,15 @@ Update selected packages with `opkg upgrade <package> ...` or `apk upgrade <pack
 
 ## Source records
 
-In [source records](../openwrt/), `<series>/<architecture>/build.json` belongs to the feed directory opened by **Packages**.
+In [source records](../../openwrt/), `<series>/<architecture>/build.json` belongs to the feed directory opened by **Packages**.
 
-`build.json` records source tags and commits, package versions, checksums and publication context. On the [project status pages](../status/README.md#page-overview), **Build log** opens the recorded build job or release run. See [column semantics](architecture.md#latest-release-available-and-in-build) for missing historical records.
+`build.json` records source tags and commits, package versions, checksums and publication context. On the [project status pages](../../status/README.md#page-overview), **Build log** opens the recorded build job or release run. See [column semantics](../publication.md#latest-release-available-and-in-build) for missing historical records.
 
 Source recipes: [SNode.C](https://github.com/SNodeC/snode.c/tree/HEAD/supplement/openwrt) and [MQTTSuite](https://github.com/SNodeC/mqttsuite/tree/HEAD/misc/openwrt).
 
 ## Troubleshooting
 
-See [common problems and fixes](troubleshooting.md#page-overview) for download, signature, dependency and application errors.
+See [common problems and fixes](../troubleshooting.md#page-overview) for download, signature, dependency and application errors.
 
 | Symptom | What to check |
 | --- | --- |

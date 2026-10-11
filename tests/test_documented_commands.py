@@ -14,7 +14,8 @@ from ci.repository import ROOT
 class DocumentedCommandsTest(unittest.TestCase):
     def examples(self):
         for name in ['debian', 'ubuntu', 'raspberrypi', 'fedora', 'rocky', 'openwrt']:
-            text = (ROOT / f'site/docs/{name}.md').read_text()
+            guide = {'raspberrypi': 'raspberry-pi-os', 'rocky': 'rocky-linux'}.get(name, name)
+            text = (ROOT / f'site/docs/installation/{guide}.md').read_text()
             blocks = re.findall(r'```sh\n(.*?)\n```', text, re.S)
             for block in blocks:
                 if 'mktemp -d' in block:

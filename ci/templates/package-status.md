@@ -9,7 +9,7 @@
 
 <!-- menu -->
 
-[Legend](#legend) · [What the columns mean](../docs/architecture.md#latest-release-available-and-in-build)
+[Legend](#legend) · [What the columns mean](../docs/publication.md#latest-release-available-and-in-build)
 
 <!-- body -->
 

@@ -1,16 +1,16 @@
 <!-- Published from DistributionPackages/site; edit that source, not this snapshot. -->
 <a id="page-overview"></a>
 
-[![Packages](media/page-banner.svg)](../README.md#project-overview)
+[![Packages](../media/page-banner.svg)](../../README.md#project-overview)
 
 # SNode.C package catalog
 
-[![Install](media/menu/install.svg)](../README.md#install) [![Status](media/menu/status.svg)](../status/snodec.md#page-overview) [![Catalog](media/menu/catalog.svg)](#package-catalog) [![Details](media/menu/details.svg)](#distribution-details) [![Query](media/menu/query.svg)](#query-available-packages) [![Use](media/menu/use.svg)](#after-installation)
+[![Install](../media/menu/install.svg)](../../README.md#install) [![Status](../media/menu/status.svg)](../../status/snodec.md#page-overview) [![Catalog](../media/menu/catalog.svg)](#package-catalog) [![Details](../media/menu/details.svg)](#distribution-details) [![Query](../media/menu/query.svg)](#query-available-packages) [![Use](../media/menu/use.svg)](#after-installation)
 Package names are shared by OpenWrt, Raspberry Pi OS, Debian, Ubuntu, Rocky Linux and Fedora. Architectures affect availability and binary contents, not names.
 
 ## Package catalog
 
-Each library package installs `lib<package>.so.<ABI>` and its real `.so.<version>` file; `<ABI>` identifies the binary interface and `<version>` follows the source release. [Package status](../status/snodec.md#page-overview) shows current versions.
+Each library package installs `lib<package>.so.<ABI>` and its real `.so.<version>` file; `<ABI>` identifies the binary interface and `<version>` follows the source release. [Package status](../../status/snodec.md#page-overview) shows current versions.
 
 | Package | Payload / role |
 | --- | --- |

@@ -22,12 +22,12 @@
 
 ## Distribution-specific help
 
-[![OpenWrt](media/menu/openwrt.svg)](openwrt.md#troubleshooting)
-[![Raspberry Pi OS](media/menu/raspberrypi.svg)](raspberrypi.md#troubleshooting)
-[![Debian](media/menu/debian.svg)](debian.md#troubleshooting)
-[![Ubuntu](media/menu/ubuntu.svg)](ubuntu.md#troubleshooting)
-[![Rocky Linux](media/menu/rocky.svg)](rocky.md#troubleshooting)
-[![Fedora](media/menu/fedora.svg)](fedora.md#troubleshooting)
+[![OpenWrt](media/menu/openwrt.svg)](installation/openwrt.md#troubleshooting)
+[![Raspberry Pi OS](media/menu/raspberrypi.svg)](installation/raspberry-pi-os.md#troubleshooting)
+[![Debian](media/menu/debian.svg)](installation/debian.md#troubleshooting)
+[![Ubuntu](media/menu/ubuntu.svg)](installation/ubuntu.md#troubleshooting)
+[![Rocky Linux](media/menu/rocky.svg)](installation/rocky-linux.md#troubleshooting)
+[![Fedora](media/menu/fedora.svg)](installation/fedora.md#troubleshooting)
 
 [![Report issue](media/menu/report-issue.svg)](https://github.com/SNodeC/Packages/issues)
 

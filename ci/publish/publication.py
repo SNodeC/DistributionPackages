@@ -55,9 +55,9 @@ ORDER = {'not built': 0, 'pending': 1, 'running': 2, 'publishing': 3, **dict.fro
 
 
 DISTRIBUTIONS = {
-    'openwrt': ('OpenWrt', 'openwrt'), 'raspberrypios': ('Raspberry Pi OS', 'raspberrypi'),
+    'openwrt': ('OpenWrt', 'openwrt'), 'raspberrypios': ('Raspberry Pi OS', 'raspberry-pi-os'),
     'debian': ('Debian', 'debian'), 'ubuntu': ('Ubuntu', 'ubuntu'),
-    'rocky': ('Rocky Linux', 'rocky'), 'fedora': ('Fedora', 'fedora'),
+    'rocky': ('Rocky Linux', 'rocky-linux'), 'fedora': ('Fedora', 'fedora'),
 }
 
 
@@ -100,7 +100,7 @@ def render(root, state):
         release = f'{version} · r{revision}' if version and revision is not None else '—'
         navigation = button('All projects', 'README.md#page-overview') + ' ' + ' '.join(
             f'<a href="{href}"><img src="../docs/media/menu/{asset}.svg" alt="{label}" align="absmiddle"></a>' for label, asset, href in [
-            ('Install', 'install', '../README.md#install'), ('Catalog', 'catalog', f'../docs/{config["package"]}-package-options.md#page-overview'),
+            ('Install', 'install', '../README.md#install'), ('Catalog', 'catalog', f'../docs/catalogs/{config["package"]}.md#page-overview'),
             ('Troubleshoot', 'troubleshoot', '../docs/troubleshooting.md#page-overview')] if label != 'Catalog' or (root / href.removeprefix('../').split('#')[0]).is_file())
         sections = {}
         for row in rows:
@@ -133,7 +133,7 @@ def render(root, state):
         for distribution, releases in sections.items():
             title, guide = DISTRIBUTIONS[distribution]
             menu.append(f'**{title}** ' + ' '.join(button(suite, f'#{distribution}-{suite.replace(".", "")}') for suite in releases))
-            body += [f'## {title}', button('Install guide', f'../docs/{guide}.md#page-overview')]
+            body += [f'## {title}', button('Install guide', f'../docs/installation/{guide}.md#page-overview')]
             for suite, lines in releases.items():
                 body += [f'<a id="{distribution}-{suite.replace(".", "")}"></a>\n\n### {title} {suite}',
                          button('↑ menu', '#page-overview'),
@@ -146,7 +146,7 @@ def render(root, state):
         selected = sorted((row for row in rows if row['distribution'] == distribution), key=lambda row: (row['suite'], row['arch']))
         suites = list(dict.fromkeys(row['suite'] for row in selected))
         architectures = list(dict.fromkeys(row['arch'] for row in selected))
-        platforms.append(f"| [{title}](docs/{guide}.md#page-overview) | {', '.join(suites)} | {', '.join(architectures) if len(architectures) < 8 else str(max(sum(row['suite'] == suite for row in selected) for suite in suites)) + ' per release (names can differ)'} |")
+        platforms.append(f"| [{title}](docs/installation/{guide}.md#page-overview) | {', '.join(suites)} | {', '.join(architectures) if len(architectures) < 8 else str(max(sum(row['suite'] == suite for row in selected) for suite in suites)) + ' per release (names can differ)'} |")
         slug = title.lower().replace(' ', '-')
         legacy.append(f'## {title}')
         for suite in dict.fromkeys(row['suite'] for row in rows if row['distribution'] == distribution):

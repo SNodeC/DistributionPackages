@@ -1,23 +1,23 @@
 <!-- Published from DistributionPackages/site; edit that source, not this snapshot. -->
 <a id="page-overview"></a>
 
-[![Packages](media/page-banner.svg)](../README.md#project-overview)
+[![Packages](../media/page-banner.svg)](../../README.md#project-overview)
 
-# Fedora
+# Rocky Linux
 
 <p>
-<a href="#requirements"><img src="media/menu/requirements.svg" alt="Requirements"></a>
-<a href="#choose-packages"><img src="media/menu/choose-packages.svg" alt="Choose packages"></a>
-<a href="#quick-install"><img src="media/menu/install.svg" alt="Install"></a>
-<a href="#manual-repository-setup"><img src="media/menu/manual.svg" alt="Manual setup"></a>
-<a href="#updates"><img src="media/menu/updates.svg" alt="Updates"></a>
-<a href="../status/README.md#page-overview"><img src="media/menu/status.svg" alt="Status"></a>
-<a href="#troubleshooting"><img src="media/menu/troubleshoot.svg" alt="Troubleshoot"></a>
+<a href="#requirements"><img src="../media/menu/requirements.svg" alt="Requirements"></a>
+<a href="#choose-packages"><img src="../media/menu/choose-packages.svg" alt="Choose packages"></a>
+<a href="#quick-install"><img src="../media/menu/install.svg" alt="Install"></a>
+<a href="#manual-repository-setup"><img src="../media/menu/manual.svg" alt="Manual setup"></a>
+<a href="#updates"><img src="../media/menu/updates.svg" alt="Updates"></a>
+<a href="../../status/README.md#page-overview"><img src="../media/menu/status.svg" alt="Status"></a>
+<a href="#troubleshooting"><img src="../media/menu/troubleshoot.svg" alt="Troubleshoot"></a>
 </p>
 
 ## Requirements
 
-Supported releases: `43`, `44`. Match the release and package architecture installed on your device. Keep official repositories enabled for dependencies.
+Supported releases: `9`, `10`. Match the release and package architecture installed on your device. Keep official repositories enabled for dependencies.
 
 Use an account with `sudo`, or run administrative commands directly as root. Install `curl` and CA certificates before downloading the installer.
 
@@ -31,13 +31,20 @@ rpm --eval '%{_arch}'
 sudo dnf install ca-certificates curl
 ```
 
+Rocky Linux 10 requires x86-64-v3 on x86 systems. ARM64 packages use `aarch64`. Enable CRB and EPEL before either installation method:
+
+```sh
+sudo dnf install -y dnf-plugins-core epel-release
+sudo dnf config-manager --set-enabled crb
+```
+
 ## Choose packages
 
-See the [SNode.C catalog](snodec-package-options.md#page-overview) and [MQTTSuite catalog](mqttsuite-package-options.md#page-overview) for package roles and after-install configuration.
+See the [SNode.C catalog](../catalogs/snodec.md#page-overview) and [MQTTSuite catalog](../catalogs/mqttsuite.md#page-overview) for package roles and after-install configuration.
 
-<a href="#complete-sets"><img src="media/menu/complete-sets.svg" alt="Complete sets" align="absmiddle"></a> Install all components of the currently offered projects.
+<a href="#complete-sets"><img src="../media/menu/complete-sets.svg" alt="Complete sets" align="absmiddle"></a> Install all components of the currently offered projects.
 
-<a href="#selected-packages"><img src="media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> Configure the signed source, then install only the components you need.
+<a href="#selected-packages"><img src="../media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> Configure the signed source, then install only the components you need.
 
 ## Quick install
 
@@ -62,7 +69,7 @@ The installer detects the distribution, release and package architecture, checks
 rpm -q snodec mqttsuite
 ```
 
-Both requested packages show their installed version, release and architecture; no “not installed” message appears. Next: [SNode.C configuration](snodec-package-options.md#after-installation) or [MQTTSuite configuration and deployment](mqttsuite-package-options.md#after-installation).
+Both requested packages show their installed version, release and architecture; no “not installed” message appears. Next: [SNode.C configuration](../catalogs/snodec.md#after-installation) or [MQTTSuite configuration and deployment](../catalogs/mqttsuite.md#after-installation).
 
 ### Selected packages
 
@@ -95,7 +102,7 @@ Dependencies are installed automatically.
 rpm -q mqttsuite-broker mqttsuite-cli
 ```
 
-Both requested packages show their installed version, release and architecture; no “not installed” message appears. Next: [SNode.C configuration](snodec-package-options.md#after-installation) or [MQTTSuite configuration and deployment](mqttsuite-package-options.md#after-installation).
+Both requested packages show their installed version, release and architecture; no “not installed” message appears. Next: [SNode.C configuration](../catalogs/snodec.md#after-installation) or [MQTTSuite configuration and deployment](../catalogs/mqttsuite.md#after-installation).
 
 ## Manual repository setup
 
@@ -107,10 +114,10 @@ APT and RPM repositories use the same signing key. Its download filename is `sno
 (
   set -eu
   . /etc/os-release
-  [ "$ID" = fedora ] || { echo "Requires fedora"; exit 1; }
+  [ "$ID" = rocky ] || { echo "Requires rocky"; exit 1; }
   suite=${VERSION_ID%%.*}
   case "$suite" in
-    43|44) ;;
+    9|10) ;;
     *) echo "Unsupported release"; exit 1 ;;
   esac
   arch=$(rpm --eval '%{_arch}')
@@ -121,7 +128,7 @@ APT and RPM repositories use the same signing key. Its download filename is `sno
   tmp=$(mktemp -d /tmp/snodec.XXXXXX)
   trap 'rm -rf "$tmp"' EXIT HUP INT TERM
   base=https://raw.githubusercontent.com/SNodeC/Packages/main
-  curl -fsSL "$base/fedora/$suite/$arch/repodata/repomd.xml" -o "$tmp/index"
+  curl -fsSL "$base/rocky/$suite/$arch/repodata/repomd.xml" -o "$tmp/index"
   curl -fsSL "$base/keys/snodec-apt.asc" -o "$tmp/key"
   sudo install -d -m 755 /etc/pki/rpm-gpg /etc/yum.repos.d
   sudo install -m 644 "$tmp/key" /etc/pki/rpm-gpg/RPM-GPG-KEY-snodec
@@ -129,7 +136,7 @@ APT and RPM repositories use the same signing key. Its download filename is `sno
   sudo tee /etc/yum.repos.d/snodec.repo >/dev/null <<REPO
 [snodec]
 name=SNode.C and MQTTSuite
-baseurl=$base/fedora/\$releasever/\$basearch/
+baseurl=$base/rocky/\$releasever/\$basearch/
 enabled=1
 gpgcheck=1
 repo_gpgcheck=1
@@ -141,7 +148,7 @@ REPO
 
 The escaped `$releasever` and `$basearch` remain literal in the file; DNF expands them for the installed system. Both RPM packages and repository metadata are signature-checked.
 
-Verify the [installed signing key](../keys/README.md#installed-keys) before installing packages.
+Verify the [installed signing key](../../keys/README.md#installed-keys) before installing packages.
 
 Install the complete sets after manual setup:
 
@@ -155,9 +162,9 @@ sudo dnf install snodec mqttsuite
 rpm -q snodec mqttsuite
 ```
 
-Both requested packages show their installed version, release and architecture; no “not installed” message appears. Next: [SNode.C configuration](snodec-package-options.md#after-installation) or [MQTTSuite configuration and deployment](mqttsuite-package-options.md#after-installation).
+Both requested packages show their installed version, release and architecture; no “not installed” message appears. Next: [SNode.C configuration](../catalogs/snodec.md#after-installation) or [MQTTSuite configuration and deployment](../catalogs/mqttsuite.md#after-installation).
 
-<a href="#install-selected-components"><img src="media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> The repository is ready; name only the components you need.
+<a href="#install-selected-components"><img src="../media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> The repository is ready; name only the components you need.
 
 ## Updates
 
@@ -169,16 +176,17 @@ The quoted patterns upgrade installed matching packages and their dependencies; 
 
 ## Source records
 
-In [source records](../fedora/), `<release>/<architecture>/build.json` belongs to the feed. **Packages** opens its `Packages/` subdirectory, not the record itself.
+In [source records](../../rocky/), `<release>/<architecture>/build.json` belongs to the feed. **Packages** opens its `Packages/` subdirectory, not the record itself.
 
-`build.json` records source tags and commits, package versions, checksums and publication context. On the [project status pages](../status/README.md#page-overview), **Build log** opens the recorded build job or release run. See [column semantics](architecture.md#latest-release-available-and-in-build) for missing historical records.
+`build.json` records source tags and commits, package versions, checksums and publication context. On the [project status pages](../../status/README.md#page-overview), **Build log** opens the recorded build job or release run. See [column semantics](../publication.md#latest-release-available-and-in-build) for missing historical records.
 
 Native package definitions: [SNode.C CPack](https://github.com/SNodeC/snode.c/blob/HEAD/cmake/Packing.cmake) and [MQTTSuite CPack](https://github.com/SNodeC/mqttsuite/blob/HEAD/cmake/Packing.cmake).
 
 ## Troubleshooting
 
-See [common problems and fixes](troubleshooting.md#page-overview) for download, signature, dependency and application errors.
+See [common problems and fixes](../troubleshooting.md#page-overview) for download, signature, dependency and application errors.
 
 | Symptom | What to check |
 | --- | --- |
-| DNF selects the wrong release | Check `VERSION_ID` and DNF’s `$releasever`; do not mix Fedora release repositories. |
+| Dependencies are missing | Enable CRB and EPEL as shown in Requirements. |
+| Illegal instruction on x86 | Check the x86-64-v3 requirement for Rocky Linux 10. |

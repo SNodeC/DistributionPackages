@@ -1,18 +1,18 @@
 <!-- Published from DistributionPackages/site; edit that source, not this snapshot. -->
 <a id="page-overview"></a>
 
-[![Packages](media/page-banner.svg)](../README.md#project-overview)
+[![Packages](../media/page-banner.svg)](../../README.md#project-overview)
 
 # Raspberry Pi OS
 
 <p>
-<a href="#requirements"><img src="media/menu/requirements.svg" alt="Requirements"></a>
-<a href="#choose-packages"><img src="media/menu/choose-packages.svg" alt="Choose packages"></a>
-<a href="#quick-install"><img src="media/menu/install.svg" alt="Install"></a>
-<a href="#manual-repository-setup"><img src="media/menu/manual.svg" alt="Manual setup"></a>
-<a href="#updates"><img src="media/menu/updates.svg" alt="Updates"></a>
-<a href="../status/README.md#page-overview"><img src="media/menu/status.svg" alt="Status"></a>
-<a href="#troubleshooting"><img src="media/menu/troubleshoot.svg" alt="Troubleshoot"></a>
+<a href="#requirements"><img src="../media/menu/requirements.svg" alt="Requirements"></a>
+<a href="#choose-packages"><img src="../media/menu/choose-packages.svg" alt="Choose packages"></a>
+<a href="#quick-install"><img src="../media/menu/install.svg" alt="Install"></a>
+<a href="#manual-repository-setup"><img src="../media/menu/manual.svg" alt="Manual setup"></a>
+<a href="#updates"><img src="../media/menu/updates.svg" alt="Updates"></a>
+<a href="../../status/README.md#page-overview"><img src="../media/menu/status.svg" alt="Status"></a>
+<a href="#troubleshooting"><img src="../media/menu/troubleshoot.svg" alt="Troubleshoot"></a>
 </p>
 
 ## Requirements
@@ -36,11 +36,11 @@ Use **Raspberry Pi 3, 4 or 5 with 64-bit Raspberry Pi OS** (`arm64`). The [offic
 
 ## Choose packages
 
-See the [SNode.C catalog](snodec-package-options.md#page-overview) and [MQTTSuite catalog](mqttsuite-package-options.md#page-overview) for package roles and after-install configuration.
+See the [SNode.C catalog](../catalogs/snodec.md#page-overview) and [MQTTSuite catalog](../catalogs/mqttsuite.md#page-overview) for package roles and after-install configuration.
 
-<a href="#complete-sets"><img src="media/menu/complete-sets.svg" alt="Complete sets" align="absmiddle"></a> Install all components of the currently offered projects.
+<a href="#complete-sets"><img src="../media/menu/complete-sets.svg" alt="Complete sets" align="absmiddle"></a> Install all components of the currently offered projects.
 
-<a href="#selected-packages"><img src="media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> Configure the signed source, then install only the components you need.
+<a href="#selected-packages"><img src="../media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> Configure the signed source, then install only the components you need.
 
 ## Quick install
 
@@ -65,7 +65,7 @@ The installer detects the distribution, release and package architecture, checks
 dpkg-query -W -f='${Package} ${Version} ${Status}\n' snodec mqttsuite
 ```
 
-The requested packages show versions and `install ok installed`. Missing or incomplete entries are not a successful installation. Next: [SNode.C configuration](snodec-package-options.md#after-installation) or [MQTTSuite configuration and deployment](mqttsuite-package-options.md#after-installation).
+The requested packages show versions and `install ok installed`. Missing or incomplete entries are not a successful installation. Next: [SNode.C configuration](../catalogs/snodec.md#after-installation) or [MQTTSuite configuration and deployment](../catalogs/mqttsuite.md#after-installation).
 
 ### Selected packages
 
@@ -98,7 +98,7 @@ Dependencies are installed automatically.
 dpkg-query -W -f='${Package} ${Version} ${Status}\n' mqttsuite-broker mqttsuite-cli
 ```
 
-The requested packages show versions and `install ok installed`. Missing or incomplete entries are not a successful installation. Next: [SNode.C configuration](snodec-package-options.md#after-installation) or [MQTTSuite configuration and deployment](mqttsuite-package-options.md#after-installation).
+The requested packages show versions and `install ok installed`. Missing or incomplete entries are not a successful installation. Next: [SNode.C configuration](../catalogs/snodec.md#after-installation) or [MQTTSuite configuration and deployment](../catalogs/mqttsuite.md#after-installation).
 
 ## Manual repository setup
 
@@ -132,7 +132,7 @@ Run these commands on the Pi. Keep the official Raspberry Pi OS repositories con
 )
 ```
 
-Verify the [installed signing key](../keys/README.md#installed-keys) before installing packages.
+Verify the [installed signing key](../../keys/README.md#installed-keys) before installing packages.
 
 Install the complete sets after manual setup:
 
@@ -146,9 +146,9 @@ sudo apt-get install snodec mqttsuite
 dpkg-query -W -f='${Package} ${Version} ${Status}\n' snodec mqttsuite
 ```
 
-The requested packages show versions and `install ok installed`. Missing or incomplete entries are not a successful installation. Next: [SNode.C configuration](snodec-package-options.md#after-installation) or [MQTTSuite configuration and deployment](mqttsuite-package-options.md#after-installation).
+The requested packages show versions and `install ok installed`. Missing or incomplete entries are not a successful installation. Next: [SNode.C configuration](../catalogs/snodec.md#after-installation) or [MQTTSuite configuration and deployment](../catalogs/mqttsuite.md#after-installation).
 
-<a href="#install-selected-components"><img src="media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> The repository is ready; name only the components you need.
+<a href="#install-selected-components"><img src="../media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> The repository is ready; name only the components you need.
 
 ## Updates
 
@@ -163,15 +163,15 @@ When moving from older combined packages to component packages, explicitly insta
 
 ## Source records
 
-In [source records](../raspberrypios/dists/), `<suite>/build.json` aggregates the suite’s architectures. **Packages** opens the shared package pool, not this record directory.
+In [source records](../../raspberrypios/dists/), `<suite>/build.json` aggregates the suite’s architectures. **Packages** opens the shared package pool, not this record directory.
 
-`build.json` records source tags and commits, package versions, checksums and publication context. On the [project status pages](../status/README.md#page-overview), **Build log** opens the recorded build job or release run. See [column semantics](architecture.md#latest-release-available-and-in-build) for missing historical records.
+`build.json` records source tags and commits, package versions, checksums and publication context. On the [project status pages](../../status/README.md#page-overview), **Build log** opens the recorded build job or release run. See [column semantics](../publication.md#latest-release-available-and-in-build) for missing historical records.
 
 Native package definitions: [SNode.C CPack](https://github.com/SNodeC/snode.c/blob/HEAD/cmake/Packing.cmake) and [MQTTSuite CPack](https://github.com/SNodeC/mqttsuite/blob/HEAD/cmake/Packing.cmake).
 
 ## Troubleshooting
 
-See [common problems and fixes](troubleshooting.md#page-overview) for download, signature, dependency and application errors.
+See [common problems and fixes](../troubleshooting.md#page-overview) for download, signature, dependency and application errors.
 
 | Symptom | What to check |
 | --- | --- |
