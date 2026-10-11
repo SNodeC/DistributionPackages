@@ -139,18 +139,20 @@ class PackagingTest(unittest.TestCase):
             publication.update(state,row,generation,'snode.c','running',1)
             publication.render(root,state)
             self.assertEqual(before,{p.name:p.read_bytes() for p in (root/'status/badges').iterdir()})
-            text=(root/'docs/status.md').read_text()
-            self.assertIn('![snode.c: running](../status/badges/running.svg)',text)
-            self.assertEqual(text.count('| Architecture | SNode.C | MQTTSuite |'),
+            text=(root/'status/snodec.md').read_text()
+            self.assertIn('![running](badges/running.svg)',text)
+            self.assertEqual(text.count('| Architecture | Available | Latest attempt |'),
                              len({(r['distribution'], r['suite']) for r in publication.targets()}))
-            self.assertEqual(sum(line.startswith('| `') for line in text.splitlines()),
+            self.assertEqual(sum(line.startswith('| '+chr(96)) for line in text.splitlines()),
                              len(publication.targets()))
-            self.assertIn('[trixie](#debian-trixie)', text)
             self.assertIn('### Debian trixie', text)
-            self.assertIn('<a id="trixie-1"></a>', text)
-            self.assertIn('Unfinished or unsuccessful attempts', text)
-            self.assertIn('SNode.C: running', text)
-            self.assertNotIn('../status/'+row['id'],text)
+            self.assertIn('<a id="debian-trixie"></a>', text)
+            self.assertIn('## Needs attention', text)
+            self.assertIn('Building', text)
+            legacy=(root/'docs/status.md').read_text()
+            self.assertIn('<a id="trixie-1"></a>', legacy)
+            self.assertIn('../status/snodec.md#debian-trixie', legacy)
+            self.assertNotIn('| Architecture', legacy)
             self.assertFalse((root/'README.md').exists())
             self.assertFalse((root/'install').exists())
             self.assertEqual(list((root/'docs').iterdir()),[root/'docs/status.md'])
@@ -478,10 +480,10 @@ class StatusEventsTest(unittest.TestCase):
         self.assertFalse((feed/'retired.ipk').exists())
         self.assertEqual((self.seed / 'status.json').read_bytes(), status_before)
         self.assertFalse((self.seed / 'docs/removed').exists())
-        self.assertIn('![snode.c: running]', (self.seed / 'docs/status.md').read_text())
+        self.assertIn('![running]', (self.seed / 'status/snodec.md').read_text())
         self.assertEqual(badges_before, {p.name: p.read_bytes() for p in (self.seed / 'status/badges').iterdir()})
-        expected_docs = {p.relative_to(repository.ROOT / 'docs'): p.read_bytes()
-                         for p in (repository.ROOT / 'docs').rglob('*') if p.is_file()}
+        expected_docs = {p.relative_to(repository.ROOT / 'site/docs'): p.read_bytes()
+                         for p in (repository.ROOT / 'site/docs').rglob('*') if p.is_file()}
         actual_docs = {p.relative_to(self.seed / 'docs'): p.read_bytes()
                        for p in (self.seed / 'docs').rglob('*') if p.is_file() and p.name != 'status.md'}
         self.assertEqual(actual_docs, expected_docs)
@@ -489,7 +491,9 @@ class StatusEventsTest(unittest.TestCase):
         self.assertEqual(publication.read(self.seed/'status.json')['targets'][self.rows[0]['id']+'/snode.c']['status'],'published')
         for name,data in original.items():
             self.assertEqual((self.bundle/name).read_bytes(),data)
-        self.assertEqual((self.seed/'README.md').read_bytes(),(repository.ROOT/'README.md').read_bytes())
+        self.assertIn('# SNodeC Packages', (self.seed/'README.md').read_text())
+        self.assertIn('<!-- packages:begin projects -->', (self.seed/'README.md').read_text())
+        self.assertNotIn('# DistributionPackages', (self.seed/'README.md').read_text())
         self.assertEqual((self.seed/'install/install.sh').read_bytes(),(repository.ROOT/'install/install.sh').read_bytes())
         self.assertFalse((self.seed / 'net').exists())
 

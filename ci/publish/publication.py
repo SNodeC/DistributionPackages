@@ -8,7 +8,7 @@ from pathlib import Path
 import shutil
 import sys
 
-from ci.repository import ROOT, matrix, linux_matrix, run, select, project_file, digest, REPOSITORIES, project_revision
+from ci.repository import ROOT, matrix, linux_matrix, run, select, project_file, digest, PROJECTS, REPOSITORIES, project_revision
 
 
 def targets():
@@ -52,73 +52,117 @@ TERMINAL = {'published', 'failed', 'cancelled', 'skipped', 'superseded'}
 ORDER = {'not built': 0, 'pending': 1, 'running': 2, 'publishing': 3, **dict.fromkeys(TERMINAL, 4)}
 
 
+DISTRIBUTIONS = {
+    'openwrt': ('OpenWrt', 'openwrt'), 'raspberrypios': ('Raspberry Pi OS', 'raspberrypi'),
+    'debian': ('Debian', 'debian'), 'ubuntu': ('Ubuntu', 'ubuntu'),
+    'rocky': ('Rocky Linux', 'rocky'), 'fedora': ('Fedora', 'fedora'),
+}
+
+
 def render(root, state):
+    """Render recorded facts only; authored docs, feeds and event state are never mutated."""
     badges = root / 'status/badges'
     badges.mkdir(parents=True, exist_ok=True)
-    sections, attention = {}, {}
     colors = {'pending': '#57606a', 'running': '#0969da', 'publishing': '#0969da', 'published': '#1a7f37',
               'failed': '#cf222e', 'cancelled': '#57606a', 'skipped': '#57606a', 'superseded': '#9a6700', 'not built': '#57606a'}
     width = max(map(len, colors)) * 7 + 16
     for label, color in colors.items():
-        badge = badges / (label.replace(' ', '-') + '.svg')
+        # Existing badge bytes/URLs stay immutable. New meaning is adjacent text, not new pipeline states.
         svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="20" role="img" aria-label="{label}"><rect width="{width}" height="20" rx="3" fill="{color}"/><text x="{width / 2}" y="14" text-anchor="middle" fill="white" font-family="Verdana,sans-serif" font-size="11">{label}</text></svg>\n'
-        badge.write_text(svg)
+        (badges / (label.replace(' ', '-') + '.svg')).write_text(svg)
     for obsolete in (root / 'status').glob('*.svg'):
         obsolete.unlink()
-    for row in sorted(targets(), key=lambda item: item['arch']):
-        info, feed = published(root, row)
-        versions = info.get('versions', {})
-        snodec = versions.get('snodec', versions.get('snode.c'))
-        date = f"[{info['published_at'][:10]}](../{feed}/build.json)" if info.get('published_at') else '—'
-        packages = f"{row['distribution']}/pool/{row['suite']}" if row['distribution'] in {'debian', 'ubuntu', 'raspberrypios'} else f'{feed}/Packages' if row['distribution'] in {'rocky', 'fedora'} else feed
-        links = f'[Packages](../{packages}/)' if info else '—'
-        cells = []
-        for project, version in zip(REPOSITORIES, (snodec, versions.get('mqttsuite'))):
-            item = state['targets'].get(f"{row['id']}/{project}", {})
+    stamp = lambda value: datetime.fromisoformat(value.replace('Z', '+00:00')).astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M UTC') if value else 'not recorded'
+    rows = sorted(targets(), key=lambda row: (list(DISTRIBUTIONS).index(row['distribution']), row['suite'], row['arch']))
+    index, projects, platforms, legacy, anchors = [], [], [], [], {}
+    template = (ROOT / 'ci/templates/package-status.md').read_text()
+    for project, config in PROJECTS.items():
+        sections, attention, available = {}, [], 0
+        for row in rows:
+            info, feed = published(root, row)
+            version = info.get('versions', {}).get(config['package'], info.get('versions', {}).get(project))
+            available += bool(version)
+            item = state.get('targets', {}).get(f"{row['id']}/{project}", {})
             status = item.get('status', 'published' if version else 'not built')
-            filename = status.replace(' ', '-') + '.svg'
-            badge = f"![{project}: {status}](../status/badges/{filename})"
-            url = item.get('job_url', item.get('run_url'))
-            badge = f'[{badge}]({url})' if url else badge
-            version = f'`{version}`' if version else '—'
-            cells.append(f'{version}<br>{badge}')
+            record = state.get('timeline', {}).get(f"{row['id']}/{project}", {})
+            event = record.get('event', {})
+            if any(event.get(key) != item.get(key) for key in ('revision', 'attempt', 'run_id', 'status')):
+                event = {}  # Old captured writers cannot attach stale metadata to a newer state.
+            dependencies = [dep for dep in config['depends_on']
+                            if state.get('targets', {}).get(f"{row['id']}/{dep}", {}).get('status') != 'published']
+            waiting = dependencies and status in {'pending', 'skipped'} and all(
+                state.get('targets', {}).get(f"{row['id']}/{dep}", {}).get('status', 'pending') not in TERMINAL for dep in dependencies)
+            label = 'Waiting for ' + ', '.join(PROJECTS[dep]['title'] for dep in dependencies) if waiting else {
+                'running': 'Building', 'publishing': 'Built · awaiting signed publication',
+                'published': 'Published', 'failed': 'Publication failed' if event.get('stage') == 'publication' else
+                'Build failed' if event.get('stage') == 'build' else 'Failed · stage not recorded',
+                'pending': 'Queued', 'not built': 'Not built',
+            }.get(status, status.capitalize())
+            if status == 'skipped' and dependencies and not waiting:
+                label += ' · ' + ', '.join(f"{PROJECTS[dep]['title']}: {state.get('targets', {}).get(row['id']+'/'+dep, {}).get('status', 'not built')}" for dep in dependencies)
+            badge = f"![{status}](badges/{status.replace(' ', '-')}.svg)"
+            generation = state.get('runs', {}).get(item.get('run_id'), {})
+            tag = generation.get('sources', {}).get(project)
+            tag = next((ref.removeprefix('refs/tags/') for ref in tag if not ref.endswith('^{}')), None) if isinstance(tag, dict) else tag
+            attempted = f"Source: \x60{tag}\x60 · " if tag else ''
+            attempted += f"r{item['revision']} · attempt {item.get('attempt', 0)}" if item else 'No attempt recorded'
+            captured = generation.get('context', {}).get('captured_at')
+            stamp_key = {'running': 'started_at', 'publishing': 'ended_at', 'published': 'published_at'}.get(status, 'updated_at')
+            stamp_label = {'running': 'Started', 'publishing': 'Built', 'published': 'Published'}.get(status, 'Changed')
+            attempt = f"{badge}<br>{label}<br>{attempted}<br>{stamp_label}: {stamp(event.get(stamp_key))}"
+            attempt += f"<br>Captured: {stamp(captured)}"
+            published_at = record.get('published', {}).get('at') if str(record.get('published', {}).get('revision')) == str(project_revision(info, project)) else None
+            if not published_at and info.get('context', {}).get('build_project') == project:
+                published_at = info.get('published_at')
+            available_capture = state.get('runs', {}).get(record.get('published', {}).get('run_id'), {}).get('context', {}).get('captured_at') if published_at and str(record.get('published', {}).get('revision')) == str(project_revision(info, project)) else None
+            if not available_capture and info.get('context', {}).get('build_project') == project:
+                available_capture = info.get('context', {}).get('captured_at')
+            current = f"\x60{version}\x60<br>Captured: {stamp(available_capture)}<br>Published: {stamp(published_at)}" if version else '—'
+            packages = f"{row['distribution']}/pool/{row['suite']}" if row['distribution'] in {'debian', 'ubuntu', 'raspberrypios'} else f'{feed}/Packages' if row['distribution'] in {'rocky', 'fedora'} else feed
+            links = [f'[Files](../{packages}/)', f'[Record](../{feed}/build.json)'] if info else []
+            if item.get('job_url') or item.get('run_url'):
+                links.insert(0, f"[Run]({item.get('job_url') or item['run_url']})")
+            sections.setdefault(row['distribution'], {}).setdefault(row['suite'], []).append(
+                f"| \x60{row['arch']}\x60 | {current} | {attempt} | {' · '.join(links) or '—'} |")
             if status != 'published':
-                title = 'SNode.C' if project == 'snode.c' else 'MQTTSuite'
-                attention.setdefault((row['distribution'], row['suite']), []).append(f"`{row['arch']}` {title}: {status}")
-        sections.setdefault(row['distribution'], {}).setdefault(row['suite'], []).append(
-            f"| `{row['arch']}` | {' | '.join(cells)} | {date} | {links} |")
-    text = (ROOT / 'ci/templates/package-status.md').read_text()
-    contents, issues, old_anchors = [], [], {}
-    for section in text.split('\n## ')[1:]:
-        marker = re.search(r'<!-- targets:(\w+) -->', section)
-        if not marker:
-            continue
-        distribution = marker[1]
-        title = section.split('\n', 1)[0]
+                attention.append(f"- [{row['distribution']} {row['suite']} / \x60{row['arch']}\x60](#{row['distribution']}-{row['suite'].replace('.', '')}): {label}")
+        body = ['## Needs attention', '\n'.join(attention) or 'No unfinished or unsuccessful attempts recorded.']
+        for distribution, releases in sections.items():
+            title, guide = DISTRIBUTIONS[distribution]
+            body += [f'## {title}', f'[Installation guide](../docs/{guide}.md#page-overview)']
+            for suite, lines in releases.items():
+                body += [f'<a id="{distribution}-{suite.replace(".", "")}"></a>\n\n### {title} {suite}',
+                         '| Architecture | Available | Latest attempt | Links |\n| --- | --- | --- | --- |\n' + '\n'.join(lines)]
+        page = template.replace('<!-- title -->', config['title']).replace('<!-- body -->', '\n\n'.join(body))
+        (root / f"status/{config['package']}.md").write_text(page)
+        link = f"[{config['title']}]({config['package']}.md#page-overview)"
+        index.append(f"- {link}: {available} / {len(rows)} targets have available packages; attention: {len(attention)} · [Package catalog](../docs/{config['package']}-package-options.md#page-overview).")
+        projects.append(f"| [{config['title']}](https://github.com/SNodeC/{project}#project-overview) | [Packages](docs/{config['package']}-package-options.md#page-overview) | [Status](status/{config['package']}.md#page-overview) | {available} / {len(rows)} |")
+    for distribution, (title, guide) in DISTRIBUTIONS.items():
+        selected = [row for row in rows if row['distribution'] == distribution]
+        suites = list(dict.fromkeys(row['suite'] for row in selected))
+        architectures = list(dict.fromkeys(row['arch'] for row in selected))
+        platforms.append(f"| [{title}](docs/{guide}.md#page-overview) | {', '.join(suites)} | {', '.join(architectures) if len(architectures) < 8 else str(max(sum(row['suite'] == suite for row in selected) for suite in suites)) + ' per release (names can differ)'} |")
         slug = title.lower().replace(' ', '-')
-        tables, releases = [], []
-        for suite, lines in sections.get(distribution, {}).items():
-            anchor = f"{slug}-{suite.replace('.', '')}"
-            releases.append(f'[{suite}](#{anchor})')
-            # Keep existing release links working after adding explicit headings.
-            old = suite.replace('.', '')
-            count = old_anchors.get(old, 0)
-            old_anchors[old] = count + 1
-            old = f'{old}-{count}' if count else old
-            tables.append(f'<a id="{old}"></a>\n\n### {title} {suite}\n\n'
-                          '| Architecture | SNode.C | MQTTSuite | Published (UTC) | Packages |\n'
-                          '| --- | :---: | :---: | --- | --- |\n' + '\n'.join(lines))
-            if (distribution, suite) in attention:
-                issues.append(f"- [{title} {suite}](#{anchor}): " + '; '.join(attention[distribution, suite]))
-        contents.append(f'- **[{title}](#{slug})** ({" · ".join(releases)})')
-        text = text.replace(f'<!-- targets:{distribution} -->', '\n\n'.join(tables))
-    summary = ('<details>\n<summary>Unfinished or unsuccessful attempts</summary>\n\n' +
-               '\n'.join(issues) + '\n\n</details>') if issues else 'All targets published for both projects.'
-    text = text.replace('<!-- attention -->', summary)
-    text = text.replace('<!-- generated -->', datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'))
-    text = text.replace('<!-- contents -->', '\n'.join(contents))
+        legacy.append(f'## {title}')
+        for suite in suites:
+            old = suite.replace('.', ''); count = anchors.get(old, 0); anchors[old] = count + 1
+            legacy.append(f'<a id="{old + ("-" + str(count) if count else "")}"></a>\n<a id="{slug}-{suite.replace(".", "")}"></a>\n\n### {title} {suite}\n\n' +
+                          ' · '.join(f"[{config['title']}](../status/{config['package']}.md#{distribution}-{suite.replace('.', '')})" for config in PROJECTS.values()))
+    intro = '<!-- Generated by DistributionPackages; do not edit. -->\n<a id="page-overview"></a>\n\n[![Packages](../docs/media/page-banner.svg)](../README.md#project-overview)\n\n'
+    (root / 'status/README.md').write_text(intro + '# Package status\n\n' + '\n'.join(index) +
+                                         '\n\nAvailable packages and the latest attempt are separate facts. Open a project for distribution details.\n')
     (root / 'docs').mkdir(exist_ok=True)
-    (root / 'docs/status.md').write_text(text)
+    (root / 'docs/status.md').write_text(intro.replace('../docs/media/', 'media/') +
+        '# Package status\n\nStatus now has [one page per project](../status/README.md#page-overview). Existing distribution and release links remain below.\n\n' + '\n\n'.join(legacy) + '\n')
+    readme = root / 'README.md'
+    if readme.exists():
+        text = readme.read_text()
+        for name, table in [('projects', '| Project | Package catalog | Availability and builds | Available targets |\n| --- | --- | --- | --- |\n' + '\n'.join(projects)),
+                            ('platforms', '| Distribution | Releases | Architectures |\n| --- | --- | --- |\n' + '\n'.join(platforms))]:
+            text = re.sub(f'(<!-- packages:begin {name} -->).*?(<!-- packages:end {name} -->)',
+                          lambda match: match[1] + '\n' + table + '\n' + match[2], text, flags=re.S)
+        readme.write_text(text)
 
 
 def update(state, row, generation, project, status, attempt, job_url=None):
@@ -136,6 +180,21 @@ def update(state, row, generation, project, status, attempt, job_url=None):
             raise RuntimeError('Two runs claim the same project revision and attempt')
         if previous['status'] in TERMINAL or ORDER[status] <= ORDER[previous['status']]:
             return
+    timeline = state.setdefault('timeline', {}).setdefault(key, {})
+    previous_event = timeline.get('event', {})
+    identity = dict(revision=revision, attempt=attempt, run_id=generation['run_id'])
+    current_event = dict(previous_event) if all(previous_event.get(k) == v for k, v in identity.items()) else identity
+    now = os.environ.get('EVENT_TIME') or datetime.now(timezone.utc).isoformat()
+    current_event.update(status=status, updated_at=now, stage=os.environ.get('EVENT_STAGE') or
+                         ('publication' if status == 'published' or (incoming == existing and previous.get('status') == 'publishing') else 'build'))
+    if status == 'running':
+        current_event['started_at'] = now
+    if status in {'publishing', 'failed', 'cancelled'}:
+        current_event['ended_at'] = now
+    if status == 'published':
+        current_event['published_at'] = now
+        timeline['published'] = dict(revision=revision, at=now, run_id=generation['run_id'])
+    timeline['event'] = current_event
     state['targets'][key] = dict(target=row, revision=revision, attempt=attempt,
                                 run_id=generation['run_id'], run_url=generation['run_url'], status=status,
                                 job_url=job_url or (previous.get('job_url') if previous.get('run_id') == generation['run_id']
@@ -307,11 +366,12 @@ def main():
                 print('published')  # This immutable upstream artifact was already committed.
                 return 0
             publish(root, bundle, Path(args[4]).resolve(), row, generation, project)
-            shutil.copy2(ROOT / 'README.md', root / 'README.md')
+            site = Path(os.environ.get('PACKAGE_SITE', ROOT / 'site'))
+            shutil.copy2(site / 'README.md', root / 'README.md')
             for directory in ('docs', 'install'):
                 if (root / directory).exists():
                     shutil.rmtree(root / directory)
-                shutil.copytree(ROOT / directory, root / directory)
+                shutil.copytree((site if directory == 'docs' else ROOT) / directory, root / directory)
             render(root, state)
         except Exception as error:
             print(f'Publication rejected: {error}', file=sys.stderr)

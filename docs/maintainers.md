@@ -1,12 +1,12 @@
-# Repository maintenance
+<a id="page-overview"></a>
 
-<p>
-  <a href="../README.md"><img src="media/menu/back-installation-overview.svg" alt="← Installation overview" width="170" height="24"></a>
-</p>
+[![DistributionPackages](media/page-banner.svg)](../README.md#project-overview)
+
+# Repository maintenance
 
 ## Responsibilities
 
-[SNodeC/DistributionPackages](https://github.com/SNodeC/DistributionPackages) owns signing, serialized publication, installation instructions and public signing keys. Release preparation and build workflows execute in [SNode.C](https://github.com/SNodeC/snode.c/actions) and [MQTTSuite](https://github.com/SNodeC/mqttsuite/actions). [SNodeC/Packages](https://github.com/SNodeC/Packages) holds generated binary repositories, the public landing page, all documentation, the installer and package status. Both use `main`. No package branch or separate SNode.C/MQTTSuite recipe branch is required. DistributionPackages can be private; installation and public documentation depend only on Packages. OpenWrt recipes belong to [SNode.C](https://github.com/SNodeC/snode.c/tree/master/supplement/openwrt) and [MQTTSuite](https://github.com/SNodeC/mqttsuite/tree/master/misc/openwrt) in their public source repositories. Canonical source-code, workflow and settings links in these maintainer guides require access to DistributionPackages.
+[SNodeC/DistributionPackages](https://github.com/SNodeC/DistributionPackages) owns signing, serialized publication, installation instructions and public signing keys. Release preparation and build workflows execute in [SNode.C](https://github.com/SNodeC/snode.c/actions) and [MQTTSuite](https://github.com/SNodeC/mqttsuite/actions). [SNodeC/Packages](https://github.com/SNodeC/Packages) holds generated binary repositories, the public landing page, published documentation, the installer and package status. Authored public documentation belongs to DistributionPackages/site; default branches are read from the GitHub API. No package branch or separate SNode.C/MQTTSuite recipe branch is required. DistributionPackages can be private; installation and public documentation depend only on Packages. OpenWrt recipes belong to [SNode.C](https://github.com/SNodeC/snode.c/tree/master/supplement/openwrt) and [MQTTSuite](https://github.com/SNodeC/mqttsuite/tree/master/misc/openwrt) in their public source repositories. Canonical source-code, workflow and settings links in these maintainer guides require access to DistributionPackages.
 
 | Source path | Purpose |
 | --- | --- |
@@ -18,7 +18,7 @@
 | `ci/repository.py` | Capture source tags, reuse published dependencies and handle OpenWrt SDKs |
 | `ci/publish/` | Signed native indexes, publication, retention and generated status |
 | `ci/templates/` | Templates for the generated package READMEs |
-| `docs/` | Distribution guides, catalogs and maintenance instructions |
+| `site/` | Authored public README, guides and media; `docs/` holds maintainer instructions |
 
 DEB and RPM component definitions remain in the upstream projects' CPack configuration. The packaging repository does not patch upstream source code. Device-specific deployment scripts are outside this repository's responsibility.
 
@@ -83,7 +83,7 @@ The inherited build scripts run SNode.C's upstream CTests, including through QEM
 
 Each feed's `build.json` records versions, source tags and commits, checksums and publication context. APT aggregates architectures within a suite. These records provide provenance; package and index signatures establish signing authenticity.
 
-[publication.py](https://github.com/SNodeC/DistributionPackages/blob/main/ci/publish/publication.py) copies the authored root README, all `docs/` files and `install/install.sh` into Packages on every publication. It generates `docs/status.md`, and badges from [the status template](https://github.com/SNodeC/DistributionPackages/blob/main/ci/templates/package-status.md). Status describes the latest attempted build; the version describes the available package. The publication date belongs to the feed and can change when either project publishes.
+[publication.py](https://github.com/SNodeC/DistributionPackages/blob/HEAD/ci/publish/publication.py) copies current authored public documentation from `site/` and the capture-pinned `install/` into Packages on publication. Its single renderer generates per-project pages under `status/`, an index, and a legacy `docs/status.md` navigation page. Available versions come from feed records; attempts and event metadata come from `status.json`. Project publication times are displayed only when attributable to that project and revision.
 
 Preparation initializes pending entries before builds become eligible. A build reports running after acquiring its build slot, and publishing, failed or cancelled at its end. The publisher commits its terminal event with the package snapshot. A source finalization job closes its interrupted pending/running targets; successful handoffs stay publishing until the central writer finishes. A failed SNode.C target marks its dependent MQTTSuite target skipped. The publisher reports failures in its own final step. Cancellation is repository-local: already-dispatched publication or dependent runs are separate runs and are not cancelled by cancelling the source run. Newer revisions/attempts win; within one attempt states move forward and terminal states cannot be overwritten. Failed SNode.C builds mark their dependent MQTTSuite build skipped. Status delivery is best-effort and cannot prevent builds from running.
 
@@ -111,3 +111,7 @@ gpg --batch --show-keys --with-colons keys/snodec-apt.asc |
 ```
 
 APT and RPM use the same OpenPGP key. The APK fingerprint is SHA-256 of the DER public key. Keep existing private signing keys when migrating; do not silently replace the trust identity.
+
+## Public documentation ownership
+
+Edit `site/README.md` and `site/docs/`, not the generated Packages snapshot. Publication overlays current default-branch authored documentation while executable tools and `install/` remain captured. Per-project status pages are generated under `status/`; `docs/status.md` preserves older distribution/release links. New event timestamps are recorded in the `status.json` timeline only by captures containing the updated tooling; older events remain explicitly unrecorded. Adding a project to `ci.repository.PROJECTS` enables its presentation but does not implement its package build or dispatch adapters.
