@@ -1,11 +1,15 @@
 <!-- Published from DistributionPackages/site/keys; key bytes are not generated. -->
-<a id="page-overview"></a>
 
-[![Packages](../docs/media/page-banner.svg)](../README.md#project-overview)
+<!-- snodec:begin page-header -->
+<a id="page-overview"></a>
+<p><picture><source media="(max-width: 640px)" srcset="../docs/media/nav/banner-signing-keys-compact.svg"><img src="../docs/media/nav/banner-signing-keys.svg" alt="Packages — Signing keys" width="100%"></picture></p>
+<p><a href="../README.md#project-overview" title="Up to Packages"><picture><source media="(prefers-color-scheme: dark)" srcset="../docs/media/nav/up-packages-dark.svg"><img src="../docs/media/nav/up-packages-light.svg" alt="Up to Packages" width="160" height="28"></picture></a><a href="https://github.com/SNodeC" title="SNodeC organization"><picture><source media="(prefers-color-scheme: dark)" srcset="../docs/media/nav/organization-dark.svg"><img align="right" src="../docs/media/nav/organization-light.svg" alt="SNodeC organization" width="160" height="28"></picture></a><a href="../README.md#project-overview" title="Packages repository"><picture><source media="(prefers-color-scheme: dark)" srcset="../docs/media/nav/repository-dark.svg"><img align="right" src="../docs/media/nav/repository-light.svg" alt="Packages repository" width="160" height="28"></picture></a><br clear="all"></p>
+<!-- snodec:end page-header -->
 
 # Package signing keys
 
 [![Install](../docs/media/menu/install.svg)](../README.md#install) [![Verify](../docs/media/menu/verify.svg)](#verify-identity) [![Troubleshoot](../docs/media/menu/troubleshoot.svg)](../docs/troubleshooting.md#page-overview)
+
 These are public verification keys, not credentials. Keep signature verification enabled. The same key applies to every supported architecture of its package-manager family; select your distribution, release and architecture using the [installation guides](../README.md#install).
 
 ## Apply the key

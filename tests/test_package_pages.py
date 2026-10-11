@@ -193,7 +193,7 @@ class PackagePagesTest(unittest.TestCase):
             with self.subTest(guide=name):
                 text = (repository.ROOT / f'site/docs/installation/{name}.md').read_text()
                 self.assertEqual([line[3:] for line in text.splitlines() if line.startswith('## ')], headings)
-                menu = text.split('<p>', 1)[1].split('</p>', 1)[0]
+                menu = next(block.split('</p>', 1)[0] for block in text.split('<p>')[1:] if 'href="#requirements"' in block)
                 anchors = ['requirements', 'choose-packages', 'quick-install', 'manual-repository-setup', 'updates']
                 self.assertEqual(sorted(anchors, key=lambda anchor: menu.index(f'href="#{anchor}"')), anchors)
                 self.assertIn('alt="Complete sets" align="absmiddle"', text)
@@ -228,6 +228,7 @@ class PackagePagesTest(unittest.TestCase):
         self.assertIn('snodec-opkg.pub', keys)
         self.assertIn('snodec-usign.pub', keys)
         self.assertIn('architecture-independent', keys)
+        self.assertIn('troubleshooting.md#page-overview)\n\nThese are public', keys)
         for name in ['debian', 'ubuntu', 'raspberry-pi-os']:
             guide = (repository.ROOT / f'site/docs/installation/{name}.md').read_text()
             self.assertIn('sudo install -m 644 "$tmp/key" /etc/apt/keyrings/snodec.asc', guide)
@@ -253,7 +254,7 @@ class PackagePagesTest(unittest.TestCase):
                     for arrow in svg.findall('{http://www.w3.org/2000/svg}path'):
                         self.assertIn('M0 1.25H5.5V0L9 2L5.5 4V2.75H0Z', arrow.attrib['d'])
                         self.assertRegex(arrow.attrib['transform'], r'translate\(\d+ 12\)')
-        for asset, height in [('banner.svg', '320'), ('page-banner.svg', '80')]:
+        for asset, height in [('banner.svg', '320'), ('nav/banner-installation.svg', '56'), ('nav/banner-installation-compact.svg', '72')]:
             svg = ET.fromstring((repository.ROOT / 'site/docs/media' / asset).read_text())
             self.assertEqual(svg.attrib['height'], height)
 
@@ -346,7 +347,8 @@ class PackagePagesTest(unittest.TestCase):
         (self.root / 'status/menu/obsolete.svg').write_text('obsolete')
         publication.render(self.root, self.state)
         text = self.text()
-        self.assertLess(text.index('# SNode.C package status'), text.index('alt="All projects"'))
+        self.assertLess(text.index('# SNode.C package status'), text.index('alt="Install"'))
+        self.assertNotIn('alt="All projects"', text)
         self.assertLess(text.index('[Legend](#legend)'), text.index('| Architecture |'))
         legend = text.split('**Legend:**', 1)[1].split('\n\n', 1)[0]
         self.assertEqual(len(re.findall(r'<img ', legend)), 11)
@@ -367,11 +369,33 @@ class PackagePagesTest(unittest.TestCase):
             svg = ET.fromstring((self.root / f'status/menu/{name}.svg').read_text())
             arrow = svg.find('{http://www.w3.org/2000/svg}path')
             self.assertEqual(arrow.attrib['d'], 'M0 1.25H5.5V0L9 2L5.5 4V2.75H0Z')
-            self.assertTrue(arrow.attrib['transform'].startswith('translate(116 12)'))
+            self.assertTrue(arrow.attrib['transform'].startswith('translate(143 12)'))
             self.assertEqual(arrow.attrib['aria-hidden'], 'true')
         legacy = (self.root / 'docs/status.md').read_text()
         for ordered in [('Debian trixie', 'Debian forky', 'Debian sid'), ('Rocky Linux 9', 'Rocky Linux 10')]:
             self.assertEqual(sorted(ordered, key=legacy.index), list(ordered))
+
+    def test_shared_page_headers_and_unified_menu_geometry(self):
+        import re
+        import xml.etree.ElementTree as ET
+        publication.render(self.root, self.state)
+        pages = [*self.root.glob('status/*.md'), self.root / 'docs/status.md']
+        for page in pages:
+            with self.subTest(page=page.name):
+                text = page.read_text()
+                self.assertEqual(text.count('<!-- snodec:begin page-header -->'), 1)
+                header = text.split('<!-- snodec:begin page-header -->')[1].split('<!-- snodec:end page-header -->')[0]
+                self.assertEqual(len(re.findall(r'<a href=', header)), 3)
+                self.assertLess(header.index('title="Up to '), header.index('title="SNodeC organization"'))
+                self.assertLess(header.index('title="SNodeC organization"'), header.index('title="Packages repository"'))
+                self.assertEqual(header.count('align="right"'), 2)
+                self.assertIn('<br clear="all">', header)
+                self.assertIn('<source media="(max-width: 640px)"', header)
+                self.assertNotIn('page-banner.svg', text)
+                self.assertNotIn('alt="All projects"', text)
+        for path in (self.root / 'status/menu').glob('*.svg'):
+            svg = ET.fromstring(path.read_text())
+            self.assertEqual((svg.attrib['width'], svg.attrib['height']), ('160', '28'))
 
     def test_direct_selection_routes_lossless_catalog_and_truthful_references(self):
         import re

@@ -1,14 +1,17 @@
 <!-- Published from DistributionPackages/site; edit that source, not this snapshot. -->
-<a id="page-overview"></a>
 
-[![Packages](../media/page-banner.svg)](../../README.md#project-overview)
+<!-- snodec:begin page-header -->
+<a id="page-overview"></a>
+<p><picture><source media="(max-width: 640px)" srcset="../media/nav/banner-installation-compact.svg"><img src="../media/nav/banner-installation.svg" alt="Packages — Installation" width="100%"></picture></p>
+<p><a href="README.md#page-overview" title="Up to Installation"><picture><source media="(prefers-color-scheme: dark)" srcset="../media/nav/up-installation-dark.svg"><img src="../media/nav/up-installation-light.svg" alt="Up to Installation" width="160" height="28"></picture></a><a href="https://github.com/SNodeC" title="SNodeC organization"><picture><source media="(prefers-color-scheme: dark)" srcset="../media/nav/organization-dark.svg"><img align="right" src="../media/nav/organization-light.svg" alt="SNodeC organization" width="160" height="28"></picture></a><a href="../../README.md#project-overview" title="Packages repository"><picture><source media="(prefers-color-scheme: dark)" srcset="../media/nav/repository-dark.svg"><img align="right" src="../media/nav/repository-light.svg" alt="Packages repository" width="160" height="28"></picture></a><br clear="all"></p>
+<!-- snodec:end page-header -->
 
 # Fedora
 
 <p>
 <a href="#requirements"><img src="../media/menu/requirements.svg" alt="Requirements"></a>
 <a href="#choose-packages"><img src="../media/menu/choose-packages.svg" alt="Choose packages"></a>
-<a href="#quick-install"><img src="../media/menu/install.svg" alt="Install"></a>
+<a href="#quick-install"><img src="../media/menu/menu-quick-install.svg" alt="Quick install"></a>
 <a href="#manual-repository-setup"><img src="../media/menu/manual.svg" alt="Manual setup"></a>
 <a href="#updates"><img src="../media/menu/updates.svg" alt="Updates"></a>
 <a href="../../status/README.md#page-overview"><img src="../media/menu/status.svg" alt="Status"></a>
