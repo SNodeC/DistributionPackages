@@ -18,7 +18,7 @@ Source snapshot: `SNodeC/Packages` at `db26363d86b9bbdb649bad3ecf9ed13d7706d61a`
 - 63 unit/integration tests passed, no skips, including disposable-key signing/publication, concurrent writers, registry extension, guide/menu order, typography, banner aspect ratio and documentation consistency.
 - All 67 checked-out JSON records, including status/retention/feed records, have unchanged SHA-256 hashes. All three original public key files are byte-identical; the new opkg filename matches the old usign key.
 - Protected feed paths are excluded from the Packages diff; no workflow definitions, signing/provenance code, run names, triggers, concurrency, licences, branches or tags changed.
-- Native GitHub browser review of the PR pages is performed before merge and live pages are checked after merge. No CI dispatch or package build is needed or authorized for this cutover.
+- Native GitHub browser review covers all 21 PR Markdown pages plus the keys directory: zero broken images; actual overview width 838px, child width 1012px; both project pages have 76 five-column rows at 38.39px height, with circle centers within 0.02px of version text. The internal-link audit covers 626 destinations; two catalog Use anchors found by it were corrected and 22 focused page tests passed afterward. An earlier full run hit a concurrent-clone fixture race; its unchanged repeat passed all 63 tests. Live pages are checked after merge. No CI dispatch or package build is needed or authorized for this cutover.
 
 ## Activation boundary
 
