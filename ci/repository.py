@@ -13,7 +13,11 @@ import sys
 import urllib.request
 
 ROOT = Path(__file__).resolve().parent.parent
-REPOSITORIES = ('snode.c', 'mqttsuite')
+PROJECTS = {
+    'snode.c': dict(title='SNode.C', package='snodec', depends_on=()),
+    'mqttsuite': dict(title='MQTTSuite', package='mqttsuite', depends_on=('snode.c',)),
+}
+REPOSITORIES = tuple(PROJECTS)
 
 
 def run(*args, **kwargs):
@@ -297,7 +301,7 @@ def sdk_dependency(sdk, bundle, dependencies):
 
 def project_revision(info, project):
     versions = info.get('versions', {})
-    version = versions.get(project, versions.get('snodec') if project == 'snode.c' else None)
+    version = versions.get(project, versions.get(PROJECTS[project]['package']))
     if version is None:
         return int(info['revision']) if info.get('context', {}).get('build_project') == project else 0
     match = re.search(r'-r?(\d+)(?:[.~]|$)', version)

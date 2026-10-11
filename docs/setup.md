@@ -1,8 +1,8 @@
-# CI setup and activation
+<a id="page-overview"></a>
 
-<p>
-  <a href="maintainers.md"><img src="media/menu/back-repository-maintenance.svg" alt="← Repository maintenance" width="192" height="24"></a>
-</p>
+[![DistributionPackages](media/page-banner.svg)](../README.md#project-overview)
+
+# CI setup and activation
 
 ## Configure DistributionPackages
 
