@@ -14,7 +14,7 @@ fi
 if [ ! -d "$root/.git" ]; then
     git clone --filter=blob:none --no-checkout https://github.com/SNodeC/Packages.git "$root"
 fi
-git -C "$root" sparse-checkout set --no-cone /README.md /status.json /docs/ /status/ '**/build.json'
+git -C "$root" sparse-checkout set --no-cone /README.md /status.json /docs/ /keys/ /status/ '**/build.json'
 git -C "$root" config user.name 'github-actions[bot]'
 git -C "$root" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 for attempt in {1..30}; do
@@ -22,6 +22,7 @@ for attempt in {1..30}; do
     previous=$(git -C "$root" rev-parse FETCH_HEAD)
     git -C "$root" reset --hard "$previous" >/dev/null
     git -C "$root" clean -fd >/dev/null
+    [[ "$command" != render ]] || python3 -c 'from pathlib import Path; import sys; from ci.publish.publication import copy_site; copy_site(Path(sys.argv[1]))' "$root"
     python3 -m ci.publish.publication "$command" "$root" "$@"
     git -C "$root" add .
     if git -C "$root" diff --cached --quiet; then exit 0; fi

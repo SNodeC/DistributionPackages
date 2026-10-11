@@ -8,6 +8,8 @@
 
 The package catalogs of SNode.C and MQTTSuite.
 
+## Sections
+
 <!-- snodec:begin section-pages -->
 - [MQTTSuite package catalog](mqttsuite.md#page-overview)
 - [SNode.C package catalog](snodec.md#page-overview)

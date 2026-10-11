@@ -150,13 +150,11 @@ class PackagingTest(unittest.TestCase):
             self.assertIn('<a id="debian-trixie"></a>', text)
             self.assertNotIn('## Needs attention', text)
             self.assertIn('latest release —', text)
-            legacy=(root/'docs/status.md').read_text()
-            self.assertIn('<a id="trixie-1"></a>', legacy)
-            self.assertIn('../status/snodec.md#debian-trixie', legacy)
-            self.assertNotIn('| Architecture', legacy)
+            self.assertFalse((root/'docs/status.md').exists())
+            self.assertIn('snodec.md#page-overview', (root/'status/README.md').read_text())
             self.assertFalse((root/'README.md').exists())
             self.assertFalse((root/'install').exists())
-            self.assertEqual(list((root/'docs').iterdir()),[root/'docs/status.md'])
+
 
     def test_key_rename_keeps_legacy_download_identical_at_publication(self):
         import shutil
@@ -172,6 +170,9 @@ class PackagingTest(unittest.TestCase):
                 shutil.copytree(incoming / 'openwrt', root / 'openwrt')
             with patch.object(publication, 'select', return_value=profile), patch.object(repository, 'publish', side_effect=copy_feed), patch.object(cleanup, 'cleanup'):
                 publication.publish(root, bundle, incoming, row, generation, 'snode.c')
+            # Authored presentation is now handed off by the shared helper used
+            # by the full feed transaction and explicit documentation rendering.
+            publication.copy_site(root)
             canonical = (repository.ROOT / 'keys/snodec-opkg.pub').read_bytes()
             self.assertEqual((root / 'keys/snodec-opkg.pub').read_bytes(), canonical)
             self.assertEqual((root / 'keys/snodec-usign.pub').read_bytes(), canonical)
@@ -355,7 +356,7 @@ class StatusEventsTest(unittest.TestCase):
         self.git('config','user.name','Test',cwd=path)
         self.git('config','user.email','test@example.invalid',cwd=path)
         if sparse:
-            self.git('sparse-checkout','set','--no-cone','/status.json','/docs/status.md','/status/','**/build.json',cwd=path)
+            self.git('sparse-checkout','set','--no-cone','/status.json','/docs/','/status/','**/build.json',cwd=path)
         return path
 
     def command(self,root,state='running',row=None,project='snode.c'):
@@ -599,6 +600,31 @@ class StatusEventsTest(unittest.TestCase):
         self.assertNotIn('# DistributionPackages', (self.seed/'README.md').read_text())
         self.assertEqual((self.seed/'install/install.sh').read_bytes(),(repository.ROOT/'install/install.sh').read_bytes())
         self.assertFalse((self.seed / 'net').exists())
+
+    def test_manual_render_handoff_replaces_docs_without_changing_state_or_keys(self):
+        (self.seed / 'keys').mkdir()
+        (self.seed / 'keys/snodec-opkg.pub').write_bytes(b'fixture public key')
+        (self.seed / 'docs/media/navigation-evidence').mkdir(parents=True)
+        (self.seed / 'docs/media/navigation-evidence/old.md').write_text('obsolete evidence')
+        (self.seed / 'docs/status.md').write_text('legacy page')
+        self.git('add', '.', cwd=self.seed)
+        self.git('commit', '-m', 'published documentation fixture', cwd=self.seed)
+        self.git('push', 'origin', 'main', cwd=self.seed)
+        state = self.snapshot()
+        subprocess.run(['bash', str(self.status_script), str(self.seed), 'render'],
+                       env=self.env, check=True, capture_output=True)
+        self.assertEqual(self.snapshot(), state)
+        self.assertEqual(self.git('show', 'main:feed', cwd=self.remote), 'original feed')
+        self.assertEqual((self.seed / 'keys/snodec-opkg.pub').read_bytes(), b'fixture public key')
+        self.assertEqual((self.seed / 'keys/README.md').read_bytes(),
+                         (repository.ROOT / 'site/keys/README.md').read_bytes())
+        self.assertFalse((self.seed / 'docs/status.md').exists())
+        self.assertFalse((self.seed / 'docs/media/navigation-evidence').exists())
+        self.assertTrue((self.seed / 'status/README.md').exists())
+        self.assertEqual({p.relative_to(self.seed / 'docs'): p.read_bytes()
+                          for p in (self.seed / 'docs').rglob('*') if p.is_file()},
+                         {p.relative_to(repository.ROOT / 'site/docs'): p.read_bytes()
+                          for p in (repository.ROOT / 'site/docs').rglob('*') if p.is_file()})
 
     def test_status_exhaustion_only_warns(self):
         # Exercise all retries without a network or real sleeps.

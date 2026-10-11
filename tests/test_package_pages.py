@@ -172,8 +172,9 @@ class PackagePagesTest(unittest.TestCase):
         self.assertEqual(first, {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob('*') if p.is_file()})
         self.assertEqual(before, self.state)
         self.assertIn('AUTHORED SENTINEL', (self.root / 'README.md').read_text())
-        for anchor in ['2410', '2512', 'trixie', 'trixie-1', 'debian-trixie', 'rocky-linux-9']:
-            self.assertIn(f'<a id="{anchor}"></a>', (self.root / 'docs/status.md').read_text())
+        for anchor in {row['distribution'] + '-' + row['suite'].replace('.', '') for row in publication.targets()}:
+            for package in ['snodec', 'mqttsuite']:
+                self.assertIn(f'<a id="{anchor}"></a>', self.text(package))
 
     def test_third_project_requires_only_registry_entry(self):
         with patch.dict(repository.PROJECTS, {'new-project': dict(title='New project', package='new-package', depends_on=())}):
@@ -234,7 +235,7 @@ class PackagePagesTest(unittest.TestCase):
             self.assertIn('sudo install -m 644 "$tmp/key" /etc/apt/keyrings/snodec.asc', guide)
             self.assertNotIn('tee /etc/apt/keyrings/snodec.asc', guide)
             self.assertIn('signed-by=/etc/apt/keyrings/snodec.asc', guide)
-        self.assertIn('/docs/ /status/', (repository.ROOT / 'ci/publish/status.sh').read_text())
+        self.assertIn('/docs/ /keys/ /status/', (repository.ROOT / 'ci/publish/status.sh').read_text())
 
     def test_public_pages_separate_html_blocks_and_use_real_menu_assets(self):
         import re
@@ -282,11 +283,32 @@ class PackagePagesTest(unittest.TestCase):
 
     def test_circles_keep_size_and_requested_palette(self):
         publication.render(self.root, self.state)
-        for label, color in [('current', '#1a7f37'), ('outdated', '#9a6700'), ('publishing', '#8250df'), ('cancelled', '#24292f'), ('skipped', '#9a6700')]:
+        for label, color in [('current', '#1a7f37'), ('outdated', '#9a6700'), ('publishing', '#8250df'), ('cancelled', '#6e7681'), ('skipped', '#9a6700')]:
             svg = (self.root / f'status/badges/{label}.svg').read_text()
             self.assertIn(f'fill="{color}"', svg)
             self.assertIn('cy="7.8" r="6"', svg)
             self.assertNotIn('<text', svg)
+
+    def test_deleted_legacy_page_is_removed_and_status_index_has_shared_sections(self):
+        (self.root / 'docs/status.md').write_text('obsolete generated redirect')
+        publication.render(self.root, self.state)
+        self.assertFalse((self.root / 'docs/status.md').exists())
+        index = (self.root / 'status/README.md').read_text()
+        self.assertEqual(index.count('<!-- snodec:begin section-pages -->'), 1)
+        self.assertIn('## Sections', index)
+        self.assertIn('snodec.md#page-overview', index)
+        self.assertIn('mqttsuite.md#page-overview', index)
+
+    def test_cancelled_circle_has_measured_contrast_in_both_themes(self):
+        def luminance(value):
+            channels = [int(value[i:i+2], 16) / 255 for i in (1, 3, 5)]
+            linear = [c / 12.92 if c <= .04045 else ((c + .055) / 1.055) ** 2.4 for c in channels]
+            return sum(c * weight for c, weight in zip(linear, [.2126, .7152, .0722]))
+        foreground = luminance('#6e7681')
+        for background in ['#ffffff', '#0d1117']:
+            light, dark = sorted([foreground, luminance(background)], reverse=True)
+            self.assertGreaterEqual((light + .05) / (dark + .05), 3)
+        self.assertNotEqual('#6e7681', '#57606a')
 
     def test_public_render_command_preserves_authoritative_state(self):
         self.feed()
@@ -362,7 +384,7 @@ class PackagePagesTest(unittest.TestCase):
         self.assertIn('src="../docs/media/menu/install.svg" alt="Install" align="absmiddle"', text)
         self.assertIn('src="../docs/media/menu/troubleshoot.svg" alt="Troubleshoot" align="absmiddle"', text)
         referenced = set()
-        for page in list((self.root / 'status').glob('*.md')) + [self.root / 'docs/status.md']:
+        for page in (self.root / 'status').glob('*.md'):
             referenced.update((page.parent / name).resolve() for name in re.findall(r'src="([^\"]*menu/[^\"]+\.svg)"', page.read_text()) if (page.parent / name).resolve().parent == (self.root / 'status/menu').resolve())
         self.assertEqual(referenced, {p.resolve() for p in (self.root / 'status/menu').glob('*.svg')})
         for name in ['menu', 'install-guide']:
@@ -371,15 +393,13 @@ class PackagePagesTest(unittest.TestCase):
             self.assertEqual(arrow.attrib['d'], 'M0 1.25H5.5V0L9 2L5.5 4V2.75H0Z')
             self.assertTrue(arrow.attrib['transform'].startswith('translate(143 12)'))
             self.assertEqual(arrow.attrib['aria-hidden'], 'true')
-        legacy = (self.root / 'docs/status.md').read_text()
-        for ordered in [('Debian trixie', 'Debian forky', 'Debian sid'), ('Rocky Linux 9', 'Rocky Linux 10')]:
-            self.assertEqual(sorted(ordered, key=legacy.index), list(ordered))
+        self.assertFalse((self.root / 'docs/status.md').exists())
 
     def test_shared_page_headers_and_unified_menu_geometry(self):
         import re
         import xml.etree.ElementTree as ET
         publication.render(self.root, self.state)
-        pages = [*self.root.glob('status/*.md'), self.root / 'docs/status.md']
+        pages = list(self.root.glob('status/*.md'))
         for page in pages:
             with self.subTest(page=page.name):
                 text = page.read_text()

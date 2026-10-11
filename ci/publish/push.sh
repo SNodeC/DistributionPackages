@@ -26,13 +26,13 @@ for attempt in {1..30}; do
         exit 0
     fi
     if [ "$remote" = "$previous" ]; then exit 1; fi
-    if ! git -C "$root" diff --quiet "$previous" "$remote" -- . ':!status.json' ':!docs/status.md' ':!status' ':!README.md'; then
+    if ! git -C "$root" diff --quiet "$previous" "$remote" -- . ':!status.json' ':!status' ':!README.md'; then
         echo 'Remote feed changed; refusing to replace it' >&2
         exit 1
     fi
     python3 -m ci.publish.publication merge-readme "$root" "$previous" "$remote"
-    git -C "$root" rm -rf --ignore-unmatch -- status.json docs/status.md status/ >/dev/null
-    git -C "$root" ls-tree -r --name-only -z "$remote" -- status.json docs/status.md status/ |
+    git -C "$root" rm -rf --ignore-unmatch -- status.json status/ >/dev/null
+    git -C "$root" ls-tree -r --name-only -z "$remote" -- status.json status/ |
         xargs -0 -r git -C "$root" checkout "$remote" --
     python3 -m ci.publish.publication render "$root"
     previous=$remote

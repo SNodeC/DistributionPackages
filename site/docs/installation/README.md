@@ -8,6 +8,8 @@
 
 Installation guides per distribution and how to select DEB and RPM packages.
 
+## Sections
+
 <!-- snodec:begin section-pages -->
 - [Debian](debian.md#page-overview)
 - [Fedora](fedora.md#page-overview)
