@@ -2,6 +2,10 @@
 
 ![DistributionPackages](docs/media/banner.svg)
 
+<!-- snodec:begin organization -->
+<p><a href="https://github.com/SNodeC" title="SNodeC organization"><picture><source media="(prefers-color-scheme: dark)" srcset="site/docs/media/nav/organization-dark.svg"><img align="right" src="site/docs/media/nav/organization-light.svg" alt="SNodeC organization" width="160" height="28"></picture></a><br clear="all"></p>
+<!-- snodec:end organization -->
+
 # DistributionPackages
 
 Build recipes, authenticated handoffs, signing and publication for SNodeC distribution packages. This is the maintainer control repository; [Packages](https://github.com/SNodeC/Packages#project-overview) is the public installation and availability hub.
