@@ -7,7 +7,7 @@
 
 Package names are shared by OpenWrt, Raspberry Pi OS, Debian, Ubuntu, Rocky Linux and Fedora. Architectures affect availability and binary contents, not names.
 
-[![Install](media/menu/install.svg)](../README.md#install) [![Status](media/menu/status.svg)](../status/mqttsuite.md#page-overview) [![Catalog](media/menu/catalog.svg)](#package-catalog) [![Details](media/menu/details.svg)](#distribution-details) [![Query](media/menu/query.svg)](#query-available-packages) [![Use](media/menu/use.svg)](#after-install)
+[![Install](media/menu/install.svg)](../README.md#install) [![Status](media/menu/status.svg)](../status/mqttsuite.md#page-overview) [![Catalog](media/menu/catalog.svg)](#package-catalog) [![Details](media/menu/details.svg)](#distribution-details) [![Query](media/menu/query.svg)](#query-available-packages) [![Use](media/menu/use.svg)](#after-installation)
 
 ## Package catalog
 

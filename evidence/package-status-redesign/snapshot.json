@@ -8,7 +8,7 @@
   "authoritative_state_unchanged": true,
   "existing_key_bytes_unchanged": true,
   "render_median_ms_7_runs": {
-    "before": 20.004,
-    "after": 20.169
+    "before": 19.78,
+    "after": 19.672
   }
 }

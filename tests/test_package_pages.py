@@ -208,6 +208,8 @@ class PackagePagesTest(unittest.TestCase):
         for package in ['snodec', 'mqttsuite']:
             text = (repository.ROOT / f'site/docs/{package}-package-options.md').read_text()
             self.assertNotIn('## Installation and availability', text)
+            self.assertIn('[![Use](media/menu/use.svg)](#after-installation)', text)
+            self.assertIn('## After installation', text)
             for label in ['Install', 'Status', 'Catalog', 'Details', 'Query', 'Use']:
                 self.assertIn(f'[![{label}]', text)
             self.assertIn(f"opkg list '{package}-*'", text)
