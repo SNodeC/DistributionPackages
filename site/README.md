@@ -26,9 +26,7 @@ Signed packages for the SNode.C ecosystem. Choose a project and distribution, in
 
 ## Quick start
 
-1. Choose a project above; its status page shows the latest captured release and the packages actually available for each target.
-2. Open your distribution guide below and check its requirements, including CRB/EPEL on Rocky Linux.
-3. Choose **complete sets** or **selected packages** before installing. The guide provides both routes and manual signed-repository setup; dependencies are installed automatically.
+Start with your installed system, not an ongoing build: use the [distribution chooser](#install), check the guide’s requirements, then choose **complete sets** or **selected packages**. Follow its Check and Next steps to confirm installation and configure your applications. Status pages are optional: consult them to compare available packages with a replacement build.
 
 <a id="distributions"></a>
 
@@ -43,7 +41,7 @@ Signed packages for the SNode.C ecosystem. Choose a project and distribution, in
 <a href="docs/fedora.md#page-overview"><img src="docs/media/menu/fedora.svg" alt="Fedora"></a>
 </p>
 
-Select the guide matching your installed distribution, release and package architecture. Each guide covers requirements, quick installation, manual repository setup and updates. To install selected components rather than the complete sets, use the [project catalogs](#projects).
+Select the guide matching your installed distribution, release and package architecture. Each guide covers requirements, quick installation, manual repository setup and updates.
 
 ## Platforms
 
@@ -56,17 +54,17 @@ The supported release and architecture matrix is generated from the publisher's 
 
 [![Signing keys](docs/media/menu/keys.svg)](keys/README.md#page-overview)
 
-The key guide identifies each verification key, its supported distributions, fingerprints and installation method. Keys do not vary by architecture. Keep signature verification enabled.
+Identify and verify the key for your package manager. Keys are shared across architectures; keep signature verification enabled.
 
 <a id="help"></a>
 
 ## Troubleshooting
 
-Read [installation troubleshooting](docs/troubleshooting.md#page-overview) for repository, key and dependency problems. For an ongoing build or an older version still available, open [project status](status/README.md#page-overview).
+[Diagnose installation errors](docs/troubleshooting.md#page-overview), or compare available packages and replacement builds on [project status](status/README.md#page-overview).
 
 ## How publication works
 
-[Publication architecture](docs/architecture.md#page-overview) explains signing, revisions, status semantics and documentation ownership. Maintainer operations live in DistributionPackages.
+[Read the column meanings and publication model](docs/architecture.md#page-overview). Maintainer operations belong to DistributionPackages.
 
 ## Contributing
 

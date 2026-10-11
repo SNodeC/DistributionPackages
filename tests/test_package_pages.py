@@ -157,8 +157,8 @@ class PackagePagesTest(unittest.TestCase):
         self.assertIn('`riscv64_riscv64`', first)
         self.assertNotIn('`riscv64_generic`', first)
         self.assertIn('`riscv64_generic`', second)
-        self.assertIn('[![24.10](menu/24-10.svg)](#openwrt-2410)', self.text())
-        self.assertIn('[![Package catalog]', self.text())
+        self.assertIn('<a href="#openwrt-2410"><img src="menu/24-10.svg" alt="24.10" title="24.10" align="absmiddle"></a>', self.text())
+        self.assertIn('src="../docs/media/menu/catalog.svg" alt="Catalog"', self.text())
         self.assertIn('align="absmiddle"', self.text())
 
     def test_deterministic_projection_preserves_state_feeds_and_authored_text(self):
@@ -179,11 +179,11 @@ class PackagePagesTest(unittest.TestCase):
         with patch.dict(repository.PROJECTS, {'new-project': dict(title='New project', package='new-package', depends_on=())}):
             publication.render(self.root, self.state)
         self.assertTrue((self.root / 'status/new-package.md').exists())
-        self.assertNotIn('Package catalog', self.text('new-package'))
+        self.assertNotIn('alt="Catalog"', self.text('new-package'))
         (self.root / 'docs/new-package-package-options.md').write_text('New catalog')
         with patch.dict(repository.PROJECTS, {'new-project': dict(title='New project', package='new-package', depends_on=())}):
             publication.render(self.root, self.state)
-        self.assertIn('[![Package catalog]', self.text('new-package'))
+        self.assertIn('src="../docs/media/menu/catalog.svg" alt="Catalog"', self.text('new-package'))
         for path in ['README.md', 'status/README.md']:
             self.assertIn('[New project](https://github.com/SNodeC/new-project#project-overview)', (self.root / path).read_text())
 
@@ -212,8 +212,8 @@ class PackagePagesTest(unittest.TestCase):
             self.assertIn('## After installation', text)
             for label in ['Install', 'Status', 'Catalog', 'Details', 'Query', 'Use']:
                 self.assertIn(f'[![{label}]', text)
-            self.assertIn(f"opkg list '{package}-*'", text)
-            self.assertIn(f"apk search '{package}-*'", text)
+            self.assertIn(f"opkg list '{package}*'", text)
+            self.assertIn(f"apk search '{package}*'", text)
         mqtt = (repository.ROOT / 'site/docs/mqttsuite-package-options.md').read_text()
         self.assertIn('mqttsuite/blob/HEAD/docs/readme/deployment.md#page-overview', mqtt)
 
@@ -230,7 +230,8 @@ class PackagePagesTest(unittest.TestCase):
         self.assertIn('architecture-independent', keys)
         for name in ['debian', 'ubuntu', 'raspberrypi']:
             guide = (repository.ROOT / f'site/docs/{name}.md').read_text()
-            self.assertIn('tee /etc/apt/keyrings/snodec.asc', guide)
+            self.assertIn('sudo install -m 644 "$tmp/key" /etc/apt/keyrings/snodec.asc', guide)
+            self.assertNotIn('tee /etc/apt/keyrings/snodec.asc', guide)
             self.assertIn('signed-by=/etc/apt/keyrings/snodec.asc', guide)
         self.assertIn('/docs/ /status/', (repository.ROOT / 'ci/publish/status.sh').read_text())
 
@@ -335,6 +336,79 @@ class PackagePagesTest(unittest.TestCase):
         self.assertEqual((current / 'README.md').read_bytes(), (repository.ROOT / 'site/README.md').read_bytes())
         self.assertFalse((current / 'docs/old.md').exists())
         self.assertEqual((current / 'tool.py').read_text(), 'CAPTURED')
+
+
+    def test_navigation_legend_geometry_and_generated_asset_ownership(self):
+        import re
+        import xml.etree.ElementTree as ET
+        self.feed()
+        publication.render(self.root, self.state)
+        (self.root / 'status/menu/obsolete.svg').write_text('obsolete')
+        publication.render(self.root, self.state)
+        text = self.text()
+        self.assertLess(text.index('# SNode.C package status'), text.index('alt="All projects"'))
+        self.assertLess(text.index('[Legend](#legend)'), text.index('| Architecture |'))
+        legend = text.split('**Legend:**', 1)[1].split('\n\n', 1)[0]
+        self.assertEqual(len(re.findall(r'<img ', legend)), 11)
+        self.assertIn('title="Not built"', legend)
+        self.assertNotIn('alt="not-built"', legend)
+        self.assertIn('&nbsp;Not&nbsp;built', legend)
+        self.assertEqual(text.count('alt="↑ menu"'), 13)
+        self.assertEqual(text.count('alt="Install guide"'), 6)
+        self.assertEqual(len(re.findall(r'^\*\*.*?<a ', text, re.M)), 6)
+        self.assertEqual(sum(line.count('<img ') for line in text.splitlines() if line.startswith('**') and 'src="menu/' in line), 13)
+        self.assertIn('src="../docs/media/menu/install.svg" alt="Install" align="absmiddle"', text)
+        self.assertIn('src="../docs/media/menu/troubleshoot.svg" alt="Troubleshoot" align="absmiddle"', text)
+        referenced = set()
+        for page in list((self.root / 'status').glob('*.md')) + [self.root / 'docs/status.md']:
+            referenced.update((page.parent / name).resolve() for name in re.findall(r'src="([^\"]*menu/[^\"]+\.svg)"', page.read_text()) if (page.parent / name).resolve().parent == (self.root / 'status/menu').resolve())
+        self.assertEqual(referenced, {p.resolve() for p in (self.root / 'status/menu').glob('*.svg')})
+        for name in ['menu', 'install-guide']:
+            svg = ET.fromstring((self.root / f'status/menu/{name}.svg').read_text())
+            arrow = svg.find('{http://www.w3.org/2000/svg}path')
+            self.assertEqual(arrow.attrib['d'], 'M0 1.25H5.5V0L9 2L5.5 4V2.75H0Z')
+            self.assertTrue(arrow.attrib['transform'].startswith('translate(116 12)'))
+            self.assertEqual(arrow.attrib['aria-hidden'], 'true')
+        legacy = (self.root / 'docs/status.md').read_text()
+        for ordered in [('Debian trixie', 'Debian forky', 'Debian sid'), ('Rocky Linux 9', 'Rocky Linux 10')]:
+            self.assertEqual(sorted(ordered, key=legacy.index), list(ordered))
+
+    def test_direct_selection_routes_lossless_catalog_and_truthful_references(self):
+        import re
+        catalog = (repository.ROOT / 'site/docs/snodec-package-options.md').read_text()
+        names = set('''snodec-common snodec snodec-apps snodec-control snodec-logger
+snodec-utils snodec-core-mux-epoll snodec-core-mux-poll snodec-core-mux-select snodec-core
+snodec-core-socket snodec-core-socket-stream snodec-core-socket-stream-legacy snodec-core-socket-stream-tls snodec-db-mariadb
+snodec-net snodec-net-in snodec-net-in-phy snodec-net-in-phy-stream snodec-net-in-stream
+snodec-net-in-stream-legacy snodec-net-in-stream-tls snodec-net-in6 snodec-net-in6-phy snodec-net-in6-phy-stream
+snodec-net-in6-stream snodec-net-in6-stream-legacy snodec-net-in6-stream-tls snodec-net-l2 snodec-net-l2-phy
+snodec-net-l2-phy-stream snodec-net-l2-stream snodec-net-l2-stream-legacy snodec-net-l2-stream-tls snodec-net-rc
+snodec-net-rc-phy snodec-net-rc-phy-stream snodec-net-rc-stream snodec-net-rc-stream-legacy snodec-net-rc-stream-tls
+snodec-net-un snodec-net-un-phy snodec-net-un-phy-stream snodec-net-un-stream snodec-net-un-stream-legacy
+snodec-net-un-stream-tls snodec-net-un-dgram snodec-http snodec-http-server snodec-http-client
+snodec-http-server-express snodec-http-server-express-legacy-in snodec-http-server-express-legacy-in6 snodec-http-server-express-legacy-rc snodec-http-server-express-legacy-un
+snodec-http-server-express-tls-in snodec-http-server-express-tls-in6 snodec-http-server-express-tls-rc snodec-http-server-express-tls-un snodec-websocket
+snodec-websocket-server snodec-websocket-client snodec-mqtt snodec-mqtt-server snodec-mqtt-client
+snodec-mqtt-server-websocket snodec-mqtt-client-websocket'''.split())
+        self.assertEqual(len(names), 67)
+        self.assertEqual(names, set(re.findall(r'`(snodec(?:-[a-z0-9-]+)?)`', catalog)))
+        for name in ['debian', 'ubuntu', 'raspberrypi', 'fedora', 'rocky', 'openwrt']:
+            text = (repository.ROOT / f'site/docs/{name}.md').read_text()
+            self.assertIn('<a id="install-selected-components"></a>\n\n```sh', text)
+            self.assertIn('href="#install-selected-components"', text)
+            self.assertEqual(text.count('href="#selected-packages"'), 1)
+            self.assertEqual(text.count('**Check**'), 3)
+            self.assertEqual(text.count('Next: '), 3)
+            self.assertIn('../keys/README.md#installed-keys', text)
+            records = text.split('## Source records')[1].split('## Troubleshooting')[0]
+            self.assertIn('`build.json`', records)
+            self.assertIn('**Build log**', records)
+            self.assertIn('**Packages**', records)
+        keys = (repository.ROOT / 'site/keys/README.md').read_text()
+        self.assertIn('### Installed keys', keys)
+        self.assertIn('/etc/opkg/keys/*', keys)
+        self.assertNotIn('maintainers edit', keys)
+        self.assertIn('separate trusted channel', keys)
 
 
 if __name__ == '__main__':

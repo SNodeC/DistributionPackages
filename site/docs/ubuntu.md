@@ -47,30 +47,58 @@ See the [SNode.C catalog](snodec-package-options.md#page-overview) and [MQTTSuit
 ### Complete sets
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/SNodeC/Packages/main/install/install.sh \
-  -o /tmp/snodec-install-feed.sh &&
-sudo sh /tmp/snodec-install-feed.sh
+(
+  set -eu
+  tmp=$(mktemp -d /tmp/snodec.XXXXXX)
+  trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+  base=https://raw.githubusercontent.com/SNodeC/Packages/main
+  curl -fsSL "$base/install/install.sh" -o "$tmp/install.sh"
+  sudo sh "$tmp/install.sh"
+)
 ```
 
-The installer detects the distribution, release and package architecture, checks that an index exists, installs the signing key, configures the repository and installs the complete package set. Configure applications before starting them. For manual configuration, use the setup section below.
+The installer detects the distribution, release and package architecture, checks that an index exists, installs the signing key, configures the repository and installs the complete package set. Configure applications before starting them. For manual configuration, use [Manual repository setup](#manual-repository-setup).
+
+**Check**
+
+```sh
+dpkg-query -W -f='${Package} ${Version} ${Status}\n' snodec mqttsuite
+```
+
+The requested packages show versions and `install ok installed`. Missing or incomplete entries are not a successful installation. Next: [SNode.C configuration](snodec-package-options.md#after-installation) or [MQTTSuite configuration and deployment](mqttsuite-package-options.md#after-installation).
 
 ### Selected packages
 
 Prepare the repository without installing packages:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/SNodeC/Packages/main/install/install.sh \
-  -o /tmp/snodec-install-feed.sh &&
-sudo sh /tmp/snodec-install-feed.sh --prepare
+(
+  set -eu
+  tmp=$(mktemp -d /tmp/snodec.XXXXXX)
+  trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+  base=https://raw.githubusercontent.com/SNodeC/Packages/main
+  curl -fsSL "$base/install/install.sh" -o "$tmp/install.sh"
+  sudo sh "$tmp/install.sh" --prepare
+)
 ```
 
 For only the broker and command-line client:
+
+<a id="install-selected-components"></a>
 
 ```sh
 sudo apt-get install mqttsuite-broker mqttsuite-cli
 ```
 
 Dependencies are installed automatically.
+
+**Check**
+
+```sh
+dpkg-query -W -f='${Package} ${Version} ${Status}\n' mqttsuite-broker mqttsuite-cli
+```
+
+The requested packages show versions and `install ok installed`. Missing or incomplete entries are not a successful installation. Next: [SNode.C configuration](snodec-package-options.md#after-installation) or [MQTTSuite configuration and deployment](mqttsuite-package-options.md#after-installation).
 
 ## Manual repository setup
 
@@ -81,23 +109,37 @@ Select your suite below (`noble` is the example), then run the block:
 ```sh
 (
   set -eu
+  . /etc/os-release
+  [ "$ID" = ubuntu ] || { echo "Requires ubuntu"; exit 1; }
   suite=noble
-  case "$suite" in noble|resolute) ;; *) echo "Unsupported suite"; exit 1;; esac
+  case "$suite" in
+    noble|resolute) ;;
+    *) echo "Unsupported suite"; exit 1 ;;
+  esac
   arch=$(dpkg --print-architecture)
-  case "$arch" in amd64|arm64) ;; *) echo "Unsupported architecture"; exit 1;; esac
+  case "$arch" in
+    amd64|arm64) ;;
+    *) echo "Unsupported architecture"; exit 1 ;;
+  esac
   sudo apt-get update
   sudo apt-get install -y ca-certificates curl
-  sudo install -d -m 755 /etc/apt/keyrings
-  curl -fsSL https://raw.githubusercontent.com/SNodeC/Packages/main/keys/snodec-apt.asc |
-    sudo tee /etc/apt/keyrings/snodec.asc >/dev/null
-  sudo chmod 644 /etc/apt/keyrings/snodec.asc
-  printf 'deb [arch=%s signed-by=/etc/apt/keyrings/snodec.asc] https://raw.githubusercontent.com/SNodeC/Packages/main/ubuntu %s main\n' "$arch" "$suite" |
-    sudo tee /etc/apt/sources.list.d/snodec.list
+  tmp=$(mktemp -d /tmp/snodec.XXXXXX)
+  trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+  base=https://raw.githubusercontent.com/SNodeC/Packages/main
+  url="$base/ubuntu"
+  curl -fsSL "$url/dists/$suite/main/binary-$arch/Packages.gz" -o "$tmp/index"
+  curl -fsSL "$base/keys/snodec-apt.asc" -o "$tmp/key"
+  sudo install -d -m 755 /etc/apt/keyrings /etc/apt/sources.list.d
+  sudo install -m 644 "$tmp/key" /etc/apt/keyrings/snodec.asc
+  printf 'deb [arch=%s signed-by=/etc/apt/keyrings/snodec.asc] %s %s main\n' \
+    "$arch" "$url" "$suite" | sudo tee /etc/apt/sources.list.d/snodec.list
   sudo apt-get update
 )
 ```
 
 APT selects packages from the index for your native architecture. Package files for all architectures share the suite’s `pool/` directory.
+
+Verify the [installed signing key](../keys/README.md#installed-keys) before installing packages.
 
 Install the complete sets after manual setup:
 
@@ -105,7 +147,15 @@ Install the complete sets after manual setup:
 sudo apt-get install snodec mqttsuite
 ```
 
-<a href="#selected-packages"><img src="media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> Install individual components after manual setup.
+**Check**
+
+```sh
+dpkg-query -W -f='${Package} ${Version} ${Status}\n' snodec mqttsuite
+```
+
+The requested packages show versions and `install ok installed`. Missing or incomplete entries are not a successful installation. Next: [SNode.C configuration](snodec-package-options.md#after-installation) or [MQTTSuite configuration and deployment](mqttsuite-package-options.md#after-installation).
+
+<a href="#install-selected-components"><img src="media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> The repository is ready; name only the components you need.
 
 ## Updates
 
@@ -116,9 +166,15 @@ sudo apt-get install snodec mqttsuite
 
 For selective installations, name the installed components rather than adding the complete metapackages. After a distribution upgrade, configure the repository for its new supported release and refresh metadata.
 
+When moving from older combined packages to component packages, explicitly install the metapackages (or the components you need): `apt-get upgrade` does not install new dependencies. Published MQTTSuite component metadata declares versioned Breaks/Replaces against older combined packages.
+
 ## Source records
 
-See [per-project versions, builds and packages](../status/README.md#page-overview) for every release and architecture.
+In [source records](../ubuntu/dists/), `<suite>/build.json` aggregates the suite’s architectures. **Packages** opens the shared package pool, not this record directory.
+
+`build.json` records source tags and commits, package versions, checksums and publication context. On the [project status pages](../status/README.md#page-overview), **Build log** opens the recorded build job or release run. See [column semantics](architecture.md#latest-release-available-and-in-build) for missing historical records.
+
+Native package definitions: [SNode.C CPack](https://github.com/SNodeC/snode.c/blob/HEAD/cmake/Packing.cmake) and [MQTTSuite CPack](https://github.com/SNodeC/mqttsuite/blob/HEAD/cmake/Packing.cmake).
 
 ## Troubleshooting
 

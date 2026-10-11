@@ -3,12 +3,18 @@
 
 [![Packages](../docs/media/page-banner.svg)](../README.md#project-overview)
 
-<!-- navigation -->
-
 # <!-- title --> package status · latest release <!-- release -->
+
+<!-- navigation -->
 
 <!-- menu -->
 
+[Legend](#legend) · [What the columns mean](../docs/architecture.md#latest-release-available-and-in-build)
+
 <!-- body -->
 
-**Legend:** <!-- legend -->. `—`: unrecorded or no replacement. Hover a circle for its exact state; image alternative text also names it.
+<a id="legend"></a>
+
+**Legend:** <!-- legend -->.
+
+Current matches Latest release; Outdated is an older or different available version. Published means publication completed and therefore appears as `—` in In build, not as a replacement still in progress. Pending waits for a build; Superseded was replaced by a newer release or attempt; Not built has no recorded build. These three states share grey, with alternative text and hover titles identifying them. `—` means no available package, no replacement in progress, or an unrecorded fact, according to the column. A waiting dependent's Build log may open its prerequisite release run before a child build job exists.

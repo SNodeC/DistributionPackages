@@ -69,10 +69,10 @@ def render(root, state):
     badges = root / 'status/badges'
     badges.mkdir(parents=True, exist_ok=True)
     for label, color in colors.items():
-        (badges / f'{label}.svg').write_text(f'<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" role="img" aria-label="{label}"><circle cx="7" cy="7.8" r="6" fill="{color}"/></svg>\n')
-    for obsolete in (root / 'status').glob('*.svg'):
+        (badges / f'{label}.svg').write_text(f'<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" role="img" aria-label="{label.replace("-", " ")}"><circle cx="7" cy="7.8" r="6" fill="{color}"/></svg>\n')
+    for obsolete in [*(root / 'status').glob('*.svg'), *(root / 'status/menu').glob('*.svg')]:
         obsolete.unlink()
-    dot = lambda label: f'<img src="badges/{label}.svg" alt="{label}" title="{label.capitalize()}" width="14" height="14" align="absmiddle">'
+    dot = lambda label: f'<img src="badges/{label}.svg" alt="{label.replace("-", " ")}" title="{label.replace("-", " ").capitalize()}" width="14" height="14" align="absmiddle">'
     stamp = lambda value: datetime.fromisoformat(value.replace('Z', '+00:00')).astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M') if value else '—'
     rows = targets()
     releases = list(dict.fromkeys((row['distribution'], row['suite']) for row in rows))
@@ -84,12 +84,12 @@ def render(root, state):
     button_source = (ROOT / 'site/docs/media/menu/status.svg').read_text()
     def button(label, href):
         slug = re.sub(r'[^a-z0-9]+', '-', label.lower()).strip('-')
-        svg = button_source.replace('Status', label.replace('↑ ', ''))
+        svg = button_source.replace('Status', label.replace('↑ ', '')).replace('<title id="title">menu</title>', '<title id="title">Back to menu</title>')
         if label in {'Install guide', '↑ menu'}:
-            transform = 'translate(112 12)' + (' rotate(-90 4.5 2)' if label == '↑ menu' else '')
-            svg = svg.replace('x="66.5" y="19"', 'x="58.5" y="19"').replace('</svg>', f'<path d="M0 1.25H5.5V0L9 2L5.5 4V2.75H0Z" transform="{transform}" fill="#ffffff"/></svg>')
+            transform = 'translate(116 12)' + (' rotate(-90 4.5 2)' if label == '↑ menu' else '')
+            svg = svg.replace('x="66.5" y="19"', 'x="58.5" y="19"').replace('</svg>', f'<path d="M0 1.25H5.5V0L9 2L5.5 4V2.75H0Z" transform="{transform}" fill="#ffffff" aria-hidden="true"/></svg>')
         (menu_dir / f'{slug}.svg').write_text(svg)
-        return f'[![{label}](menu/{slug}.svg)]({href})'
+        return f'<a href="{href}"><img src="menu/{slug}.svg" alt="{label}" title="{label}" align="absmiddle"></a>'
     for project, config in PROJECTS.items():
         candidates = [generation for generation in state.get('runs', {}).values() if project in generation.get('revisions', {})]
         latest = max(candidates, key=lambda generation: (int(generation['revisions'][project]), generation.get('context', {}).get('captured_at', ''), generation.get('run_id', '')), default={})
@@ -98,10 +98,10 @@ def render(root, state):
         version = tag.removeprefix('v') if tag and re.fullmatch(r'v?\d+\.\d+\.\d+', tag) else None
         revision = latest.get('revisions', {}).get(project)
         release = f'{version} · r{revision}' if version and revision is not None else '—'
-        navigation = ' '.join(button(label, href) for label, href in [
-            ('All projects', 'README.md#page-overview'), ('Installation', '../README.md#install'),
-            ('Package catalog', f'../docs/{config["package"]}-package-options.md#page-overview'),
-            ('Troubleshooting', '../docs/troubleshooting.md#page-overview')] if label != 'Package catalog' or (root / href.removeprefix('../').split('#')[0]).is_file())
+        navigation = button('All projects', 'README.md#page-overview') + ' ' + ' '.join(
+            f'<a href="{href}"><img src="../docs/media/menu/{asset}.svg" alt="{label}" align="absmiddle"></a>' for label, asset, href in [
+            ('Install', 'install', '../README.md#install'), ('Catalog', 'catalog', f'../docs/{config["package"]}-package-options.md#page-overview'),
+            ('Troubleshoot', 'troubleshoot', '../docs/troubleshooting.md#page-overview')] if label != 'Catalog' or (root / href.removeprefix('../').split('#')[0]).is_file())
         sections = {}
         for row in rows:
             info, feed = published(root, row)
@@ -138,7 +138,7 @@ def render(root, state):
                 body += [f'<a id="{distribution}-{suite.replace(".", "")}"></a>\n\n### {title} {suite}',
                          button('↑ menu', '#page-overview'),
                          '| Architecture | Available | Published (UTC) | In build | Links |\n| --- | --- | --- | --- | --- |\n' + '\n'.join(lines)]
-        legend = ' · '.join(f'{dot(label)} {label.replace("-", " ").capitalize()}' for label in colors)
+        legend = ' · '.join(f'{dot(label)}&nbsp;{label.replace("-", " ").capitalize().replace(" ", "&nbsp;")}' for label in colors)
         page = template.replace('<!-- title -->', config['title']).replace('<!-- release -->', release).replace('<!-- navigation -->', navigation).replace('<!-- menu -->', '\n\n'.join(menu)).replace('<!-- body -->', '\n\n'.join(body)).replace('<!-- legend -->', legend)
         (root / f"status/{config['package']}.md").write_text(page)
         projects.append((config, project, release))
@@ -149,15 +149,15 @@ def render(root, state):
         platforms.append(f"| [{title}](docs/{guide}.md#page-overview) | {', '.join(suites)} | {', '.join(architectures) if len(architectures) < 8 else str(max(sum(row['suite'] == suite for row in selected) for suite in suites)) + ' per release (names can differ)'} |")
         slug = title.lower().replace(' ', '-')
         legacy.append(f'## {title}')
-        for suite in suites:
+        for suite in dict.fromkeys(row['suite'] for row in rows if row['distribution'] == distribution):
             old = suite.replace('.', ''); count = anchors.get(old, 0); anchors[old] = count + 1
             legacy.append(f'<a id="{old + ("-" + str(count) if count else "")}"></a>\n<a id="{slug}-{suite.replace(".", "")}"></a>\n\n### {title} {suite}\n\n' +
-                          ' '.join(button(config['title'], f"../status/{config['package']}.md#{distribution}-{suite.replace('.', '')}").replace('(menu/', '(../status/menu/') for config in PROJECTS.values()))
+                          ' '.join(button(config['title'], f"../status/{config['package']}.md#{distribution}-{suite.replace('.', '')}").replace('src="menu/', 'src="../status/menu/') for config in PROJECTS.values()))
     def overview(prefix):
         return '| Project | Latest release | Status |\n| --- | --- | --- |\n' + '\n'.join(
             f'| [{config["title"]}](https://github.com/SNodeC/{project}#project-overview) | {release} | [{config["title"]} status →]({prefix}{config["package"]}.md#page-overview) |' for config, project, release in projects)
     intro = '<!-- Generated by DistributionPackages; do not edit. -->\n<a id="page-overview"></a>\n\n[![Packages](../docs/media/page-banner.svg)](../README.md#project-overview)\n\n'
-    (root / 'status/README.md').write_text(intro + button('Installation', '../README.md#install') + ' ' + button('Troubleshooting', '../docs/troubleshooting.md#page-overview') + '\n\n# Package status\n\n' + overview('') + '\n')
+    (root / 'status/README.md').write_text(intro + '# Package status\n\n[![Install](../docs/media/menu/install.svg)](../README.md#install) [![Troubleshoot](../docs/media/menu/troubleshoot.svg)](../docs/troubleshooting.md#page-overview)\n\n' + overview('') + '\n')
     (root / 'docs').mkdir(exist_ok=True)
     (root / 'docs/status.md').write_text(intro.replace('../docs/media/', 'media/') +
         '# Package status\n\nStatus now has [one page per project](../status/README.md#page-overview). Existing distribution and release links remain below.\n\n' + '\n\n'.join(legacy) + '\n')
