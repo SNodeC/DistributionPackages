@@ -41,7 +41,7 @@ class PackagingTest(unittest.TestCase):
             feed, bundle, dependencies = (root / name for name in ('feed', 'bundle', 'dependencies'))
             shutil.copytree(repository.ROOT / 'ci', feed / 'ci')
             (feed / 'keys').mkdir()
-            for name in ('snodec-usign.pub', 'snodec-apk.pem'):
+            for name in ('snodec-opkg.pub', 'snodec-apk.pem'):
                 (feed / 'keys' / name).write_text('test public key')
             # A stale recipe next to the CI tools must never be selected.
             (feed / 'net/snode.c').mkdir(parents=True)
@@ -127,10 +127,10 @@ class PackagingTest(unittest.TestCase):
             (root / 'status/old-target.svg').write_text('obsolete')
             publication.render(root, {'targets': {}})
             before = {p.name: p.read_bytes() for p in (root / 'status/badges').iterdir()}
-            self.assertEqual(len(before), 9)
+            self.assertEqual(set(before), {label + ".svg" for label in ["current", "outdated", "pending", "running", "publishing", "published", "failed", "cancelled", "skipped", "superseded", "not-built"]})
             for svg in before.values():
-                self.assertIn(b'width="86" height="20"', svg)
-                self.assertIn(b'<text x="43.0"', svg)
+                self.assertIn(b'width="14" height="14"', svg)
+                self.assertIn(b'<circle cx="7" cy="7.8" r="6"', svg)
             (root / 'status/badges/pending.svg').write_text('previous badge design')
             self.assertFalse((root / 'status/old-target.svg').exists())
             state = dict(targets={})
@@ -140,15 +140,16 @@ class PackagingTest(unittest.TestCase):
             publication.render(root,state)
             self.assertEqual(before,{p.name:p.read_bytes() for p in (root/'status/badges').iterdir()})
             text=(root/'status/snodec.md').read_text()
-            self.assertIn('![running](badges/running.svg)',text)
-            self.assertEqual(text.count('| Architecture | Available | Latest attempt |'),
+            self.assertIn('alt="running"', text)
+            self.assertIn('| Architecture | Available | Published (UTC) | In build | Links |', text)
+            self.assertEqual(text.count('| Architecture | Available | Published (UTC) | In build | Links |'),
                              len({(r['distribution'], r['suite']) for r in publication.targets()}))
             self.assertEqual(sum(line.startswith('| '+chr(96)) for line in text.splitlines()),
                              len(publication.targets()))
             self.assertIn('### Debian trixie', text)
             self.assertIn('<a id="debian-trixie"></a>', text)
-            self.assertIn('## Needs attention', text)
-            self.assertIn('Building', text)
+            self.assertNotIn('## Needs attention', text)
+            self.assertIn('latest release —', text)
             legacy=(root/'docs/status.md').read_text()
             self.assertIn('<a id="trixie-1"></a>', legacy)
             self.assertIn('../status/snodec.md#debian-trixie', legacy)
@@ -156,6 +157,48 @@ class PackagingTest(unittest.TestCase):
             self.assertFalse((root/'README.md').exists())
             self.assertFalse((root/'install').exists())
             self.assertEqual(list((root/'docs').iterdir()),[root/'docs/status.md'])
+
+    def test_key_rename_keeps_legacy_download_identical_at_publication(self):
+        import shutil
+        with tempfile.TemporaryDirectory() as temporary:
+            root, bundle, incoming = (Path(temporary) / name for name in ('root', 'bundle', 'incoming'))
+            row = publication.targets()[0]
+            profile = dict(baseline={}, sources={}, context={'build_project': 'snode.c', 'release_project': 'snode.c'})
+            publication.write(bundle / 'profiles.json', {row['id']: profile})
+            metadata = dict(revision='1', sources=profile['sources'], context=profile['context'], files={})
+            publication.write(incoming / 'openwrt' / row['suite'] / row['arch'] / 'build.json', metadata)
+            generation = dict(revisions={'snode.c': '1'}, profiles_hash=repository.digest(bundle / 'profiles.json'))
+            def copy_feed(*args):
+                shutil.copytree(incoming / 'openwrt', root / 'openwrt')
+            with patch.object(publication, 'select', return_value=profile), patch.object(repository, 'publish', side_effect=copy_feed), patch.object(cleanup, 'cleanup'):
+                publication.publish(root, bundle, incoming, row, generation, 'snode.c')
+            canonical = (repository.ROOT / 'keys/snodec-opkg.pub').read_bytes()
+            self.assertEqual((root / 'keys/snodec-opkg.pub').read_bytes(), canonical)
+            self.assertEqual((root / 'keys/snodec-usign.pub').read_bytes(), canonical)
+            self.assertTrue((root / 'keys/README.md').exists())
+            self.assertFalse((repository.ROOT / 'keys/snodec-usign.pub').exists())
+
+    def test_native_cpack_consumes_shared_version_policy_without_changing_formats(self):
+        source = (repository.ROOT / 'ci/build/native.sh').read_text()
+        package = source.split('package() {', 1)[1].split('\n}\n', 1)[0]
+        package = 'package() {' + package + '\n}\n'
+        package = package.replace('/work/feed/ci/repository.py', str(repository.ROOT / 'ci/repository.py'))
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            build = root / 'build'
+            (build / '_packages').mkdir(parents=True)
+            (root / 'packages').mkdir()
+            (build / 'CPackConfig.cmake').write_text('set(CPACK_PACKAGE_VERSION "2.0.0")\n')
+            for distribution, suite, format, expected in [('debian', 'sid', 'DEB', 'CPACK_PACKAGE_VERSION=2.0.0-9~sid'),
+                    ('raspberrypios', 'trixie', 'DEB', 'CPACK_PACKAGE_VERSION=2.0.0-9~trixie'),
+                    ('rocky', '10', 'RPM', 'CPACK_RPM_PACKAGE_RELEASE=9.el10'),
+                    ('fedora', '44', 'RPM', 'CPACK_RPM_PACKAGE_RELEASE=9.fc44')]:
+                (build / '_packages' / ('fixture.' + format.lower())).touch()
+                (build / '_packages/fixture.packages').touch()
+                env = os.environ | {'DISTRIBUTION': distribution, 'SUITE': suite, 'PACKAGE_RELEASE': '9', 'format': format}
+                shell = 'cpack() { printf "%s\\n" "$@" > "$OUTPUT"; }\n' + package + 'package "$BUILD"'
+                subprocess.run(['bash', '-e', '-c', shell], cwd=root, env=env | {'OUTPUT': str(root / 'args'), 'BUILD': str(build)}, check=True)
+                self.assertEqual((root / 'args').read_text().splitlines(), ['-G', format, '-D', expected])
 
     def test_installer_openwrt_series_and_urls(self):
         source = (repository.ROOT / 'install/install.sh').read_text().split('fetch() {', 1)[0]
@@ -297,7 +340,7 @@ class StatusEventsTest(unittest.TestCase):
         self.bundle=self.root/'bundle'
         self.rows=publication.targets()[:20]
         self.context=dict(run_id='100',run_url='https://example.invalid/100',destination='SNodeC/Packages',release_project='snode.c')
-        for name,value in dict(context=self.context,targets=self.rows,revisions={'snode.c':'1','mqttsuite':'1'},sources={},profiles={}).items():
+        for name,value in dict(context=self.context,targets=self.rows,revisions={'snode.c':'1','mqttsuite':'1'},sources={'snode.c': {'refs/tags/v2.0.0': 'fixture'}, 'mqttsuite': {'refs/tags/v1.0.2': 'fixture'}},profiles={}).items():
             publication.write(self.bundle/f'{name}.json',value)
         self.env=os.environ | {'GITHUB_RUN_ATTEMPT':'1','PYTHONPATH':str(repository.ROOT)}
         self.status_script=repository.ROOT/'ci/publish/status.sh'
@@ -418,6 +461,66 @@ class StatusEventsTest(unittest.TestCase):
         self.assertIn('Remote feed changed',result.stderr)
         self.assertEqual(self.git('show','main:feed',cwd=self.remote),'new remote feed')
 
+    def test_concurrent_status_and_feed_writers_preserve_authored_readme(self):
+        import shutil
+        shutil.copy2(repository.ROOT / 'site/README.md', self.seed / 'README.md')
+        (self.seed / 'README.md').write_text('BASE INTRO\n' + (self.seed / 'README.md').read_text() + '\nBASE FOOTER\n')
+        self.event(self.seed, 'pending')
+        self.git('add', '.', cwd=self.seed)
+        self.git('commit', '-m', 'README base', cwd=self.seed)
+        self.git('push', 'origin', 'main', cwd=self.seed)
+        publisher = self.clone('readme-publisher')
+        previous = self.git('rev-parse', 'HEAD', cwd=publisher)
+        (publisher / 'feed').write_text('published feed')
+        (publisher / 'README.md').write_text((publisher / 'README.md').read_text().replace('BASE INTRO', 'LOCAL INTRO'))
+        other = self.clone('readme-status')
+        (other / 'README.md').write_text((other / 'README.md').read_text().replace('BASE FOOTER', 'REMOTE FOOTER'))
+        self.git('add', '.', cwd=other)
+        self.git('commit', '-m', 'authored README update', cwd=other)
+        self.git('push', 'origin', 'main', cwd=other)
+        subprocess.run(['bash', str(self.status_script), str(other), 'status', str(self.bundle), json.dumps(self.rows[1]), 'mqttsuite', 'running'], env=self.env, check=True, capture_output=True)
+        result = subprocess.run(['bash', str(self.push_script), str(publisher), previous, 'publish', *self.command(publisher, 'published')], env=self.env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        readme = self.git('show', 'main:README.md', cwd=self.remote)
+        self.assertIn('LOCAL INTRO', readme)
+        self.assertIn('REMOTE FOOTER', readme)
+        self.assertIn('| Project | Latest release | Status |', readme)
+        self.assertEqual(readme.count('| [SNode.C]'), 1)
+        state = self.snapshot()['targets']
+        self.assertEqual(state[self.rows[0]['id'] + '/snode.c']['status'], 'published')
+        self.assertEqual(state[self.rows[1]['id'] + '/mqttsuite']['status'], 'running')
+        self.assertEqual(self.git('show', 'main:feed', cwd=self.remote), 'published feed')
+
+    def test_authored_readme_conflict_fails_closed(self):
+        (self.seed / 'README.md').write_text('BASE\n')
+        self.git('add', '.', cwd=self.seed)
+        self.git('commit', '-m', 'README base', cwd=self.seed)
+        self.git('push', 'origin', 'main', cwd=self.seed)
+        local = self.clone('readme-conflict-local')
+        previous = self.git('rev-parse', 'HEAD', cwd=local)
+        (local / 'README.md').write_text('LOCAL\n')
+        other = self.clone('readme-conflict-remote')
+        (other / 'README.md').write_text('REMOTE\n')
+        self.git('add', '.', cwd=other)
+        self.git('commit', '-m', 'conflicting authored README', cwd=other)
+        self.git('push', 'origin', 'main', cwd=other)
+        result = subprocess.run(['bash', str(self.push_script), str(local), previous, 'publish', *self.command(local, 'published')], env=self.env, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Conflicting authored README edits', result.stderr)
+        self.assertEqual(self.git('show', 'main:README.md', cwd=self.remote), 'REMOTE')
+
+    def test_status_only_writer_updates_readme_at_capture_time(self):
+        import shutil
+        shutil.copy2(repository.ROOT / 'site/README.md', self.seed / 'README.md')
+        self.git('add', '.', cwd=self.seed)
+        self.git('commit', '-m', 'README', cwd=self.seed)
+        self.git('push', 'origin', 'main', cwd=self.seed)
+        writer = self.clone('readme-sparse-writer', sparse=True)
+        subprocess.run(['bash', str(self.status_script), str(writer), 'status', str(self.bundle), '-', '-', 'pending'], env=self.env, check=True, capture_output=True)
+        readme = self.git('show', 'main:README.md', cwd=self.remote)
+        self.assertIn('2.0.0 · r1', readme)
+        self.assertIn('1.0.2 · r1', readme)
+
     def test_reservation_survives_status_commit_with_sparse_checkout(self):
         allocator=self.clone('allocator',sparse=True)
         previous=self.git('rev-parse','HEAD',cwd=allocator)
@@ -480,7 +583,7 @@ class StatusEventsTest(unittest.TestCase):
         self.assertFalse((feed/'retired.ipk').exists())
         self.assertEqual((self.seed / 'status.json').read_bytes(), status_before)
         self.assertFalse((self.seed / 'docs/removed').exists())
-        self.assertIn('![running]', (self.seed / 'status/snodec.md').read_text())
+        self.assertIn('alt="running"', (self.seed / 'status/snodec.md').read_text())
         self.assertEqual(badges_before, {p.name: p.read_bytes() for p in (self.seed / 'status/badges').iterdir()})
         expected_docs = {p.relative_to(repository.ROOT / 'site/docs'): p.read_bytes()
                          for p in (repository.ROOT / 'site/docs').rglob('*') if p.is_file()}

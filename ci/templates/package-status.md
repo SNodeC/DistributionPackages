@@ -3,12 +3,12 @@
 
 [![Packages](../docs/media/page-banner.svg)](../README.md#project-overview)
 
-# <!-- title --> package status
+<!-- navigation -->
 
-[All projects](README.md#page-overview) · [Installation](../README.md#install) · [Troubleshooting](../docs/troubleshooting.md#page-overview)
+# <!-- title --> package status · latest release <!-- release -->
 
-**Available** is the version in the signed feed; an unfinished replacement does not remove it. **Latest attempt** shows the upstream source tag and separately allocated package revision. Captured is source-capture time, not tag-push time. Started, built, published and changed are recorded event times in UTC; old events say “not recorded.” A feed record's timestamp may belong to a different project's publication, so it is never relabelled as this project's time.
-
-Files opens the feed directory (APT pools contain multiple architectures); Record opens its source manifest. Run opens the recorded job or capture run; viewing GitHub Actions logs may require sign-in. Package managers select architecture-compatible files from signed indexes.
+<!-- menu -->
 
 <!-- body -->
+
+**Legend:** <!-- legend -->. `—`: no recorded value or no replacement build shown. Status names are also available as image alternative text and hover descriptions.

@@ -9,24 +9,26 @@
 
 Product repositories build and test unsigned artifacts. DistributionPackages validates each build identity, signs and publishes its target, and renders these pages. Packages serves the signed feeds and generated public documentation; nothing builds or renders here.
 
-## Available versus attempted
+## Latest release, Available and In build
 
-An available version comes from the signed feed's `build.json`. The latest attempt comes from `status.json`. An unsuccessful rebuild leaves the older packages available. Package revisions are allocated per project; upstream release versions and package revisions are not interchangeable.
+**Latest release** is the source version and allocated package revision from the newest captured release for that project. It changes at capture time, before packages necessarily reach the feeds. The overview links to a separate status page for each project.
 
-A SNode.C publication dispatches the dependent MQTTSuite build for that target against the exact published dependency snapshot. A failed dependency can leave a skipped dependent placeholder; a later dependency retry appears as waiting, without changing the recorded pipeline state.
+**Available** comes from the signed feed's `build.json`. A green current indicator means its source version and revision match Latest release; an amber outdated indicator means they differ. An unsuccessful replacement leaves the available packages intact.
 
-## Recorded times and failures
+**In build** describes only the latest captured revision: pending, running, awaiting publication, failed, cancelled, skipped or superseded. It becomes `—` once that release is available. A skipped dependent means its dependency did not complete successfully; it is not evidence that the dependent was compiled. Indicators have a legend, alternative text and hover descriptions.
 
-Captured means the source bundle capture, not the triggering tag push. Started, built, changed and published are accepted event times in UTC. Timestamps are retained across metadata lease retries. Older captured tools did not record them, so their pages say “not recorded.” Unknown failure stages are not guessed.
+**Published (UTC)** is the available package's publication time, shown as `YYYY-MM-DD HH:MM`. The renderer uses project/revision-specific timeline records or an attributable feed timestamp. A feed timestamp belonging to a different project's publication is not reused. An unrecorded value is `—`; capture time is never substituted.
 
-A feed's `published_at` can refer to whichever project last updated it. A project-specific publication time is displayed only when recorded for that project and available revision. Pending, building and built-but-awaiting-publication states are not claims of signed availability.
+**Build log** opens the job for In build, or the job that produced Available when no replacement is shown. Historical records may provide only a run URL or no URL. **Packages** opens the feed directory; APT pools share suites across architectures, and signed indexes determine compatible files. Viewing Actions logs may require sign-in.
+
+A SNode.C publication dispatches the dependent MQTTSuite build for that target against the exact published dependency snapshot. Release versions and package revisions remain independent facts.
 
 ## Trust and ownership
 
 Signing executes only trusted tooling from the captured DistributionPackages commit. Public documentation is copied from its current default-branch `site/` directory; installer scripts and build/signing tools remain capture-pinned. The same central renderer writes project status pages in product jobs and the publisher. Products report metadata without knowing the Markdown structure.
 
-Feed writes are serialized; concurrent status-only commits are merged under Git leases. Package publication uses a parentless snapshot, so repository history is not a package changelog. The signing allow-list remains a deliberate DistributionPackages edit; organization catalog entries do not grant signing rights.
+Feed writes are serialized; concurrent status-only commits are merged under Git leases. Generated README blocks are re-rendered from the resulting state while authored README content is preserved. Package publication uses a parentless snapshot, so repository history is not a package changelog. The signing allow-list remains a deliberate DistributionPackages edit; organization catalog entries do not grant signing rights.
 
 ## Source records
 
-Each [project status page](../status/README.md#page-overview) links to feed records, package directories and build runs. APT pools share suites across architectures; signed indexes determine which files are compatible. GitHub Actions logs may require sign-in even for a public repository. Keep signature verification enabled.
+The feed's `build.json` records provenance and package inventory; the project status page exposes Build log and Packages links rather than embedding those records. Keep signature verification enabled. [Signing keys](../keys/README.md#page-overview) explains the verification keys.

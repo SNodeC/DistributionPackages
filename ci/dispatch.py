@@ -52,9 +52,19 @@ def receive(payload):
             raise ValueError('Capture must be the originating version-tag run')
     elif project != 'mqttsuite' or origin['display_title'] != f'Packages · {capture} · {row["id"]}':
         raise ValueError('Only a published SNode.C target dispatches a dependent build')
+    job_url = origin['html_url']
+    if 'job' in payload:
+        job_id = str(payload['job'])
+        if not job_id.isdecimal() or int(job_id) <= 0:
+            raise ValueError('Invalid job identity')
+        job = api(f'repos/SNodeC/{project}/actions/jobs/{job_id}')
+        if (str(job['run_id']) != build_run or str(job['run_attempt']) != attempt
+                or job['name'] != f"Build and test · {row['distribution']} · {row['suite']} · {row['arch']}"):
+            raise ValueError('Job does not belong to the validated target and build attempt')
+        job_url = job['html_url']
     name = f'packages-{project}-{row["id"]}-{attempt}'
     return dict(project=project, target=json.dumps(row), capture=capture, run=build_run,
-                attempt=attempt, artifact=name, run_url=origin['html_url'],
+                attempt=attempt, artifact=name, run_url=job_url,
                 capture_repository='SNodeC/' + (project if origin['event'] == 'push' else 'snode.c'))
 
 
@@ -101,6 +111,6 @@ if __name__ == '__main__':
         capture = read(Path(bundle) / 'context.json')['run_id']
         api('repos/SNodeC/DistributionPackages/dispatches', dict(event_type='package-built', client_payload=dict(
             capture=capture, project=project, target=target, run=os.environ['GITHUB_RUN_ID'],
-            attempt=os.environ['GITHUB_RUN_ATTEMPT'])))
+            attempt=os.environ['GITHUB_RUN_ATTEMPT'], **({'job': os.environ['BUILD_JOB_ID']} if os.environ.get('BUILD_JOB_ID') else {}))))
     else:
         {'build': build, 'baseline': baseline}[command](Path(args[0]), *args[1:])

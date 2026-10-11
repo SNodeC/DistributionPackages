@@ -50,8 +50,6 @@ The installer checks the target, configures its signed package source and instal
 
 ## Projects
 
-Available targets refer to published packages, not the success of a replacement build. Open the [project directory](status/README.md#page-overview) for package catalogs and per-project status.
-
 <!-- packages:begin projects -->
 <!-- packages:end projects -->
 
@@ -96,7 +94,7 @@ f6fd78dca70698e8
 8BBFD49E3C826FDB1416C79E60046744B15B0E05
 ```
 
-[Download public keys](https://github.com/SNodeC/Packages/tree/main/keys). APT and RPM use the same key. Keep signature verification enabled.
+[Signing-key guide](keys/README.md#page-overview) explains the keys, fingerprints and distribution-specific installation. Keep signature verification enabled.
 
 <a id="help"></a>
 

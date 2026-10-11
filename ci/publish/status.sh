@@ -5,7 +5,7 @@ root=$1
 command=$2
 shift 2
 export EVENT_TIME="${EVENT_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
-[ "$command" = reserve ] || trap 'result=$?; if [ "$result" != 0 ]; then echo "::warning::Package status update failed (exit $result); continuing"; fi; exit 0' EXIT
+[[ "$command" = reserve || "$command" = render ]] || trap 'result=$?; if [ "$result" != 0 ]; then echo "::warning::Package status update failed (exit $result); continuing"; fi; exit 0' EXIT
 if [ -n "${PACKAGES_TOKEN:-}" ]; then
     export GIT_CONFIG_COUNT=1
     export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
@@ -14,7 +14,7 @@ fi
 if [ ! -d "$root/.git" ]; then
     git clone --filter=blob:none --no-checkout https://github.com/SNodeC/Packages.git "$root"
 fi
-git -C "$root" sparse-checkout set --no-cone /status.json /docs/status.md /status/ '**/build.json'
+git -C "$root" sparse-checkout set --no-cone /README.md /status.json /docs/status.md /status/ '**/build.json'
 git -C "$root" config user.name 'github-actions[bot]'
 git -C "$root" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 for attempt in {1..30}; do
