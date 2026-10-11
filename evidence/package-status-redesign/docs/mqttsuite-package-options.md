@@ -7,9 +7,7 @@
 
 Package names are shared by OpenWrt, Raspberry Pi OS, Debian, Ubuntu, Rocky Linux and Fedora. Architectures affect availability and binary contents, not names.
 
-## Installation and availability
-
-[Choose your distribution](../README.md#install) · [MQTTSuite status](../status/mqttsuite.md#page-overview)
+[![Install](media/menu/install.svg)](../README.md#install) [![Status](media/menu/status.svg)](../status/mqttsuite.md#page-overview) [![Catalog](media/menu/catalog.svg)](#package-catalog) [![Details](media/menu/details.svg)](#distribution-details) [![Query](media/menu/query.svg)](#query-available-packages) [![Use](media/menu/use.svg)](#after-installation)
 
 ## Package catalog
 
@@ -43,9 +41,18 @@ apt-cache pkgnames mqttsuite- | sort
 dnf list --available 'mqttsuite-*'
 ```
 
+```sh
+# OpenWrt 24.10 (opkg)
+opkg list 'mqttsuite-*'
+# OpenWrt 25.12 (APK)
+apk search 'mqttsuite-*'
+```
+
 ## After installation
 
-Inspect `mqttbroker --help` and `mqttcli --help`. Configure listeners, credentials and TLS certificates before starting services. MQTTStore needs a configured database. Read the [application deployment guidance](https://github.com/SNodeC/mqttsuite#project-overview) before exposing management interfaces.
+Inspect `mqttbroker --help` and `mqttcli --help`. Configure listeners, credentials and TLS certificates before starting services. MQTTStore needs a configured database. Before exposing management interfaces, review the deployment guide.
+
+[![Deploy safely](media/menu/deploy.svg)](https://github.com/SNodeC/mqttsuite/blob/HEAD/docs/readme/deployment.md#page-overview)
 
 ### Native Linux
 

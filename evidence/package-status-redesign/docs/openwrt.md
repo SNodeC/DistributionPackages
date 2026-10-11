@@ -7,6 +7,7 @@
 
 <p>
 <a href="#requirements"><img src="media/menu/requirements.svg" alt="Requirements"></a>
+<a href="#choose-packages"><img src="media/menu/choose-packages.svg" alt="Choose packages"></a>
 <a href="#quick-install"><img src="media/menu/install.svg" alt="Install"></a>
 <a href="#manual-repository-setup"><img src="media/menu/manual.svg" alt="Manual setup"></a>
 <a href="#updates"><img src="media/menu/updates.svg" alt="Updates"></a>
@@ -28,7 +29,17 @@ printf 'OpenWrt: %s\nPackage architecture: %s\n' "$DISTRIB_RELEASE" "$DISTRIB_AR
 
 Use `DISTRIB_ARCH`, not `uname -m`. Several devices can share a package architecture. OpenWrt 24.10 uses `opkg`/IPK; 25.12 uses `apk`/APK.
 
+## Choose packages
+
+See the [SNode.C catalog](snodec-package-options.md#page-overview) and [MQTTSuite catalog](mqttsuite-package-options.md#page-overview) for package roles and after-install configuration.
+
+<a href="#complete-sets"><img src="media/menu/complete-sets.svg" alt="Complete sets" align="absmiddle"></a> Install all components of the currently offered projects.
+
+<a href="#selected-packages"><img src="media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> Configure the signed source, then install only the components you need.
+
 ## Quick install
+
+### Complete sets
 
 ```sh
 wget -O /tmp/snodec-install-feed.sh \
@@ -36,11 +47,9 @@ wget -O /tmp/snodec-install-feed.sh \
 sh /tmp/snodec-install-feed.sh
 ```
 
-The installer detects the distribution, release and package architecture, checks that an index exists, installs the signing key, configures the feed and installs the complete package set. Configure applications before starting them. Prefer manual setup? Use [Manual repository setup](#manual-repository-setup).
+The installer detects the distribution, release and package architecture, checks that an index exists, installs the signing key, configures the feed and installs the complete package set. Configure applications before starting them. For manual configuration, use the setup section below.
 
-## Choose packages
-
-See the [SNode.C catalog](snodec-package-options.md#page-overview) and [MQTTSuite catalog](mqttsuite-package-options.md#page-overview) for package roles and after-install configuration.
+### Selected packages
 
 Prepare the feed without installing packages:
 
@@ -62,35 +71,7 @@ opkg install mqttsuite-broker mqttsuite-cli
 apk add mqttsuite-broker mqttsuite-cli
 ```
 
-Dependencies are installed automatically. For the full selection after manual preparation, install the complete-project packages in the project catalogs.
-
-Full catalogs: [SNode.C](snodec-package-options.md#page-overview) and [MQTTSuite](mqttsuite-package-options.md#page-overview).
-
-```sh
-# OpenWrt 24.10: full selection
-opkg install snodec mqttsuite
-```
-
-```sh
-# OpenWrt 25.12: full selection
-apk add snodec mqttsuite
-```
-
-## Updates
-
-```sh
-# OpenWrt 24.10
-opkg update
-opkg list-upgradable
-```
-
-```sh
-# OpenWrt 25.12
-apk update
-apk list --upgradable
-```
-
-Update selected packages with `opkg upgrade <package> ...` or `apk upgrade <package> ...`. Review related library and application updates together. This does not upgrade firmware. After changing OpenWrt release series, configure the matching feed again.
+Dependencies are installed automatically.
 
 ## Manual repository setup
 
@@ -153,7 +134,35 @@ https://raw.githubusercontent.com/SNodeC/Packages/main/openwrt/25.12/aarch64_cor
 
 Import the corresponding signing key as shown above. For other devices, use their `DISTRIB_ARCH`; each architecture has its own directory. After an OpenWrt release-series upgrade, reconfigure this feed for the new series.
 
-Then [choose packages](#choose-packages) to install.
+Install the complete sets after manual setup:
+
+```sh
+# OpenWrt 24.10: full selection
+opkg install snodec mqttsuite
+```
+
+```sh
+# OpenWrt 25.12: full selection
+apk add snodec mqttsuite
+```
+
+<a href="#selected-packages"><img src="media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> Install individual components after manual setup.
+
+## Updates
+
+```sh
+# OpenWrt 24.10
+opkg update
+opkg list-upgradable
+```
+
+```sh
+# OpenWrt 25.12
+apk update
+apk list --upgradable
+```
+
+Update selected packages with `opkg upgrade <package> ...` or `apk upgrade <package> ...`. Review related library and application updates together. This does not upgrade firmware. After changing OpenWrt release series, configure the matching feed again.
 
 ## Source records
 
@@ -161,7 +170,7 @@ Source recipes: [SNode.C](https://github.com/SNodeC/snode.c/tree/master/suppleme
 
 Both releases support the same platform variants. RISC-V is named `riscv64_riscv64` on 24.10 and `riscv64_generic` on 25.12.
 
-See [per-project availability and source records](../status/README.md#page-overview) for every release and architecture.
+See [per-project versions, builds and packages](../status/README.md#page-overview) for every release and architecture.
 
 ## Troubleshooting
 
