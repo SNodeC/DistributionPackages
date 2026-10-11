@@ -7,6 +7,7 @@
 
 <p>
 <a href="#requirements"><img src="media/menu/requirements.svg" alt="Requirements"></a>
+<a href="#choose-packages"><img src="media/menu/choose-packages.svg" alt="Choose packages"></a>
 <a href="#quick-install"><img src="media/menu/install.svg" alt="Install"></a>
 <a href="#manual-repository-setup"><img src="media/menu/manual.svg" alt="Manual setup"></a>
 <a href="#updates"><img src="media/menu/updates.svg" alt="Updates"></a>
@@ -33,7 +34,17 @@ sudo apt-get install ca-certificates curl
 
 Use **Raspberry Pi 3, 4 or 5 with 64-bit Raspberry Pi OS** (`arm64`). The [official Lite images](https://www.raspberrypi.com/software/operating-systems/) are supported. 32-bit installations are not covered. The installer recognises Raspberry Pi OS through `/etc/rpi-issue`, even when `/etc/os-release` says Debian.
 
+## Choose packages
+
+See the [SNode.C catalog](snodec-package-options.md#page-overview) and [MQTTSuite catalog](mqttsuite-package-options.md#page-overview) for package roles and after-install configuration.
+
+[![Complete sets](media/menu/complete-sets.svg)](#complete-sets) Install all components of the currently offered projects.
+
+[![Selected packages](media/menu/selected-packages.svg)](#selected-packages) Configure the signed source, then install only the components you need.
+
 ## Quick install
+
+### Complete sets
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/SNodeC/Packages/main/install/install.sh \
@@ -41,11 +52,9 @@ curl -fsSL https://raw.githubusercontent.com/SNodeC/Packages/main/install/instal
 sudo sh /tmp/snodec-install-feed.sh
 ```
 
-The installer detects the distribution, release and package architecture, checks that an index exists, installs the signing key, configures the repository and installs the complete package set. Configure applications before starting them. Prefer manual setup? Use [Manual repository setup](#manual-repository-setup).
+The installer detects the distribution, release and package architecture, checks that an index exists, installs the signing key, configures the repository and installs the complete package set. Configure applications before starting them. For manual configuration, use the setup section below.
 
-## Choose packages
-
-See the [SNode.C catalog](snodec-package-options.md#page-overview) and [MQTTSuite catalog](mqttsuite-package-options.md#page-overview) for package roles and after-install configuration.
+### Selected packages
 
 Prepare the repository without installing packages:
 
@@ -61,22 +70,7 @@ For only the broker and command-line client:
 sudo apt-get install mqttsuite-broker mqttsuite-cli
 ```
 
-Dependencies are installed automatically. For the full selection after manual preparation, install the complete-project packages in the project catalogs.
-
-```sh
-sudo apt-get install snodec mqttsuite
-```
-
-## Updates
-
-```sh
-sudo apt-get update
-sudo apt-get install snodec mqttsuite
-```
-
-For selective installations, name the installed components rather than adding the complete metapackages. After a distribution upgrade, configure the repository for its new supported release and refresh metadata.
-
-Installing the metapackages also upgrades older combined packages to component packages. `apt-get upgrade` alone can hold back that transition when new dependencies are needed. Component packages declare replacement of old files.
+Dependencies are installed automatically.
 
 ## Manual repository setup
 
@@ -97,7 +91,24 @@ printf 'deb [arch=arm64 signed-by=/etc/apt/keyrings/snodec.asc] https://raw.gith
 sudo apt-get update
 ```
 
-Then [choose packages](#choose-packages) to install.
+Install the complete sets after manual setup:
+
+```sh
+sudo apt-get install snodec mqttsuite
+```
+
+[![Selected packages](media/menu/selected-packages.svg)](#selected-packages) Install individual components after manual setup.
+
+## Updates
+
+```sh
+sudo apt-get update
+sudo apt-get install snodec mqttsuite
+```
+
+For selective installations, name the installed components rather than adding the complete metapackages. After a distribution upgrade, configure the repository for its new supported release and refresh metadata.
+
+Installing the metapackages also upgrades older combined packages to component packages. `apt-get upgrade` alone can hold back that transition when new dependencies are needed. Component packages declare replacement of old files.
 
 ## Source records
 

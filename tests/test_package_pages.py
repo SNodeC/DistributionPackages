@@ -23,6 +23,7 @@ class PackagePagesTest(unittest.TestCase):
                                sources={'snode.c': {'refs/tags/v2.0.0': 'sha'}, 'mqttsuite': {'refs/tags/v1.0.2': 'sha'}})
         self.state = dict(targets={}, runs={'capture': self.generation})
         shutil.copy2(repository.ROOT / 'site/README.md', self.root / 'README.md')
+        shutil.copytree(repository.ROOT / 'site/docs', self.root / 'docs')
 
     def feed(self, row=None, revision=9):
         row = row or self.row
@@ -178,8 +179,78 @@ class PackagePagesTest(unittest.TestCase):
         with patch.dict(repository.PROJECTS, {'new-project': dict(title='New project', package='new-package', depends_on=())}):
             publication.render(self.root, self.state)
         self.assertTrue((self.root / 'status/new-package.md').exists())
+        self.assertNotIn('Package catalog', self.text('new-package'))
+        (self.root / 'docs/new-package-package-options.md').write_text('New catalog')
+        with patch.dict(repository.PROJECTS, {'new-project': dict(title='New project', package='new-package', depends_on=())}):
+            publication.render(self.root, self.state)
+        self.assertIn('[![Package catalog]', self.text('new-package'))
         for path in ['README.md', 'status/README.md']:
             self.assertIn('[New project](https://github.com/SNodeC/new-project#project-overview)', (self.root / path).read_text())
+
+    def test_distribution_guides_choose_before_install_and_match_the_menu(self):
+        headings = ['Requirements', 'Choose packages', 'Quick install', 'Manual repository setup', 'Updates', 'Source records', 'Troubleshooting']
+        for name in ['debian', 'ubuntu', 'fedora', 'rocky', 'raspberrypi', 'openwrt']:
+            with self.subTest(guide=name):
+                text = (repository.ROOT / f'site/docs/{name}.md').read_text()
+                self.assertEqual([line[3:] for line in text.splitlines() if line.startswith('## ')], headings)
+                menu = text.split('<p>', 1)[1].split('</p>', 1)[0]
+                anchors = ['requirements', 'choose-packages', 'quick-install', 'manual-repository-setup', 'updates']
+                self.assertEqual(sorted(anchors, key=lambda anchor: menu.index(f'href="#{anchor}"')), anchors)
+                self.assertIn('[![Complete sets]', text)
+                self.assertIn('[![Selected packages]', text)
+                self.assertLess(text.index('## Choose packages'), text.index('### Complete sets'))
+                self.assertIn('--prepare', text)
+                self.assertNotIn('automatically. ##', text)
+
+    def test_catalogs_have_buttons_and_queries_for_all_package_managers(self):
+        for package in ['snodec', 'mqttsuite']:
+            text = (repository.ROOT / f'site/docs/{package}-package-options.md').read_text()
+            self.assertNotIn('## Installation and availability', text)
+            for label in ['Install', 'Status', 'Catalog', 'Details', 'Query', 'Use']:
+                self.assertIn(f'[![{label}]', text)
+            self.assertIn(f"opkg list '{package}-*'", text)
+            self.assertIn(f"apk search '{package}-*'", text)
+        mqtt = (repository.ROOT / 'site/docs/mqttsuite-package-options.md').read_text()
+        self.assertIn('mqttsuite/blob/HEAD/docs/readme/deployment.md#page-overview', mqtt)
+
+    def test_hub_and_keys_have_one_fingerprint_authority_and_consistent_apt_setup(self):
+        hub = (repository.ROOT / 'site/README.md').read_text()
+        keys = (repository.ROOT / 'site/keys/README.md').read_text()
+        self.assertNotIn('8BBFD49E3C826FDB1416C79E60046744B15B0E05', hub)
+        self.assertIn('8BBFD49E3C826FDB1416C79E60046744B15B0E05', keys)
+        self.assertIn('ASCII-armored key unchanged', keys)
+        self.assertNotIn('dearmor', keys)
+        self.assertNotIn('| Key | Distributions', keys)
+        self.assertIn('snodec-opkg.pub', keys)
+        self.assertIn('snodec-usign.pub', keys)
+        self.assertIn('architecture-independent', keys)
+        for name in ['debian', 'ubuntu', 'raspberrypi']:
+            guide = (repository.ROOT / f'site/docs/{name}.md').read_text()
+            self.assertIn('tee /etc/apt/keyrings/snodec.asc', guide)
+            self.assertIn('signed-by=/etc/apt/keyrings/snodec.asc', guide)
+        self.assertIn('/docs/ /status/', (repository.ROOT / 'ci/publish/status.sh').read_text())
+
+    def test_public_pages_separate_html_blocks_and_use_real_menu_assets(self):
+        import re
+        import xml.etree.ElementTree as ET
+        for path in (repository.ROOT / 'site').rglob('*.md'):
+            text = path.read_text()
+            self.assertNotRegex(text, r'</p>\n[^\n<]')
+            self.assertIn('project-overview' if path == repository.ROOT / 'site/README.md' else 'page-overview', text)
+            for image in re.findall(r'(?:src="|!\[[^\]]*\]\()([^"\)]+\.svg)', text):
+                target = path.parent / image
+                self.assertTrue(target.is_file(), f'{path}: {image}')
+                if '/menu/' in image:
+                    svg = ET.fromstring(target.read_text())
+                    label = svg.find('{http://www.w3.org/2000/svg}text')
+                    self.assertEqual(label.attrib['font-size'], '16')
+                    self.assertEqual(label.attrib['font-weight'], '600')
+                    for arrow in svg.findall('{http://www.w3.org/2000/svg}path'):
+                        self.assertIn('M0 1.25H5.5V0L9 2L5.5 4V2.75H0Z', arrow.attrib['d'])
+                        self.assertRegex(arrow.attrib['transform'], r'translate\(\d+ 12\)')
+        for asset, height in [('banner.svg', '320'), ('page-banner.svg', '80')]:
+            svg = ET.fromstring((repository.ROOT / 'site/docs/media' / asset).read_text())
+            self.assertEqual(svg.attrib['height'], height)
 
     def test_replayed_regressive_terminal_events_do_not_change_metadata(self):
         self.event('snode.c', 'running')

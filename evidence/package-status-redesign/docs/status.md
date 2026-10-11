@@ -14,14 +14,14 @@ Status now has [one page per project](../status/README.md#page-overview). Existi
 
 ### OpenWrt 24.10
 
-[SNode.C](../status/snodec.md#openwrt-2410) · [MQTTSuite](../status/mqttsuite.md#openwrt-2410)
+[![SNode.C](../status/menu/snode-c.svg)](../status/snodec.md#openwrt-2410) [![MQTTSuite](../status/menu/mqttsuite.svg)](../status/mqttsuite.md#openwrt-2410)
 
 <a id="2512"></a>
 <a id="openwrt-2512"></a>
 
 ### OpenWrt 25.12
 
-[SNode.C](../status/snodec.md#openwrt-2512) · [MQTTSuite](../status/mqttsuite.md#openwrt-2512)
+[![SNode.C](../status/menu/snode-c.svg)](../status/snodec.md#openwrt-2512) [![MQTTSuite](../status/menu/mqttsuite.svg)](../status/mqttsuite.md#openwrt-2512)
 
 ## Raspberry Pi OS
 
@@ -30,14 +30,14 @@ Status now has [one page per project](../status/README.md#page-overview). Existi
 
 ### Raspberry Pi OS bookworm
 
-[SNode.C](../status/snodec.md#raspberrypios-bookworm) · [MQTTSuite](../status/mqttsuite.md#raspberrypios-bookworm)
+[![SNode.C](../status/menu/snode-c.svg)](../status/snodec.md#raspberrypios-bookworm) [![MQTTSuite](../status/menu/mqttsuite.svg)](../status/mqttsuite.md#raspberrypios-bookworm)
 
 <a id="trixie"></a>
 <a id="raspberry-pi-os-trixie"></a>
 
 ### Raspberry Pi OS trixie
 
-[SNode.C](../status/snodec.md#raspberrypios-trixie) · [MQTTSuite](../status/mqttsuite.md#raspberrypios-trixie)
+[![SNode.C](../status/menu/snode-c.svg)](../status/snodec.md#raspberrypios-trixie) [![MQTTSuite](../status/menu/mqttsuite.svg)](../status/mqttsuite.md#raspberrypios-trixie)
 
 ## Debian
 
@@ -46,21 +46,21 @@ Status now has [one page per project](../status/README.md#page-overview). Existi
 
 ### Debian forky
 
-[SNode.C](../status/snodec.md#debian-forky) · [MQTTSuite](../status/mqttsuite.md#debian-forky)
+[![SNode.C](../status/menu/snode-c.svg)](../status/snodec.md#debian-forky) [![MQTTSuite](../status/menu/mqttsuite.svg)](../status/mqttsuite.md#debian-forky)
 
 <a id="sid"></a>
 <a id="debian-sid"></a>
 
 ### Debian sid
 
-[SNode.C](../status/snodec.md#debian-sid) · [MQTTSuite](../status/mqttsuite.md#debian-sid)
+[![SNode.C](../status/menu/snode-c.svg)](../status/snodec.md#debian-sid) [![MQTTSuite](../status/menu/mqttsuite.svg)](../status/mqttsuite.md#debian-sid)
 
 <a id="trixie-1"></a>
 <a id="debian-trixie"></a>
 
 ### Debian trixie
 
-[SNode.C](../status/snodec.md#debian-trixie) · [MQTTSuite](../status/mqttsuite.md#debian-trixie)
+[![SNode.C](../status/menu/snode-c.svg)](../status/snodec.md#debian-trixie) [![MQTTSuite](../status/menu/mqttsuite.svg)](../status/mqttsuite.md#debian-trixie)
 
 ## Ubuntu
 
@@ -69,14 +69,14 @@ Status now has [one page per project](../status/README.md#page-overview). Existi
 
 ### Ubuntu noble
 
-[SNode.C](../status/snodec.md#ubuntu-noble) · [MQTTSuite](../status/mqttsuite.md#ubuntu-noble)
+[![SNode.C](../status/menu/snode-c.svg)](../status/snodec.md#ubuntu-noble) [![MQTTSuite](../status/menu/mqttsuite.svg)](../status/mqttsuite.md#ubuntu-noble)
 
 <a id="resolute"></a>
 <a id="ubuntu-resolute"></a>
 
 ### Ubuntu resolute
 
-[SNode.C](../status/snodec.md#ubuntu-resolute) · [MQTTSuite](../status/mqttsuite.md#ubuntu-resolute)
+[![SNode.C](../status/menu/snode-c.svg)](../status/snodec.md#ubuntu-resolute) [![MQTTSuite](../status/menu/mqttsuite.svg)](../status/mqttsuite.md#ubuntu-resolute)
 
 ## Rocky Linux
 
@@ -85,14 +85,14 @@ Status now has [one page per project](../status/README.md#page-overview). Existi
 
 ### Rocky Linux 10
 
-[SNode.C](../status/snodec.md#rocky-10) · [MQTTSuite](../status/mqttsuite.md#rocky-10)
+[![SNode.C](../status/menu/snode-c.svg)](../status/snodec.md#rocky-10) [![MQTTSuite](../status/menu/mqttsuite.svg)](../status/mqttsuite.md#rocky-10)
 
 <a id="9"></a>
 <a id="rocky-linux-9"></a>
 
 ### Rocky Linux 9
 
-[SNode.C](../status/snodec.md#rocky-9) · [MQTTSuite](../status/mqttsuite.md#rocky-9)
+[![SNode.C](../status/menu/snode-c.svg)](../status/snodec.md#rocky-9) [![MQTTSuite](../status/menu/mqttsuite.svg)](../status/mqttsuite.md#rocky-9)
 
 ## Fedora
 
@@ -101,11 +101,11 @@ Status now has [one page per project](../status/README.md#page-overview). Existi
 
 ### Fedora 43
 
-[SNode.C](../status/snodec.md#fedora-43) · [MQTTSuite](../status/mqttsuite.md#fedora-43)
+[![SNode.C](../status/menu/snode-c.svg)](../status/snodec.md#fedora-43) [![MQTTSuite](../status/menu/mqttsuite.svg)](../status/mqttsuite.md#fedora-43)
 
 <a id="44"></a>
 <a id="fedora-44"></a>
 
 ### Fedora 44
 
-[SNode.C](../status/snodec.md#fedora-44) · [MQTTSuite](../status/mqttsuite.md#fedora-44)
+[![SNode.C](../status/menu/snode-c.svg)](../status/snodec.md#fedora-44) [![MQTTSuite](../status/menu/mqttsuite.svg)](../status/mqttsuite.md#fedora-44)

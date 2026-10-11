@@ -7,9 +7,7 @@
 
 Package names are shared by OpenWrt, Raspberry Pi OS, Debian, Ubuntu, Rocky Linux and Fedora. Architectures affect availability and binary contents, not names.
 
-## Installation and availability
-
-[Choose your distribution](../README.md#install) · [SNode.C status](../status/snodec.md#page-overview)
+[![Install](media/menu/install.svg)](../README.md#install) [![Status](media/menu/status.svg)](../status/snodec.md#page-overview) [![Catalog](media/menu/catalog.svg)](#package-catalog) [![Details](media/menu/details.svg)](#distribution-details) [![Query](media/menu/query.svg)](#query-available-packages) [![Use](media/menu/use.svg)](#after-install)
 
 ## Package catalog
 
@@ -101,6 +99,13 @@ The `net-l2-*` rows are L2CAP; the `net-rc-*` rows are RFCOMM. Selecting their u
 apt-cache pkgnames snodec- | sort
 # RPM distributions
 dnf list --available 'snodec-*'
+```
+
+```sh
+# OpenWrt 24.10 (opkg)
+opkg list 'snodec-*'
+# OpenWrt 25.12 (APK)
+apk search 'snodec-*'
 ```
 
 ## After installation

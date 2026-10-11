@@ -1,29 +1,25 @@
-# Package-status redesign evidence
+# Package-page correction verification
 
-These files are a local projection, not a publication to Packages. The recorded source commit is in `snapshot.json`. Authored installation pages and assets are included so the evidence's document navigation can be reviewed; feed-directory links are deployment-relative and no package binaries are copied here.
+Source snapshot: `SNodeC/Packages` at `db26363d86b9bbdb649bad3ecf9ed13d7706d61a`. The snapshot is regenerated from DistributionPackages' authored `site/`, existing installer/public keys, and single status renderer. Package binaries, signed indexes, feed manifests, retention and `status.json` are not regenerated.
 
-## Verified
+## Restored invariants
 
-- All 59 DistributionPackages unit/integration tests passed with local usign, APK and RPM signing tools enabled. Signing tests use disposable fixture keys, not production signing secrets.
-- Both project status pages contain 76 architecture rows: 75 current and one outdated. SNode.C Debian sid armhf shows available `2.0.0-5~sid`, cancelled `2.0.0-9~sid`; MQTTSuite shows available `1.0.2-5~sid`, published `2026-10-09 05:05`, skipped `1.0.2-9~sid`.
-- Actual GitHub Markdown rendering accepts the circles' `align="absmiddle"`, produces 13 release tables and 380 data cells on each project page, and retains linked navigation images.
-- Desktop inspection using GitHub's own page styles: maximum article width 1012 px; widest table 776.44 px; row height 38.39 px; circle ink-center offset from version text approximately 0.019 px. Mobile wrapping and horizontal scrolling are intentionally unchanged and were not redesigned.
-- The platforms table matches the published snapshot byte-for-byte.
-- Deterministic rendering, publication-job URL persistence, validated target/run/attempt job identity, old-payload run URL fallback, metadata-only README updates, concurrent writers and authored README conflict rejection are covered by tests.
-- The canonical renamed opkg key is byte-identical to the previous `snodec-usign.pub`. Publication generates the legacy download copy from that one canonical source. Fingerprints were checked with usign, OpenSSL and GPG.
-- SNode.C's `CiWorkflowPathsPolicyTest` passed locally. Each product caller differs by exactly three step-environment additions; existing triggers, run names, concurrency and permissions are unchanged. Bash syntax, Python compilation and Git whitespace checks passed.
-- Rendering before/after was measured against the recorded state, using the original renderer and template for the baseline. Seven-run median timings are in `snapshot.json`; this is a local filesystem measurement, not a runner performance guarantee.
+- A coherent snapshot deploys the authored hub, guides, key guide and generated status together; a source merge alone is not a deployment.
+- Overview tables contain Project / Latest release / Status, with no availability counts.
+- Both project pages have 76 compact rows and exactly Architecture / Available / Published (UTC) / In build / Links. Status indicators are 14 px filled circles with a legend, alt text and hover descriptions.
+- Page banners are 1280×80, one quarter of the main banner's 1280×320 aspect ratio. Menus use rendered SVG buttons, 16 px semibold labels; further/route buttons use the existing bold 9×4 SVG arrow, centered at y=14. Native GitHub wrapping remains untouched.
+- Every distribution guide follows Requirements / Choose packages / Quick install / Manual repository setup / Updates / Source records / Troubleshooting. Choice precedes installation; menus match that order.
+- Catalog navigation uses buttons; queries cover APT, RPM, opkg and APK. MQTTSuite deployment links directly to its deployment guide.
+- Fingerprints have one authored home, the key guide. Its APT instructions match the guides' ASCII-armored `.asc` setup. All existing key bytes and the legacy usign URL are preserved; `snodec-opkg.pub` is a byte-identical canonical download.
+- Optional catalog navigation appears only for a catalog actually present in the published documentation. Metadata sparse checkouts include docs so that this is also true during status events. Adding a third PROJECTS entry needs no placeholder catalog or template edit.
 
-## Workflow validation
+## Checks
 
-GitHub documents [`job.check_run_id`](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#job-context), and a read-only lookup of an existing SNode.C job confirmed that its Actions job ID matches its check-run ID. The receiver obtains the job URL from the [Actions jobs API](https://docs.github.com/en/rest/actions/workflow-jobs), after checking the validated run, attempt and exact matrix job name.
+- 63 unit/integration tests passed, no skips, including disposable-key signing/publication, concurrent writers, registry extension, guide/menu order, typography, banner aspect ratio and documentation consistency.
+- All 67 checked-out JSON records, including status/retention/feed records, have unchanged SHA-256 hashes. All three original public key files are byte-identical; the new opkg filename matches the old usign key.
+- Protected feed paths are excluded from the Packages diff; no workflow definitions, signing/provenance code, run names, triggers, concurrency, licences, branches or tags changed.
+- Native GitHub browser review of the PR pages is performed before merge and live pages are checked after merge. No CI dispatch or package build is needed or authorized for this cutover.
 
-Actionlint 1.7.12 reports only its outdated schema warnings for existing `queue: max` and `actions/create-github-app-token@v3` client-ID inputs. No other diagnostics appeared. These constructs were retained rather than changing publication behavior: [GitHub concurrency documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#concurrency) documents the queue option, and the [action's documentation](https://github.com/actions/create-github-app-token#inputs) documents the client-ID input. Structural YAML comparison additionally checked the unchanged product callers and matching manual/publication concurrency groups. This is not a claim of clean actionlint output.
+## Activation boundary
 
-## Activation boundaries
-
-No workflows were dispatched, tags moved, default branches renamed, licence files changed, or files pushed to Packages for this change. The new manual workflow must be merged and explicitly requested before it is run. It updates generated status regions, not authored site documents or signing keys; those are distributed by the existing publication path.
-
-Executable packaging tools remain capture-pinned. A fresh capture containing this implementation enables new job-ID handoffs and timeline persistence; old captured tools retain their old behavior and can overwrite the newer generated layout if rerun. Existing in-flight/old payloads without a job ID still validate through the existing run checks and use a run URL. The canonical key filename and key guide also need the updated publication tools; do not rerun an old capture as the activation procedure. No historic job IDs or event timestamps were invented.
-
-The legend intentionally includes shared colors: pending/superseded/not-built and outdated/skipped require their alternative text or hover descriptions for exact state identification. There is no white status text inside the circles; tests check the requested circle palette, dimensions and accessible markup instead of the superseded white-text badge contrast requirement.
+The owner explicitly authorizes source and generated-snapshot PRs and their merge without CI. Old captures still freeze their older executable tooling; do not rerun an old capture to activate this design. New job-level build-log records require a future explicitly requested fresh capture. Historic run-level links and unrecorded timestamps are not fabricated.

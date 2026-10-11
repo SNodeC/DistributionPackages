@@ -101,7 +101,7 @@ def render(root, state):
         navigation = ' '.join(button(label, href) for label, href in [
             ('All projects', 'README.md#page-overview'), ('Installation', '../README.md#install'),
             ('Package catalog', f'../docs/{config["package"]}-package-options.md#page-overview'),
-            ('Troubleshooting', '../docs/troubleshooting.md#page-overview')])
+            ('Troubleshooting', '../docs/troubleshooting.md#page-overview')] if label != 'Package catalog' or (root / href.removeprefix('../').split('#')[0]).is_file())
         sections = {}
         for row in rows:
             info, feed = published(root, row)
@@ -152,7 +152,7 @@ def render(root, state):
         for suite in suites:
             old = suite.replace('.', ''); count = anchors.get(old, 0); anchors[old] = count + 1
             legacy.append(f'<a id="{old + ("-" + str(count) if count else "")}"></a>\n<a id="{slug}-{suite.replace(".", "")}"></a>\n\n### {title} {suite}\n\n' +
-                          ' · '.join(f"[{config['title']}](../status/{config['package']}.md#{distribution}-{suite.replace('.', '')})" for config in PROJECTS.values()))
+                          ' '.join(button(config['title'], f"../status/{config['package']}.md#{distribution}-{suite.replace('.', '')}").replace('(menu/', '(../status/menu/') for config in PROJECTS.values()))
     def overview(prefix):
         return '| Project | Latest release | Status |\n| --- | --- | --- |\n' + '\n'.join(
             f'| [{config["title"]}](https://github.com/SNodeC/{project}#project-overview) | {release} | [{config["title"]} status →]({prefix}{config["package"]}.md#page-overview) |' for config, project, release in projects)

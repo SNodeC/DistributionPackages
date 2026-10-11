@@ -11,4 +11,4 @@
 
 <!-- body -->
 
-**Legend:** <!-- legend -->. `—`: no recorded value or no replacement build shown. Status names are also available as image alternative text and hover descriptions.
+**Legend:** <!-- legend -->. `—`: unrecorded or no replacement. Hover a circle for its exact state; image alternative text also names it.

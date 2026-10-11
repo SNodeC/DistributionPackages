@@ -7,22 +7,29 @@
 
 These are public verification keys, not credentials. Keep signature verification enabled. The same key applies to every supported architecture of its package-manager family; select your distribution, release and architecture using the [installation guides](../README.md#install).
 
-| Key | Distributions and package manager | Installation |
-| --- | --- | --- |
-| [snodec-apt.asc](snodec-apt.asc) | Debian, Ubuntu and Raspberry Pi OS (APT); Rocky Linux and Fedora (DNF/RPM) | [Debian](../docs/debian.md#page-overview) · [Ubuntu](../docs/ubuntu.md#page-overview) · [Raspberry Pi OS](../docs/raspberrypi.md#page-overview) · [Rocky Linux](../docs/rocky.md#page-overview) · [Fedora](../docs/fedora.md#page-overview) |
-| [snodec-opkg.pub](snodec-opkg.pub) | OpenWrt 24.10, opkg package-feed index signatures | [OpenWrt](../docs/openwrt.md#page-overview) |
-| [snodec-apk.pem](snodec-apk.pem) | OpenWrt 25.12, APK v3 package-feed index signatures | [OpenWrt](../docs/openwrt.md#page-overview) |
-
-APT and RPM share the same OpenPGP key despite its APT-labelled download filename. The old `snodec-usign.pub` download URL remains available in Packages as a generated, byte-identical copy of `snodec-opkg.pub`; maintainers edit only the canonical key. The OpenWrt keys are different formats and cannot be substituted for one another. The APK key here is for OpenWrt, not an Alpine Linux package repository or Android application signing.
+[![Install](../docs/media/menu/install.svg)](../README.md#install) [![Verify](../docs/media/menu/verify.svg)](#verify-identity) [![Troubleshoot](../docs/media/menu/troubleshoot.svg)](../docs/troubleshooting.md#page-overview)
 
 ## Apply the key
 
-The [installer](../install/install.sh) configures the correct key for its detected package manager. For manual setup, use the complete commands in your distribution guide: importing a key alone does not configure a repository.
+The [installer](../install/install.sh) configures the correct verification key. Manual setup also needs the signed repository configuration from your distribution guide; importing a key alone is not enough.
 
-- **APT:** dearmor `snodec-apt.asc` into the keyring used by the guide's `signed-by` repository configuration. Do not enable trust for unrelated repositories.
-- **DNF/RPM:** download the same OpenPGP key as `RPM-GPG-KEY-snodec`; the guide's repository configuration references it using `gpgkey` and keeps signature checks enabled.
-- **OpenWrt / opkg:** import the public usign key with `opkg-key add`, then configure the matching signed feed.
-- **OpenWrt / APK:** install `snodec-apk.pem` in `/etc/apk/keys/`, then configure the matching APK feed.
+### OpenPGP: APT and RPM
+
+[`snodec-apt.asc`](snodec-apt.asc) is shared by Debian, Ubuntu and Raspberry Pi OS (APT), and Rocky Linux and Fedora (DNF/RPM). APT guides download the ASCII-armored key unchanged to `/etc/apt/keyrings/snodec.asc` and reference it using `signed-by`. RPM guides install the same key as `RPM-GPG-KEY-snodec` and keep package and repository signature checks enabled.
+
+[![Debian](../docs/media/menu/debian.svg)](../docs/debian.md#page-overview) [![Ubuntu](../docs/media/menu/ubuntu.svg)](../docs/ubuntu.md#page-overview) [![Raspberry Pi OS](../docs/media/menu/raspberrypi.svg)](../docs/raspberrypi.md#page-overview) [![Rocky Linux](../docs/media/menu/rocky.svg)](../docs/rocky.md#page-overview) [![Fedora](../docs/media/menu/fedora.svg)](../docs/fedora.md#page-overview)
+
+### opkg: OpenWrt 24.10
+
+[`snodec-opkg.pub`](snodec-opkg.pub) verifies opkg feed-index signatures. Import it with `opkg-key add`, then configure the matching signed feed. The old `snodec-usign.pub` URL remains a byte-identical download copy; maintainers edit only the canonical opkg key.
+
+[![OpenWrt](../docs/media/menu/openwrt.svg)](../docs/openwrt.md#page-overview)
+
+### APK: OpenWrt 25.12
+
+[`snodec-apk.pem`](snodec-apk.pem) verifies APK v3 feed-index signatures. Install it in `/etc/apk/keys/`, then configure the matching APK feed. This key is for OpenWrt, not an Alpine Linux repository or Android application signing. The opkg and APK keys cannot be substituted for each other.
+
+[![OpenWrt](../docs/media/menu/openwrt.svg)](../docs/openwrt.md#page-overview)
 
 Keys are architecture-independent; feed URLs and package compatibility are not. Never choose an architecture by downloading a different key.
 
