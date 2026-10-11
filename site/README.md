@@ -12,7 +12,7 @@ Signed packages for the SNode.C ecosystem. Choose a project and distribution, in
 <a href="#install"><img src="docs/media/menu/install.svg" alt="Install"></a>
 <a href="status/README.md#page-overview"><img src="docs/media/menu/status.svg" alt="Status"></a>
 <a href="docs/troubleshooting.md#page-overview"><img src="docs/media/menu/troubleshoot.svg" alt="Troubleshoot"></a>
-<a href="docs/architecture.md#page-overview"><img src="docs/media/menu/architecture.svg" alt="Architecture"></a>
+<a href="docs/publication.md#page-overview"><img src="docs/media/menu/architecture.svg" alt="Architecture"></a>
 <a href="#contributing"><img src="docs/media/menu/contribute.svg" alt="Contribute"></a>
 </p>
 <a id="packages"></a>
@@ -33,12 +33,12 @@ Start with your installed system, not an ongoing build: use the [distribution ch
 ## Install
 
 <p>
-<a href="docs/openwrt.md#page-overview"><img src="docs/media/menu/openwrt.svg" alt="OpenWrt"></a>
-<a href="docs/raspberrypi.md#page-overview"><img src="docs/media/menu/raspberrypi.svg" alt="Raspberry Pi OS"></a>
-<a href="docs/debian.md#page-overview"><img src="docs/media/menu/debian.svg" alt="Debian"></a>
-<a href="docs/ubuntu.md#page-overview"><img src="docs/media/menu/ubuntu.svg" alt="Ubuntu"></a>
-<a href="docs/rocky.md#page-overview"><img src="docs/media/menu/rocky.svg" alt="Rocky Linux"></a>
-<a href="docs/fedora.md#page-overview"><img src="docs/media/menu/fedora.svg" alt="Fedora"></a>
+<a href="docs/installation/openwrt.md#page-overview"><img src="docs/media/menu/openwrt.svg" alt="OpenWrt"></a>
+<a href="docs/installation/raspberry-pi-os.md#page-overview"><img src="docs/media/menu/raspberrypi.svg" alt="Raspberry Pi OS"></a>
+<a href="docs/installation/debian.md#page-overview"><img src="docs/media/menu/debian.svg" alt="Debian"></a>
+<a href="docs/installation/ubuntu.md#page-overview"><img src="docs/media/menu/ubuntu.svg" alt="Ubuntu"></a>
+<a href="docs/installation/rocky-linux.md#page-overview"><img src="docs/media/menu/rocky.svg" alt="Rocky Linux"></a>
+<a href="docs/installation/fedora.md#page-overview"><img src="docs/media/menu/fedora.svg" alt="Fedora"></a>
 </p>
 
 Select the guide matching your installed distribution, release and package architecture. Each guide covers requirements, quick installation, manual repository setup and updates.
@@ -64,7 +64,7 @@ Identify and verify the key for your package manager. Keys are shared across arc
 
 ## How publication works
 
-[Read the column meanings and publication model](docs/architecture.md#page-overview). Maintainer operations belong to DistributionPackages.
+[Read the column meanings and publication model](docs/publication.md#page-overview). Maintainer operations belong to DistributionPackages.
 
 ## Contributing
 

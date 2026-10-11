@@ -52,7 +52,7 @@ apk search 'mqttsuite-*'
 
 Inspect `mqttbroker --help` and `mqttcli --help`. Configure listeners, credentials and TLS certificates before starting services. MQTTStore needs a configured database. Before exposing management interfaces, review the deployment guide.
 
-[![Deploy safely](media/menu/deploy.svg)](https://github.com/SNodeC/mqttsuite/blob/HEAD/docs/readme/deployment.md#page-overview)
+[![Deploy safely](media/menu/deploy.svg)](https://github.com/SNodeC/mqttsuite/blob/HEAD/docs/guides/deployment.md#page-overview)
 
 ### Native Linux
 

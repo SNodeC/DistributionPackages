@@ -1,6 +1,6 @@
 """Monotonic build events and serialized feed publication for Packages/main."""
 from datetime import datetime, timezone
-import importlib
+import importlib.util
 import json
 import os
 import re
@@ -55,14 +55,42 @@ ORDER = {'not built': 0, 'pending': 1, 'running': 2, 'publishing': 3, **dict.fro
 
 
 DISTRIBUTIONS = {
-    'openwrt': ('OpenWrt', 'openwrt'), 'raspberrypios': ('Raspberry Pi OS', 'raspberrypi'),
+    'openwrt': ('OpenWrt', 'openwrt'), 'raspberrypios': ('Raspberry Pi OS', 'raspberry-pi-os'),
     'debian': ('Debian', 'debian'), 'ubuntu': ('Ubuntu', 'ubuntu'),
-    'rocky': ('Rocky Linux', 'rocky'), 'fedora': ('Fedora', 'fedora'),
+    'rocky': ('Rocky Linux', 'rocky-linux'), 'fedora': ('Fedora', 'fedora'),
 }
 
 
 def render(root, state):
     """Project recorded release and feed facts; never mutate feeds or event state."""
+    # Resolve the approved read-only presentation dependency once for this render.
+    # No persisted checkout/cache, and no package or signing logic comes from it.
+    with tempfile.TemporaryDirectory(prefix='snodec-navigation-') as temporary:
+        control = Path(temporary) / 'control'
+        subprocess.run(['git', '-c', 'http.https://github.com/.extraheader=', 'clone',
+                        '--quiet', '--depth=1', '--filter=blob:none', '--sparse', '--branch', 'v1.0',
+                        'https://github.com/SNodeC/.github.git', str(control)], env=dict(PATH=os.defpath, HOME=temporary), check=True, timeout=120)
+        subprocess.run(['git', '-C', str(control), 'sparse-checkout', 'set', 'tools/snodec_sync',
+                        'navigation', 'brand', 'catalog.yml', '--skip-checks'], env=dict(PATH=os.defpath, HOME=temporary), check=True, timeout=120)
+        environment = dict(PATH=os.defpath, HOME=temporary, PYTHONPATH=temporary)
+        if importlib.util.find_spec('yaml') is None:
+            subprocess.run([sys.executable, '-m', 'pip', 'install', '--quiet', '--no-cache-dir',
+                            '--target', temporary, 'PyYAML'], env=environment, check=True, timeout=120)
+        paths = ['status/README.md', 'docs/status.md', *(f"status/{config['package']}.md" for config in PROJECTS.values())]
+        labels = [*(row['suite'] for row in targets()), *(config['title'] for config in PROJECTS.values()), 'Install guide', '↑ menu']
+        # Isolated read-only worker: no feed paths, CI credentials or signing environment.
+        worker = """import json, sys
+sys.path.insert(0, sys.argv[1])
+from snodec_sync.navigation import render_header, _menu_svg
+paths, labels = json.load(sys.stdin)
+print(json.dumps([{path: render_header('Packages', path) for path in paths},
+                 {label: _menu_svg(label.removeprefix('↑ '), 160,
+                  'up' if label == '↑ menu' else 'right' if label == 'Install guide' else '', label) for label in labels}]))
+"""
+        result = subprocess.run([sys.executable, '-c', worker, str(control / 'tools')],
+                                input=json.dumps([paths, labels]), text=True, capture_output=True,
+                                cwd=temporary, env=environment, check=True, timeout=120)
+        headers, buttons = json.loads(result.stdout)
     colors = {'current': '#1a7f37', 'outdated': '#9a6700', 'pending': '#57606a', 'running': '#0969da',
               'publishing': '#8250df', 'published': '#1a7f37', 'failed': '#cf222e', 'cancelled': '#24292f',
               'skipped': '#9a6700', 'superseded': '#57606a', 'not-built': '#57606a'}
@@ -81,14 +109,9 @@ def render(root, state):
     template = (ROOT / 'ci/templates/package-status.md').read_text()
     menu_dir = root / 'status/menu'
     menu_dir.mkdir(exist_ok=True)
-    button_source = (ROOT / 'site/docs/media/menu/status.svg').read_text()
     def button(label, href):
         slug = re.sub(r'[^a-z0-9]+', '-', label.lower()).strip('-')
-        svg = button_source.replace('Status', label.replace('↑ ', '')).replace('<title id="title">menu</title>', '<title id="title">Back to menu</title>')
-        if label in {'Install guide', '↑ menu'}:
-            transform = 'translate(116 12)' + (' rotate(-90 4.5 2)' if label == '↑ menu' else '')
-            svg = svg.replace('x="66.5" y="19"', 'x="58.5" y="19"').replace('</svg>', f'<path d="M0 1.25H5.5V0L9 2L5.5 4V2.75H0Z" transform="{transform}" fill="#ffffff" aria-hidden="true"/></svg>')
-        (menu_dir / f'{slug}.svg').write_text(svg)
+        (menu_dir / f'{slug}.svg').write_text(buttons[label])
         return f'<a href="{href}"><img src="menu/{slug}.svg" alt="{label}" title="{label}" align="absmiddle"></a>'
     for project, config in PROJECTS.items():
         candidates = [generation for generation in state.get('runs', {}).values() if project in generation.get('revisions', {})]
@@ -98,9 +121,9 @@ def render(root, state):
         version = tag.removeprefix('v') if tag and re.fullmatch(r'v?\d+\.\d+\.\d+', tag) else None
         revision = latest.get('revisions', {}).get(project)
         release = f'{version} · r{revision}' if version and revision is not None else '—'
-        navigation = button('All projects', 'README.md#page-overview') + ' ' + ' '.join(
+        navigation = ' '.join(
             f'<a href="{href}"><img src="../docs/media/menu/{asset}.svg" alt="{label}" align="absmiddle"></a>' for label, asset, href in [
-            ('Install', 'install', '../README.md#install'), ('Catalog', 'catalog', f'../docs/{config["package"]}-package-options.md#page-overview'),
+            ('Install', 'install', '../README.md#install'), ('Catalog', 'catalog', f'../docs/catalogs/{config["package"]}.md#page-overview'),
             ('Troubleshoot', 'troubleshoot', '../docs/troubleshooting.md#page-overview')] if label != 'Catalog' or (root / href.removeprefix('../').split('#')[0]).is_file())
         sections = {}
         for row in rows:
@@ -133,20 +156,20 @@ def render(root, state):
         for distribution, releases in sections.items():
             title, guide = DISTRIBUTIONS[distribution]
             menu.append(f'**{title}** ' + ' '.join(button(suite, f'#{distribution}-{suite.replace(".", "")}') for suite in releases))
-            body += [f'## {title}', button('Install guide', f'../docs/{guide}.md#page-overview')]
+            body += [f'## {title}', button('Install guide', f'../docs/installation/{guide}.md#page-overview')]
             for suite, lines in releases.items():
                 body += [f'<a id="{distribution}-{suite.replace(".", "")}"></a>\n\n### {title} {suite}',
                          button('↑ menu', '#page-overview'),
                          '| Architecture | Available | Published (UTC) | In build | Links |\n| --- | --- | --- | --- | --- |\n' + '\n'.join(lines)]
         legend = ' · '.join(f'{dot(label)}&nbsp;{label.replace("-", " ").capitalize().replace(" ", "&nbsp;")}' for label in colors)
-        page = template.replace('<!-- title -->', config['title']).replace('<!-- release -->', release).replace('<!-- navigation -->', navigation).replace('<!-- menu -->', '\n\n'.join(menu)).replace('<!-- body -->', '\n\n'.join(body)).replace('<!-- legend -->', legend)
+        page = template.replace('<!-- header -->', headers[f"status/{config['package']}.md"]).replace('<!-- title -->', config['title']).replace('<!-- release -->', release).replace('<!-- navigation -->', navigation).replace('<!-- menu -->', '\n\n'.join(menu)).replace('<!-- body -->', '\n\n'.join(body)).replace('<!-- legend -->', legend)
         (root / f"status/{config['package']}.md").write_text(page)
         projects.append((config, project, release))
     for distribution, (title, guide) in DISTRIBUTIONS.items():
         selected = sorted((row for row in rows if row['distribution'] == distribution), key=lambda row: (row['suite'], row['arch']))
         suites = list(dict.fromkeys(row['suite'] for row in selected))
         architectures = list(dict.fromkeys(row['arch'] for row in selected))
-        platforms.append(f"| [{title}](docs/{guide}.md#page-overview) | {', '.join(suites)} | {', '.join(architectures) if len(architectures) < 8 else str(max(sum(row['suite'] == suite for row in selected) for suite in suites)) + ' per release (names can differ)'} |")
+        platforms.append(f"| [{title}](docs/installation/{guide}.md#page-overview) | {', '.join(suites)} | {', '.join(architectures) if len(architectures) < 8 else str(max(sum(row['suite'] == suite for row in selected) for suite in suites)) + ' per release (names can differ)'} |")
         slug = title.lower().replace(' ', '-')
         legacy.append(f'## {title}')
         for suite in dict.fromkeys(row['suite'] for row in rows if row['distribution'] == distribution):
@@ -156,11 +179,11 @@ def render(root, state):
     def overview(prefix):
         return '| Project | Latest release | Status |\n| --- | --- | --- |\n' + '\n'.join(
             f'| [{config["title"]}](https://github.com/SNodeC/{project}#project-overview) | {release} | [{config["title"]} status →]({prefix}{config["package"]}.md#page-overview) |' for config, project, release in projects)
-    intro = '<!-- Generated by DistributionPackages; do not edit. -->\n<a id="page-overview"></a>\n\n[![Packages](../docs/media/page-banner.svg)](../README.md#project-overview)\n\n'
-    (root / 'status/README.md').write_text(intro + '# Package status\n\n[![Install](../docs/media/menu/install.svg)](../README.md#install) [![Troubleshoot](../docs/media/menu/troubleshoot.svg)](../docs/troubleshooting.md#page-overview)\n\n' + overview('') + '\n')
+    intro = '<!-- Generated by DistributionPackages; do not edit. -->\n'
+    (root / 'status/README.md').write_text(intro + headers['status/README.md'] + '\n\n# Package status\n\n[![Install](../docs/media/menu/install.svg)](../README.md#install) [![Troubleshoot](../docs/media/menu/troubleshoot.svg)](../docs/troubleshooting.md#page-overview)\n\n' + overview('') + '\n')
     (root / 'docs').mkdir(exist_ok=True)
-    (root / 'docs/status.md').write_text(intro.replace('../docs/media/', 'media/') +
-        '# Package status\n\nStatus now has [one page per project](../status/README.md#page-overview). Existing distribution and release links remain below.\n\n' + '\n\n'.join(legacy) + '\n')
+    (root / 'docs/status.md').write_text(intro + headers['docs/status.md'] +
+        '\n\n# Package status\n\nStatus now has [one page per project](../status/README.md#page-overview). Existing distribution and release links remain below.\n\n' + '\n\n'.join(legacy) + '\n')
     readme = root / 'README.md'
     if readme.exists():
         text = readme.read_text()
