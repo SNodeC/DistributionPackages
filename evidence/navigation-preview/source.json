@@ -1,7 +1,0 @@
-{
-  "packages_commit": "cfd165fa1cec99007e43b69f07bd205da79d6ae3",
-  "control_tag": "v1.0",
-  "control_commit": "aea158dd44afd8b3c687ce09ee2a972263bb45df",
-  "state": "read-only current status.json and 65 build.json records; no state files committed",
-  "uri_rewrites": "Documentation/assets resolve to the authoritative branch site; feed links resolve to the recorded Packages default branch. Rendered facts unchanged."
-}

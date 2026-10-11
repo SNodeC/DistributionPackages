@@ -8,6 +8,8 @@
 
 Installation guides, package catalogs, troubleshooting and how publication works.
 
+## Sections
+
 <!-- snodec:begin section-pages -->
 - [Catalogs](catalogs/README.md#page-overview)
 - [Installation](installation/README.md#page-overview)
