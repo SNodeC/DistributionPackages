@@ -5,9 +5,8 @@
 
 # MQTTSuite package catalog
 
-Package names are shared by OpenWrt, Raspberry Pi OS, Debian, Ubuntu, Rocky Linux and Fedora. Architectures affect availability and binary contents, not names.
-
 [![Install](media/menu/install.svg)](../README.md#install) [![Status](media/menu/status.svg)](../status/mqttsuite.md#page-overview) [![Catalog](media/menu/catalog.svg)](#package-catalog) [![Details](media/menu/details.svg)](#distribution-details) [![Query](media/menu/query.svg)](#query-available-packages) [![Use](media/menu/use.svg)](#after-installation)
+Package names are shared by OpenWrt, Raspberry Pi OS, Debian, Ubuntu, Rocky Linux and Fedora. Architectures affect availability and binary contents, not names.
 
 ## Package catalog
 
@@ -26,6 +25,8 @@ Library `<version>` follows the published release; `<ABI>` identifies its binary
 
 Application libraries also include the real `.so.<version>` file. Each enabled MQTT WebSocket plugin contains its `.so.<ABI>` ABI symlink and `.so.<version>` real file.
 
+Install the application you need, such as `mqttsuite-broker`; its published dependencies select the framework components. The `mqttsuite` metapackage instead selects the full suite.
+
 ## Distribution details
 
 - OpenWrt's broker, bridge and integrator packages include procd service scripts. DEB/RPM packages currently do not ship systemd units.
@@ -34,18 +35,20 @@ Application libraries also include the real `.so.<version>` file. Each enabled M
 
 ## Query available packages
 
+Patterns include the bare metapackage and its components. APT lists known names (including virtual or unavailable entries); consult `apt-cache policy <package>` before choosing a version. The remaining commands query repository metadata.
+
 ```sh
 # APT distributions
-apt-cache pkgnames mqttsuite- | sort
+apt-cache pkgnames mqttsuite | sort
 # RPM distributions
-dnf list --available 'mqttsuite-*'
+dnf list --available 'mqttsuite*'
 ```
 
 ```sh
 # OpenWrt 24.10 (opkg)
-opkg list 'mqttsuite-*'
+opkg list 'mqttsuite*'
 # OpenWrt 25.12 (APK)
-apk search 'mqttsuite-*'
+apk search 'mqttsuite*'
 ```
 
 ## After installation

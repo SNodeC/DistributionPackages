@@ -5,4 +5,4 @@
 
 # Install MQTTSuite
 
-Package selection and installation now start at [Install MQTTSuite](mqttsuite-package-options.md#page-overview).
+Installation starts with the [distribution guides](../README.md#install). Choose components using the [MQTTSuite package catalog](mqttsuite-package-options.md#page-overview).

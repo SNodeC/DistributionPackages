@@ -51,30 +51,58 @@ See the [SNode.C catalog](snodec-package-options.md#page-overview) and [MQTTSuit
 ### Complete sets
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/SNodeC/Packages/main/install/install.sh \
-  -o /tmp/snodec-install-feed.sh &&
-sudo sh /tmp/snodec-install-feed.sh
+(
+  set -eu
+  tmp=$(mktemp -d /tmp/snodec.XXXXXX)
+  trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+  base=https://raw.githubusercontent.com/SNodeC/Packages/main
+  curl -fsSL "$base/install/install.sh" -o "$tmp/install.sh"
+  sudo sh "$tmp/install.sh"
+)
 ```
 
-The installer detects the distribution, release and package architecture, checks that an index exists, installs the signing key, configures the repository and installs the complete package set. Configure applications before starting them. For manual configuration, use the setup section below.
+The installer detects the distribution, release and package architecture, checks that an index exists, installs the signing key, configures the repository and installs the complete package set. Configure applications before starting them. For manual configuration, use [Manual repository setup](#manual-repository-setup).
+
+**Check**
+
+```sh
+rpm -q snodec mqttsuite
+```
+
+Both requested packages show their installed version, release and architecture; no “not installed” message appears. Next: [SNode.C configuration](snodec-package-options.md#after-installation) or [MQTTSuite configuration and deployment](mqttsuite-package-options.md#after-installation).
 
 ### Selected packages
 
 Prepare the repository without installing packages:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/SNodeC/Packages/main/install/install.sh \
-  -o /tmp/snodec-install-feed.sh &&
-sudo sh /tmp/snodec-install-feed.sh --prepare
+(
+  set -eu
+  tmp=$(mktemp -d /tmp/snodec.XXXXXX)
+  trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+  base=https://raw.githubusercontent.com/SNodeC/Packages/main
+  curl -fsSL "$base/install/install.sh" -o "$tmp/install.sh"
+  sudo sh "$tmp/install.sh" --prepare
+)
 ```
 
 For only the broker and command-line client:
+
+<a id="install-selected-components"></a>
 
 ```sh
 sudo dnf install mqttsuite-broker mqttsuite-cli
 ```
 
 Dependencies are installed automatically.
+
+**Check**
+
+```sh
+rpm -q mqttsuite-broker mqttsuite-cli
+```
+
+Both requested packages show their installed version, release and architecture; no “not installed” message appears. Next: [SNode.C configuration](snodec-package-options.md#after-installation) or [MQTTSuite configuration and deployment](mqttsuite-package-options.md#after-installation).
 
 ## Manual repository setup
 
@@ -83,23 +111,44 @@ These commands configure the signed repository without installing SNode.C or MQT
 APT and RPM repositories use the same signing key. Its download filename is `snodec-apt.asc`; the commands below install it under the RPM-specific name `RPM-GPG-KEY-snodec`.
 
 ```sh
-sudo install -d -m 755 /etc/pki/rpm-gpg
-sudo curl -fsSL https://raw.githubusercontent.com/SNodeC/Packages/main/keys/snodec-apt.asc \
-  -o /etc/pki/rpm-gpg/RPM-GPG-KEY-snodec
-sudo rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-snodec
-sudo tee /etc/yum.repos.d/snodec.repo >/dev/null <<'REPO'
+(
+  set -eu
+  . /etc/os-release
+  [ "$ID" = rocky ] || { echo "Requires rocky"; exit 1; }
+  suite=${VERSION_ID%%.*}
+  case "$suite" in
+    9|10) ;;
+    *) echo "Unsupported release"; exit 1 ;;
+  esac
+  arch=$(rpm --eval '%{_arch}')
+  case "$arch" in
+    x86_64|aarch64) ;;
+    *) echo "Unsupported architecture"; exit 1 ;;
+  esac
+  tmp=$(mktemp -d /tmp/snodec.XXXXXX)
+  trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+  base=https://raw.githubusercontent.com/SNodeC/Packages/main
+  curl -fsSL "$base/rocky/$suite/$arch/repodata/repomd.xml" -o "$tmp/index"
+  curl -fsSL "$base/keys/snodec-apt.asc" -o "$tmp/key"
+  sudo install -d -m 755 /etc/pki/rpm-gpg /etc/yum.repos.d
+  sudo install -m 644 "$tmp/key" /etc/pki/rpm-gpg/RPM-GPG-KEY-snodec
+  sudo rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-snodec
+  sudo tee /etc/yum.repos.d/snodec.repo >/dev/null <<REPO
 [snodec]
 name=SNode.C and MQTTSuite
-baseurl=https://raw.githubusercontent.com/SNodeC/Packages/main/rocky/$releasever/$basearch/
+baseurl=$base/rocky/\$releasever/\$basearch/
 enabled=1
 gpgcheck=1
 repo_gpgcheck=1
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-snodec
 REPO
-sudo dnf makecache
+  sudo dnf makecache
+)
 ```
 
-The quoted `REPO` delimiter preserves `$releasever` and `$basearch`; DNF expands them for the installed system. Both RPM packages and repository metadata are signature-checked.
+The escaped `$releasever` and `$basearch` remain literal in the file; DNF expands them for the installed system. Both RPM packages and repository metadata are signature-checked.
+
+Verify the [installed signing key](../keys/README.md#installed-keys) before installing packages.
 
 Install the complete sets after manual setup:
 
@@ -107,7 +156,15 @@ Install the complete sets after manual setup:
 sudo dnf install snodec mqttsuite
 ```
 
-<a href="#selected-packages"><img src="media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> Install individual components after manual setup.
+**Check**
+
+```sh
+rpm -q snodec mqttsuite
+```
+
+Both requested packages show their installed version, release and architecture; no “not installed” message appears. Next: [SNode.C configuration](snodec-package-options.md#after-installation) or [MQTTSuite configuration and deployment](mqttsuite-package-options.md#after-installation).
+
+<a href="#install-selected-components"><img src="media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> The repository is ready; name only the components you need.
 
 ## Updates
 
@@ -115,11 +172,15 @@ sudo dnf install snodec mqttsuite
 sudo dnf upgrade 'snodec*' 'mqttsuite*'
 ```
 
-For selective installations, name the installed components rather than adding the complete metapackages. After a distribution upgrade, configure the repository for its new supported release and refresh metadata.
+The quoted patterns upgrade installed matching packages and their dependencies; they do not select the complete metapackages for installation. DNF substitutes the new `$releasever` after a distribution upgrade. Confirm that the new release is supported and refresh metadata with `sudo dnf makecache --refresh`. Installer-created repository URLs are fixed to the detected release; rerun the installer for a supported new release in that case.
 
 ## Source records
 
-See [per-project versions, builds and packages](../status/README.md#page-overview) for every release and architecture.
+In [source records](../rocky/), `<release>/<architecture>/build.json` belongs to the feed. **Packages** opens its `Packages/` subdirectory, not the record itself.
+
+`build.json` records source tags and commits, package versions, checksums and publication context. On the [project status pages](../status/README.md#page-overview), **Build log** opens the recorded build job or release run. See [column semantics](architecture.md#latest-release-available-and-in-build) for missing historical records.
+
+Native package definitions: [SNode.C CPack](https://github.com/SNodeC/snode.c/blob/HEAD/cmake/Packing.cmake) and [MQTTSuite CPack](https://github.com/SNodeC/mqttsuite/blob/HEAD/cmake/Packing.cmake).
 
 ## Troubleshooting
 

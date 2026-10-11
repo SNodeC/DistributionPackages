@@ -12,7 +12,7 @@
 | Symptom | What to check |
 | --- | --- |
 | Feed or repository returns 404 | Match the distribution, release and package architecture to the [distribution guide](../README.md#install). Use **Packages** links on project status pages for directories; raw URLs serve individual files, not directory listings. |
-| Signature verification fails | Check the system clock, repository URL and installed [signing key](../README.md#signing-keys). Keep signature verification enabled. |
+| Signature verification fails | Check the system clock, repository URL and installed [signing key](../keys/README.md#verify-identity). Keep signature verification enabled. |
 | Dependencies cannot be installed | Keep the official repositories enabled for the installed release. Do not mix distributions, releases or package architectures. Check the guide for additional dependency repositories. |
 | Download fails just after publication | Refresh package indexes and retry after GitHub's raw-content caches update. |
 | A newer package is unavailable | Compare **Available** with **In build** on [Package status](../status/README.md#page-overview). A successful compilation alone does not mean publication succeeded. |
@@ -41,4 +41,3 @@ If the problem remains, include the distribution, release, package architecture,
 - **Package architecture:** the name reported by the package manager; it may differ from a board or CPU name.
 - **Metapackage:** a package that selects a group of component packages through dependencies.
 - **Index:** the file the package manager reads to find packages and verify their metadata.
-- **Browse:** a GitHub directory view for people; it is not an index URL.

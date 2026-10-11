@@ -103,7 +103,7 @@ for key in keys/*.asc keys/*.pub keys/*.pem; do
 done
 ```
 
-Compute the fingerprints shown in the installation overview:
+Compute the fingerprints shown in the public keys guide:
 
 ```sh
 usign -F -p keys/snodec-opkg.pub
@@ -116,4 +116,4 @@ APT and RPM use the same OpenPGP key. The APK fingerprint is SHA-256 of the DER 
 
 ## Public documentation ownership
 
-Edit `site/README.md`, `site/docs/` and the public key guide in `site/keys/README.md`, not the generated Packages snapshot. Publication overlays current default-branch authored documentation while executable tools and `install/` remain captured. Per-project status pages are generated under `status/`; `docs/status.md` preserves older distribution/release links. New event timestamps are recorded in the `status.json` timeline only by captures containing the updated tooling; older events render as `—`. Adding a project to `ci.repository.PROJECTS` enables its presentation but does not implement its package build or dispatch adapters. New job-ID handoffs and the renamed-key publication require a fresh capture containing the updated tooling. The manual render workflow changes generated status only; it does not deploy authored guides or keys. Do not rerun an older capture as the activation procedure: its renderer can restore the old layout, and its key-copy logic predates the canonical opkg filename.
+Edit `site/README.md`, `site/docs/` and the public key guide in `site/keys/README.md`, not the generated Packages snapshot. Publication overlays current default-branch authored documentation while executable tools and `install/` remain captured. Per-project status pages are generated under `status/`; `docs/status.md` preserves older distribution/release links. New event timestamps are recorded in the `status.json` timeline only by captures containing the updated tooling; older events render as `—`. Adding a project to `ci.repository.PROJECTS` enables its presentation but does not implement its package build or dispatch adapters. The signing allow-list remains a deliberate edit here; an organization catalog entry does not grant signing rights. New job-ID handoffs and the renamed-key publication require a fresh capture containing the updated tooling. The manual render workflow changes generated status only; it does not deploy authored guides or keys. Do not rerun an older capture as the activation procedure. Captures through r9 used `40d7a9638125de8e384150693cf3328d6afaed72` (before circle presentation and the canonical opkg copy). Capture r10 uses `d3efc7808fbd9902c6ba7e7aa4ad84049cbe7658`, which already renders circles and both key names but predates this documentation correction. Publications and source status events execute the captured renderer/template. Consequently, even r10 can regenerate its existing navigation and legend until a new capture uses the correction. Current authored guides are overlaid separately; do not change executable trust rules to update presentation.

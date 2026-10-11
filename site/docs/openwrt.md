@@ -19,13 +19,15 @@
 
 Supported releases: `24.10`, `25.12`. Match the release and package architecture installed on your device. Keep official feeds enabled for dependencies.
 
-Use official OpenWrt and log in as `root`. A matching CPU does not establish compatibility with a manufacturer’s modified firmware. Install CA certificates and provide HTTPS-capable `wget` (or `curl` for the installer’s downloads).
+Use official OpenWrt and log in as `root`. For commands shown for both release series, run only the block for your installed series. A matching CPU does not establish compatibility with a manufacturer’s modified firmware. Install CA certificates and provide HTTPS-capable `wget` (or `curl` for the installer’s downloads).
 
 ```sh
 cat /etc/openwrt_release
 . /etc/openwrt_release
 printf 'OpenWrt: %s\nPackage architecture: %s\n' "$DISTRIB_RELEASE" "$DISTRIB_ARCH"
 ```
+
+RISC-V is named `riscv64_riscv64` on 24.10 and `riscv64_generic` on 25.12; read the name for your installed release.
 
 Use `DISTRIB_ARCH`, not `uname -m`. Several devices can share a package architecture. OpenWrt 24.10 uses `opkg`/IPK; 25.12 uses `apk`/APK.
 
@@ -42,24 +44,50 @@ See the [SNode.C catalog](snodec-package-options.md#page-overview) and [MQTTSuit
 ### Complete sets
 
 ```sh
-wget -O /tmp/snodec-install-feed.sh \
-  https://raw.githubusercontent.com/SNodeC/Packages/main/install/install.sh &&
-sh /tmp/snodec-install-feed.sh
+(
+  set -eu
+  tmp=$(mktemp -d /tmp/snodec.XXXXXX)
+  trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+  base=https://raw.githubusercontent.com/SNodeC/Packages/main
+  wget -O "$tmp/install.sh" "$base/install/install.sh"
+  sh "$tmp/install.sh"
+)
 ```
 
-The installer detects the distribution, release and package architecture, checks that an index exists, installs the signing key, configures the feed and installs the complete package set. Configure applications before starting them. For manual configuration, use the setup section below.
+The installer detects the distribution, release and package architecture, checks that an index exists, installs the signing key, configures the feed and installs the complete package set. Configure applications before starting them. For manual configuration, use [Manual repository setup](#manual-repository-setup).
+
+**Check**
+
+```sh
+# OpenWrt 24.10
+opkg list-installed | grep -E '^(snodec|mqttsuite)( |-)'
+```
+
+```sh
+# OpenWrt 25.12
+apk info -e snodec mqttsuite
+```
+
+On 24.10, installed package names and versions are listed; on 25.12, both requested names are printed and the command succeeds. Next: [SNode.C configuration](snodec-package-options.md#after-installation) or [MQTTSuite configuration and deployment](mqttsuite-package-options.md#after-installation).
 
 ### Selected packages
 
 Prepare the feed without installing packages:
 
 ```sh
-wget -O /tmp/snodec-install-feed.sh \
-  https://raw.githubusercontent.com/SNodeC/Packages/main/install/install.sh &&
-sh /tmp/snodec-install-feed.sh --prepare
+(
+  set -eu
+  tmp=$(mktemp -d /tmp/snodec.XXXXXX)
+  trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+  base=https://raw.githubusercontent.com/SNodeC/Packages/main
+  wget -O "$tmp/install.sh" "$base/install/install.sh"
+  sh "$tmp/install.sh" --prepare
+)
 ```
 
 For only the broker and command-line client:
+
+<a id="install-selected-components"></a>
 
 ```sh
 # OpenWrt 24.10
@@ -73,6 +101,20 @@ apk add mqttsuite-broker mqttsuite-cli
 
 Dependencies are installed automatically.
 
+**Check**
+
+```sh
+# OpenWrt 24.10
+opkg list-installed | grep -E '^mqttsuite-(broker|cli) '
+```
+
+```sh
+# OpenWrt 25.12
+apk info -e mqttsuite-broker mqttsuite-cli
+```
+
+On 24.10, installed package names and versions are listed; on 25.12, both requested names are printed and the command succeeds. Next: [SNode.C configuration](snodec-package-options.md#after-installation) or [MQTTSuite configuration and deployment](mqttsuite-package-options.md#after-installation).
+
 ## Manual repository setup
 
 Run the block for your release as `root`. These commands only configure the feed and refresh its index; package installation is a separate step. Existing feeds are preserved. The public keys can also be inspected in [keys](../keys).
@@ -83,13 +125,18 @@ Run the block for your release as `root`. These commands only configure the feed
 (
   set -eu
   . /etc/openwrt_release
-  case "$DISTRIB_RELEASE" in 24.10.*) ;; *) echo 'Requires OpenWrt 24.10'; exit 1 ;; esac
+  case "$DISTRIB_RELEASE" in
+    24.10|24.10.*|24.10-*) ;;
+    *) echo 'Requires OpenWrt 24.10'; exit 1 ;;
+  esac
+  tmp=$(mktemp -d /tmp/snodec.XXXXXX)
+  trap 'rm -rf "$tmp"' EXIT HUP INT TERM
   base=https://raw.githubusercontent.com/SNodeC/Packages/main
   feed="$base/openwrt/24.10/$DISTRIB_ARCH"
-  # Check that this exact feed exists; set -e stops setup if the download fails.
-  wget -O /tmp/snodec-feed-build.json "$feed/build.json"
-  wget -O /tmp/snodec-opkg.pub "$base/keys/snodec-opkg.pub"
-  opkg-key add /tmp/snodec-opkg.pub
+  # Download both files successfully before writing configuration.
+  wget -O "$tmp/index" "$feed/build.json"
+  wget -O "$tmp/key" "$base/keys/snodec-opkg.pub"
+  opkg-key add "$tmp/key"
   touch /etc/opkg/customfeeds.conf
   sed -i '/^src\/gz snodec /d' /etc/opkg/customfeeds.conf
   printf 'src/gz snodec %s\n' "$feed" >> /etc/opkg/customfeeds.conf
@@ -103,14 +150,19 @@ Run the block for your release as `root`. These commands only configure the feed
 (
   set -eu
   . /etc/openwrt_release
-  case "$DISTRIB_RELEASE" in 25.12.*) ;; *) echo 'Requires OpenWrt 25.12'; exit 1 ;; esac
+  case "$DISTRIB_RELEASE" in
+    25.12|25.12.*|25.12-*) ;;
+    *) echo 'Requires OpenWrt 25.12'; exit 1 ;;
+  esac
+  tmp=$(mktemp -d /tmp/snodec.XXXXXX)
+  trap 'rm -rf "$tmp"' EXIT HUP INT TERM
   base=https://raw.githubusercontent.com/SNodeC/Packages/main
   feed="$base/openwrt/25.12/$DISTRIB_ARCH"
-  # Check that this exact feed exists; set -e stops setup if the download fails.
-  wget -O /tmp/snodec-feed-build.json "$feed/build.json"
-  wget -O /tmp/snodec-apk.pem "$base/keys/snodec-apk.pem"
+  # Download both files successfully before writing configuration.
+  wget -O "$tmp/index" "$feed/build.json"
+  wget -O "$tmp/key" "$base/keys/snodec-apk.pem"
   mkdir -p /etc/apk/keys /etc/apk/repositories.d
-  cp /tmp/snodec-apk.pem /etc/apk/keys/snodec-apk.pem
+  cp "$tmp/key" /etc/apk/keys/snodec-apk.pem
   printf '%s/packages.adb\n' "$feed" > /etc/apk/repositories.d/snodec.list
   apk update
 )
@@ -120,19 +172,20 @@ Run the block for your release as `root`. These commands only configure the feed
 
 This device uses `aarch64_cortex-a53`.
 
-On **24.10**, the entry in `/etc/opkg/customfeeds.conf` is:
+The manual setup above writes `/etc/opkg/customfeeds.conf` on **24.10** and `/etc/apk/repositories.d/snodec.list` on **25.12**. To inspect the corresponding entries without changing either file:
 
-```text
-src/gz snodec https://raw.githubusercontent.com/SNodeC/Packages/main/openwrt/24.10/aarch64_cortex-a53
-```
-
-On **25.12**, `/etc/apk/repositories.d/snodec.list` contains:
-
-```text
-https://raw.githubusercontent.com/SNodeC/Packages/main/openwrt/25.12/aarch64_cortex-a53/packages.adb
+```sh
+base=https://raw.githubusercontent.com/SNodeC/Packages/main
+arch=aarch64_cortex-a53
+# OpenWrt 24.10: feed entry
+printf 'src/gz snodec %s\n' "$base/openwrt/24.10/$arch"
+# OpenWrt 25.12: repository entry
+printf '%s/packages.adb\n' "$base/openwrt/25.12/$arch"
 ```
 
 Import the corresponding signing key as shown above. For other devices, use their `DISTRIB_ARCH`; each architecture has its own directory. After an OpenWrt release-series upgrade, reconfigure this feed for the new series.
+
+Verify the [installed signing key](../keys/README.md#installed-keys) before installing packages.
 
 Install the complete sets after manual setup:
 
@@ -146,7 +199,21 @@ opkg install snodec mqttsuite
 apk add snodec mqttsuite
 ```
 
-<a href="#selected-packages"><img src="media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> Install individual components after manual setup.
+**Check**
+
+```sh
+# OpenWrt 24.10
+opkg list-installed | grep -E '^(snodec|mqttsuite)( |-)'
+```
+
+```sh
+# OpenWrt 25.12
+apk info -e snodec mqttsuite
+```
+
+On 24.10, installed package names and versions are listed; on 25.12, both requested names are printed and the command succeeds. Next: [SNode.C configuration](snodec-package-options.md#after-installation) or [MQTTSuite configuration and deployment](mqttsuite-package-options.md#after-installation).
+
+<a href="#install-selected-components"><img src="media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> The repository is ready; name only the components you need.
 
 ## Updates
 
@@ -166,11 +233,11 @@ Update selected packages with `opkg upgrade <package> ...` or `apk upgrade <pack
 
 ## Source records
 
-Source recipes: [SNode.C](https://github.com/SNodeC/snode.c/tree/master/supplement/openwrt) and [MQTTSuite](https://github.com/SNodeC/mqttsuite/tree/master/misc/openwrt).
+In [source records](../openwrt/), `<series>/<architecture>/build.json` belongs to the feed directory opened by **Packages**.
 
-Both releases support the same platform variants. RISC-V is named `riscv64_riscv64` on 24.10 and `riscv64_generic` on 25.12.
+`build.json` records source tags and commits, package versions, checksums and publication context. On the [project status pages](../status/README.md#page-overview), **Build log** opens the recorded build job or release run. See [column semantics](architecture.md#latest-release-available-and-in-build) for missing historical records.
 
-See [per-project versions, builds and packages](../status/README.md#page-overview) for every release and architecture.
+Source recipes: [SNode.C](https://github.com/SNodeC/snode.c/tree/HEAD/supplement/openwrt) and [MQTTSuite](https://github.com/SNodeC/mqttsuite/tree/HEAD/misc/openwrt).
 
 ## Troubleshooting
 

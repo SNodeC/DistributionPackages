@@ -5,4 +5,4 @@
 
 # Install SNode.C
 
-Package selection and installation now start at [Install SNode.C](snodec-package-options.md#page-overview).
+Installation starts with the [distribution guides](../README.md#install). Choose components using the [SNode.C package catalog](snodec-package-options.md#page-overview).
