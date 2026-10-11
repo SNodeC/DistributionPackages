@@ -9,7 +9,7 @@ case "${DISTRIBUTION:-raspberrypios}" in
         libdir=lib
         apt-get update
         apt-get install -y build-essential cmake ninja-build pkg-config git ca-certificates adduser passwd util-linux libbluetooth-dev \
-            libmagic-dev libmariadb-dev libssl-dev libncurses-dev nlohmann-json3-dev file
+            libmagic-dev libmariadb-dev libssl-dev libncurses-dev nlohmann-json3-dev file python3
         ;;
     rocky|fedora)
         format=RPM
@@ -20,7 +20,7 @@ case "${DISTRIBUTION:-raspberrypios}" in
         fi
         dnf install -y gcc gcc-c++ cmake ninja-build make pkgconf-pkg-config git ca-certificates \
             bluez-libs-devel file-devel mariadb-connector-c-devel openssl-devel ncurses-devel \
-            json-devel file rpm-build shadow-utils util-linux
+            json-devel file python3 rpm-build shadow-utils util-linux
         if [ "$DISTRIBUTION:$SUITE" = rocky:9 ]; then
             dnf install -y gcc-toolset-14-gcc-c++
             source /opt/rh/gcc-toolset-14/enable
@@ -35,14 +35,10 @@ done
 package() {
     local build=$1 version
     version=$(sed -n 's/^set(CPACK_PACKAGE_VERSION "\([^" ]*\)")/\1/p' "$build/CPackConfig.cmake")
-    local options=()
-    if [ "$format" = DEB ]; then
-        options=(-D "CPACK_PACKAGE_VERSION=$version-$PACKAGE_RELEASE~$SUITE")
-    else
-        local suffix=fc
-        [ "$DISTRIBUTION" != rocky ] || suffix=el
-        options=(-D "CPACK_RPM_PACKAGE_RELEASE=$PACKAGE_RELEASE.$suffix$SUITE")
-    fi
+    local distribution=${DISTRIBUTION:-raspberrypios}
+    version=$(python3 /work/feed/ci/repository.py package-version "$distribution" "$SUITE" "$version" "$PACKAGE_RELEASE")
+    local options=(-D "CPACK_PACKAGE_VERSION=$version")
+    [ "$format" = DEB ] || options=(-D "CPACK_RPM_PACKAGE_RELEASE=${version#*-}")
     (cd "$build" && cpack -G "$format" "${options[@]}")
     cp "$build"/_packages/*."${format,,}" "$build"/_packages/*.packages packages/
 }

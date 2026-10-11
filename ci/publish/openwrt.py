@@ -17,7 +17,7 @@ def sign(directory, info):
             index = directory / 'Packages'
             signature = directory / 'Packages.sig'
             run('usign', '-S', '-m', str(index), '-s', str(key), '-x', str(signature))
-            run('usign', '-V', '-m', str(index), '-p', str(ROOT / 'keys/snodec-usign.pub'), '-x', str(signature))
+            run('usign', '-V', '-m', str(index), '-p', str(ROOT / 'keys/snodec-opkg.pub'), '-x', str(signature))
             info['files']['Packages.sig'] = digest(signature)
         else:
             key.write_text(os.environ['OPENWRT_APK_KEY'])

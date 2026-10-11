@@ -184,7 +184,7 @@ class OpenWrtSigningTest(unittest.TestCase):
             keys.mkdir()
             private = root / 'private'
             private.mkdir()
-            repository.run('usign', '-G', '-s', str(private / 'usign'), '-p', str(keys / 'snodec-usign.pub'))
+            repository.run('usign', '-G', '-s', str(private / 'usign'), '-p', str(keys / 'snodec-opkg.pub'))
             repository.run('openssl', 'genpkey', '-algorithm', 'RSA', '-pkeyopt', 'rsa_keygen_bits:2048', '-out', str(private / 'apk'), stderr=subprocess.DEVNULL)
             repository.run('openssl', 'pkey', '-in', str(private / 'apk'), '-pubout', '-out', str(keys / 'snodec-apk.pem'))
             env = {'OPENWRT_USIGN_KEY': (private / 'usign').read_text(), 'OPENWRT_APK_KEY': (private / 'apk').read_text()}
@@ -264,3 +264,46 @@ printf fixture > %{buildroot}/usr/share/snodec-fixture/data
                 with patch.object(rpm, 'signer', side_effect=AssertionError('retry must not sign twice')):
                     rpm.publish([row], output, checkout, bundle)
             self.assertEqual(publication.read(checkout / 'rocky/10/x86_64/build.json'), final)
+
+
+class JobIdentityTest(unittest.TestCase):
+    def setUp(self):
+        self.row = publication.targets()[0]
+        self.payload = dict(project='snode.c', target=self.row['id'], capture='456', run='456', attempt='1', job='789')
+        self.origin = dict(event='push', head_branch='v2.0.0', path='.github/workflows/packages.yml',
+                           head_repository={'full_name': 'SNodeC/snode.c'}, run_attempt=2,
+                           display_title='Packages · 456 · -', html_url='https://example.invalid/run')
+        self.job = dict(run_id=456, run_attempt=1, html_url='https://example.invalid/job',
+                        name=f"Build and test · {self.row['distribution']} · {self.row['suite']} · {self.row['arch']}")
+
+    def test_job_url_requires_exact_repository_run_attempt_and_target(self):
+        with patch.object(dispatch, 'api', side_effect=[self.origin, self.job]) as api:
+            self.assertEqual(dispatch.receive(self.payload)['run_url'], self.job['html_url'])
+            self.assertEqual(api.call_args.args, ('repos/SNodeC/snode.c/actions/jobs/789',))
+        for changes in [dict(run_id=999), dict(run_attempt=2), dict(name='prepare')]:
+            with self.subTest(changes=changes), patch.object(dispatch, 'api', side_effect=[self.origin, self.job | changes]):
+                with self.assertRaises(ValueError):
+                    dispatch.receive(self.payload)
+        for job in ['0', '-1', '../789', '']:
+            with self.subTest(job=job), patch.object(dispatch, 'api', return_value=self.origin):
+                with self.assertRaises(ValueError):
+                    dispatch.receive(self.payload | {'job': job})
+
+    def test_old_payload_preserves_run_url_without_job_api(self):
+        with patch.object(dispatch, 'api', return_value=self.origin) as api:
+            self.assertEqual(dispatch.receive({key: value for key, value in self.payload.items() if key != 'job'})['run_url'], self.origin['html_url'])
+            self.assertEqual(api.call_count, 1)
+
+    def test_built_payload_carries_job_id(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            bundle = Path(temporary)
+            publication.write(bundle / 'context.json', {'run_id': '456'})
+            env = {'GITHUB_RUN_ID': '456', 'GITHUB_RUN_ATTEMPT': '1', 'BUILD_JOB_ID': '789'}
+            with patch.dict(os.environ, env), patch('sys.argv', ['dispatch', 'built', str(bundle), self.row['id'], 'snode.c']):
+                import runpy
+                with patch('ci.repository.run', return_value='') as run:
+                    # Exercise the public command; its API call is serialized through the shared runner.
+                    runpy.run_path(str(repository.ROOT / 'ci/dispatch.py'), run_name='__main__')
+                    args = run.call_args.kwargs['input']
+            payload = json.loads(args)
+            self.assertEqual(payload['client_payload']['job'], '789')

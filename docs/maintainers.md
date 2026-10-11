@@ -45,7 +45,7 @@ For a SNode.C release, each target builds and tests in SNode.C and uploads an un
 
 The captured source bundle freezes the selected tags, resolved commits, upstream OpenWrt recipes and matrix for a run. SNode.C’s development archive includes its recipe; an MQTTSuite build reuses that exact published dependency recipe alongside its own captured source recipe. Tag changes during a build reject a superseded publication. Publication checks also prevent a build from replacing a newer counterpart.
 
-Each source repository has 19 build slots per captured release, including two slots dedicated to slow Linux architectures. GitHub applies the shared account runner limit; concurrency groups do not form a cross-repository slot pool. Feed publications use one serialized writer because APT architectures share suite metadata. Status events run independently in their originating jobs and use Git leases. A publisher merges intervening status-only commits and aborts if any other remote files changed.
+Each source repository has 19 build slots per captured release, including two slots dedicated to slow Linux architectures. GitHub applies the shared account runner limit; concurrency groups do not form a cross-repository slot pool. Feed publications use one serialized writer because APT architectures share suite metadata. Status events run independently in their originating jobs and use Git leases. A publisher merges intervening status-only commits and re-renders the generated README blocks from the resulting status state. Authored README changes are preserved; conflicting authored edits are rejected. Feed changes still abort publication.
 
 A failed build leaves the previous feed intact. Packages/main is a generated snapshot: the writer uses a parentless commit and force-with-lease. Source history in DistributionPackages/main is normal Git history and is never rewritten by CI. Neither DistributionPackages nor Packages maintains a copy of the upstream OpenWrt recipes. Do not edit generated files manually or protect Packages/main against the writer's required snapshot replacement.
 
@@ -58,6 +58,8 @@ Superseded files remain for 30 days after leaving the active index. Cleanup runs
 | [SNode.C packages.yml](https://github.com/SNodeC/snode.c/blob/master/.github/workflows/packages.yml) | Capture version-tag releases, allocate revisions, build/test unsigned packages and request publication |
 | [MQTTSuite packages.yml](https://github.com/SNodeC/mqttsuite/blob/master/.github/workflows/packages.yml) | Same lifecycle, using the corresponding published SNode.C dependency |
 | [release.yml](https://github.com/SNodeC/DistributionPackages/blob/main/.github/workflows/release.yml) | Validate completed upstream artifacts, sign, publish and dispatch dependent targets |
+
+The manual-only **Render package status** workflow in DistributionPackages runs the default-branch renderer against the current Packages state, with the existing publication concurrency group and metadata retry transaction. It does not build, sign or publish packages, and is not triggered automatically after merge. Run it only after explicit approval. Locally: `python3 -m ci.publish.publication render /path/to/Packages`. The operation preserves feed records and `status.json`.
 
 There are no workflows in Packages. Shared platform scripts have one implementation in DistributionPackages; the source repositories own and execute the build jobs. The central publisher executes only tools checked out from its own Git history at the captured packaging commit, never scripts supplied by an uploaded artifact. Signing secrets exist only in DistributionPackages. OpenWrt index signing and RPM package/index signing happen there after upload; APT metadata is also signed there. Builds need no private signing key.
 
@@ -83,11 +85,11 @@ The inherited build scripts run SNode.C's upstream CTests, including through QEM
 
 Each feed's `build.json` records versions, source tags and commits, checksums and publication context. APT aggregates architectures within a suite. These records provide provenance; package and index signatures establish signing authenticity.
 
-[publication.py](https://github.com/SNodeC/DistributionPackages/blob/HEAD/ci/publish/publication.py) copies current authored public documentation from `site/` and the capture-pinned `install/` into Packages on publication. Its single renderer generates per-project pages under `status/`, an index, and a legacy `docs/status.md` navigation page. Available versions come from feed records; attempts and event metadata come from `status.json`. Project publication times are displayed only when attributable to that project and revision.
+[publication.py](https://github.com/SNodeC/DistributionPackages/blob/HEAD/ci/publish/publication.py) copies current authored public documentation from `site/` and the capture-pinned `install/` into Packages on publication. Its single renderer generates per-project pages under `status/`, an index, and a legacy `docs/status.md` navigation page. The overview shows Latest release, derived from the newest captured source tag and allocated revision for each project. Project tables show Architecture, Available, Published (UTC), In build and Links. Available comes from feed records; In build describes only that latest revision. Build log selects its build job or the job that produced Available; Packages opens the feed directory. Project publication times appear only when attributable to that project and revision; unrecorded values render as `—`.
 
 Preparation initializes pending entries before builds become eligible. A build reports running after acquiring its build slot, and publishing, failed or cancelled at its end. The publisher commits its terminal event with the package snapshot. A source finalization job closes its interrupted pending/running targets; successful handoffs stay publishing until the central writer finishes. A failed SNode.C target marks its dependent MQTTSuite target skipped. The publisher reports failures in its own final step. Cancellation is repository-local: already-dispatched publication or dependent runs are separate runs and are not cancelled by cancelling the source run. Newer revisions/attempts win; within one attempt states move forward and terminal states cannot be overwritten. Failed SNode.C builds mark their dependent MQTTSuite build skipped. Status delivery is best-effort and cannot prevent builds from running.
 
-Badges are immutable images under `status/badges/`; the generated table changes which image it references. This avoids stale per-target image contents, but GitHub may still cache the Markdown page. GitHub scheduling and network failures can delay updates; force-cancellation or runner loss can prevent final steps from executing. No polling workflow is used.
+Status circles are fixed named images under `status/badges/`; the generated table changes which image it references. This avoids stale per-target image contents, but GitHub may still cache the Markdown page. GitHub scheduling and network failures can delay updates; force-cancellation or runner loss can prevent final steps from executing. No polling workflow is used.
 
 Guides and package catalogs are handwritten. Keep their architecture tables in agreement with the target files. Native component names follow upstream CPack; `snodec-control` contains the configuration tool.
 
@@ -96,7 +98,7 @@ Guides and package catalogs are handwritten. Keep their architecture tables in a
 The installer obtains these public keys from Packages/main. Compare both checkouts:
 
 ```sh
-for key in keys/*; do
+for key in keys/*.asc keys/*.pub keys/*.pem; do
   cmp "$key" "../Packages/keys/${key##*/}" || exit 1
 done
 ```
@@ -104,7 +106,7 @@ done
 Compute the fingerprints shown in the installation overview:
 
 ```sh
-usign -F -p keys/snodec-usign.pub
+usign -F -p keys/snodec-opkg.pub
 openssl pkey -pubin -in keys/snodec-apk.pem -outform DER | openssl dgst -sha256
 gpg --batch --show-keys --with-colons keys/snodec-apt.asc |
   awk -F: '$1 == "fpr" { print $10; exit }'
@@ -114,4 +116,4 @@ APT and RPM use the same OpenPGP key. The APK fingerprint is SHA-256 of the DER 
 
 ## Public documentation ownership
 
-Edit `site/README.md` and `site/docs/`, not the generated Packages snapshot. Publication overlays current default-branch authored documentation while executable tools and `install/` remain captured. Per-project status pages are generated under `status/`; `docs/status.md` preserves older distribution/release links. New event timestamps are recorded in the `status.json` timeline only by captures containing the updated tooling; older events remain explicitly unrecorded. Adding a project to `ci.repository.PROJECTS` enables its presentation but does not implement its package build or dispatch adapters.
+Edit `site/README.md`, `site/docs/` and the public key guide in `site/keys/README.md`, not the generated Packages snapshot. Publication overlays current default-branch authored documentation while executable tools and `install/` remain captured. Per-project status pages are generated under `status/`; `docs/status.md` preserves older distribution/release links. New event timestamps are recorded in the `status.json` timeline only by captures containing the updated tooling; older events render as `—`. Adding a project to `ci.repository.PROJECTS` enables its presentation but does not implement its package build or dispatch adapters. New job-ID handoffs and the renamed-key publication require a fresh capture containing the updated tooling. The manual render workflow changes generated status only; it does not deploy authored guides or keys. Do not rerun an older capture as the activation procedure: its renderer can restore the old layout, and its key-copy logic predates the canonical opkg filename.

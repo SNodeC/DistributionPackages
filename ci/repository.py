@@ -254,7 +254,7 @@ def stage(sdk, bundle, output):
     info.update(sources=json.loads((bundle / 'sources.json').read_text()), files=files,
                 revision=os.environ['PACKAGE_RELEASE'],
                 context=json.loads((bundle / 'context.json').read_text()))
-    info['versions'] = {repo: f"{version}-r{info['revision']}"
+    info['versions'] = {repo: package_version(dict(distribution="openwrt"), version, info["revision"])
                         for repo, version in info['context']['versions'].items()}
     baseline = json.loads((bundle / 'baseline.json').read_text())
     other = 'mqttsuite' if info['context']['build_project'] == 'snode.c' else 'snode.c'
@@ -297,6 +297,18 @@ def sdk_dependency(sdk, bundle, dependencies):
                 '-C', str(sdk), 'recipes/snode.c', str(target.relative_to(sdk) / 'usr/include'),
                 str(target.relative_to(sdk) / 'usr/lib'),
                 *(str(p.relative_to(sdk)) for p in sorted((target / 'pkginfo').glob('*.provides'))))
+
+
+def package_version(row, version, revision):
+    """One package-version policy for native CPack, feed metadata and status pages."""
+    distribution = row['distribution']
+    if distribution in {'debian', 'ubuntu', 'raspberrypios'}:
+        return f"{version}-{revision}~{row['suite']}"
+    if distribution in {'rocky', 'fedora'}:
+        return f"{version}-{revision}.{'el' if distribution == 'rocky' else 'fc'}{row['suite']}"
+    if distribution == 'openwrt':
+        return f'{version}-r{revision}'
+    raise ValueError('Unknown package distribution')
 
 
 def project_revision(info, project):
@@ -354,7 +366,9 @@ def publish(incoming, checkout, bundle):
 
 if __name__ == '__main__':
     command, *args = sys.argv[1:]
-    if command == 'matrix':
+    if command == 'package-version':
+        print(package_version(dict(distribution=args[0], suite=args[1]), args[2], args[3]))
+    elif command == 'matrix':
         print(json.dumps({'include': matrix()}))
     elif command == 'linux-matrix':
         print(json.dumps({'include': linux_matrix()}))

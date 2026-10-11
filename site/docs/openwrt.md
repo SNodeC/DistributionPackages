@@ -107,8 +107,8 @@ Run the block for your release as `root`. These commands only configure the feed
   feed="$base/openwrt/24.10/$DISTRIB_ARCH"
   # Check that this exact feed exists; set -e stops setup if the download fails.
   wget -O /tmp/snodec-feed-build.json "$feed/build.json"
-  wget -O /tmp/snodec-usign.pub "$base/keys/snodec-usign.pub"
-  opkg-key add /tmp/snodec-usign.pub
+  wget -O /tmp/snodec-opkg.pub "$base/keys/snodec-opkg.pub"
+  opkg-key add /tmp/snodec-opkg.pub
   touch /etc/opkg/customfeeds.conf
   sed -i '/^src\/gz snodec /d' /etc/opkg/customfeeds.conf
   printf 'src/gz snodec %s\n' "$feed" >> /etc/opkg/customfeeds.conf

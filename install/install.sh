@@ -55,7 +55,7 @@ url=$base/$distribution
 case "$manager" in
     apt) metadata=$url/dists/$suite/main/binary-$arch/Packages.gz; key=snodec-apt.asc ;;
     dnf) url=$url/$suite/$arch; metadata=$url/repodata/repomd.xml; key=snodec-apt.asc ;;
-    opkg) url=$url/$suite/$arch; metadata=$url/Packages.gz; key=snodec-usign.pub ;;
+    opkg) url=$url/$suite/$arch; metadata=$url/Packages.gz; key=snodec-opkg.pub ;;
     apk) url=$url/$suite/$arch; metadata=$url/packages.adb; key=snodec-apk.pem ;;
 esac
 fetch() {
