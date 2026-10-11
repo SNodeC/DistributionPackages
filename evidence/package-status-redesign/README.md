@@ -34,21 +34,6 @@ Signed packages for the SNode.C ecosystem. Choose a project and distribution, in
 2. Open your distribution guide below and check its requirements, including CRB/EPEL on Rocky Linux.
 3. Choose **complete sets** or **selected packages** before installing. The guide provides both routes and manual signed-repository setup; dependencies are installed automatically.
 
-## Platforms
-
-The supported release and architecture matrix is generated from the publisher's target definitions. Availability is reported per project and target.
-
-<!-- packages:begin platforms -->
-| Distribution | Releases | Architectures |
-| --- | --- | --- |
-| [OpenWrt](docs/openwrt.md#page-overview) | 24.10, 25.12 | 25 per release (names can differ) |
-| [Raspberry Pi OS](docs/raspberrypi.md#page-overview) | bookworm, trixie | arm64 |
-| [Debian](docs/debian.md#page-overview) | forky, sid, trixie | amd64, arm64, armhf, riscv64 |
-| [Ubuntu](docs/ubuntu.md#page-overview) | noble, resolute | amd64, arm64 |
-| [Rocky Linux](docs/rocky.md#page-overview) | 10, 9 | aarch64, x86_64 |
-| [Fedora](docs/fedora.md#page-overview) | 43, 44 | aarch64, x86_64 |
-<!-- packages:end platforms -->
-
 <a id="distributions"></a>
 
 ## Install
@@ -63,6 +48,21 @@ The supported release and architecture matrix is generated from the publisher's 
 </p>
 
 Select the guide matching your installed distribution, release and package architecture. Each guide covers requirements, quick installation, manual repository setup and updates. To install selected components rather than the complete sets, use the [project catalogs](#projects).
+
+## Platforms
+
+The supported release and architecture matrix is generated from the publisher's target definitions. Availability is reported per project and target.
+
+<!-- packages:begin platforms -->
+| Distribution | Releases | Architectures |
+| --- | --- | --- |
+| [OpenWrt](docs/openwrt.md#page-overview) | 24.10, 25.12 | 25 per release (names can differ) |
+| [Raspberry Pi OS](docs/raspberrypi.md#page-overview) | bookworm, trixie | arm64 |
+| [Debian](docs/debian.md#page-overview) | forky, sid, trixie | amd64, arm64, armhf, riscv64 |
+| [Ubuntu](docs/ubuntu.md#page-overview) | noble, resolute | amd64, arm64 |
+| [Rocky Linux](docs/rocky.md#page-overview) | 10, 9 | aarch64, x86_64 |
+| [Fedora](docs/fedora.md#page-overview) | 43, 44 | aarch64, x86_64 |
+<!-- packages:end platforms -->
 
 ## Signing keys
 

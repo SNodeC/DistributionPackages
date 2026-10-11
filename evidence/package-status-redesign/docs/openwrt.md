@@ -33,9 +33,9 @@ Use `DISTRIB_ARCH`, not `uname -m`. Several devices can share a package architec
 
 See the [SNode.C catalog](snodec-package-options.md#page-overview) and [MQTTSuite catalog](mqttsuite-package-options.md#page-overview) for package roles and after-install configuration.
 
-[![Complete sets](media/menu/complete-sets.svg)](#complete-sets) Install all components of the currently offered projects.
+<a href="#complete-sets"><img src="media/menu/complete-sets.svg" alt="Complete sets" align="absmiddle"></a> Install all components of the currently offered projects.
 
-[![Selected packages](media/menu/selected-packages.svg)](#selected-packages) Configure the signed source, then install only the components you need.
+<a href="#selected-packages"><img src="media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> Configure the signed source, then install only the components you need.
 
 ## Quick install
 
@@ -146,7 +146,7 @@ opkg install snodec mqttsuite
 apk add snodec mqttsuite
 ```
 
-[![Selected packages](media/menu/selected-packages.svg)](#selected-packages) Install individual components after manual setup.
+<a href="#selected-packages"><img src="media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> Install individual components after manual setup.
 
 ## Updates
 
@@ -170,7 +170,7 @@ Source recipes: [SNode.C](https://github.com/SNodeC/snode.c/tree/master/suppleme
 
 Both releases support the same platform variants. RISC-V is named `riscv64_riscv64` on 24.10 and `riscv64_generic` on 25.12.
 
-See [per-project availability and source records](../status/README.md#page-overview) for every release and architecture.
+See [per-project versions, builds and packages](../status/README.md#page-overview) for every release and architecture.
 
 ## Troubleshooting
 

@@ -196,8 +196,10 @@ class PackagePagesTest(unittest.TestCase):
                 menu = text.split('<p>', 1)[1].split('</p>', 1)[0]
                 anchors = ['requirements', 'choose-packages', 'quick-install', 'manual-repository-setup', 'updates']
                 self.assertEqual(sorted(anchors, key=lambda anchor: menu.index(f'href="#{anchor}"')), anchors)
-                self.assertIn('[![Complete sets]', text)
-                self.assertIn('[![Selected packages]', text)
+                self.assertIn('alt="Complete sets" align="absmiddle"', text)
+                self.assertIn('href="#complete-sets"', text)
+                self.assertIn('alt="Selected packages" align="absmiddle"', text)
+                self.assertIn('href="#selected-packages"', text)
                 self.assertLess(text.index('## Choose packages'), text.index('### Complete sets'))
                 self.assertIn('--prepare', text)
                 self.assertNotIn('automatically. ##', text)

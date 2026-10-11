@@ -30,13 +30,6 @@ Signed packages for the SNode.C ecosystem. Choose a project and distribution, in
 2. Open your distribution guide below and check its requirements, including CRB/EPEL on Rocky Linux.
 3. Choose **complete sets** or **selected packages** before installing. The guide provides both routes and manual signed-repository setup; dependencies are installed automatically.
 
-## Platforms
-
-The supported release and architecture matrix is generated from the publisher's target definitions. Availability is reported per project and target.
-
-<!-- packages:begin platforms -->
-<!-- packages:end platforms -->
-
 <a id="distributions"></a>
 
 ## Install
@@ -51,6 +44,13 @@ The supported release and architecture matrix is generated from the publisher's 
 </p>
 
 Select the guide matching your installed distribution, release and package architecture. Each guide covers requirements, quick installation, manual repository setup and updates. To install selected components rather than the complete sets, use the [project catalogs](#projects).
+
+## Platforms
+
+The supported release and architecture matrix is generated from the publisher's target definitions. Availability is reported per project and target.
+
+<!-- packages:begin platforms -->
+<!-- packages:end platforms -->
 
 ## Signing keys
 
