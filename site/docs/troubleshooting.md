@@ -8,7 +8,9 @@
 
 # Troubleshooting
 
+<!-- snodec:begin menu -->
 [![Install](media/menu/install.svg)](../README.md#install) [![Status](media/menu/status.svg)](../status/README.md#page-overview) [![Terms](media/menu/terms.svg)](#terms)
+<!-- snodec:end menu -->
 
 ## Common problems
 
@@ -25,14 +27,14 @@
 
 ## Distribution-specific help
 
-[![OpenWrt](media/menu/openwrt.svg)](installation/openwrt.md#troubleshooting)
-[![Raspberry Pi OS](media/menu/raspberrypi.svg)](installation/raspberry-pi-os.md#troubleshooting)
-[![Debian](media/menu/debian.svg)](installation/debian.md#troubleshooting)
-[![Ubuntu](media/menu/ubuntu.svg)](installation/ubuntu.md#troubleshooting)
-[![Rocky Linux](media/menu/rocky.svg)](installation/rocky-linux.md#troubleshooting)
-[![Fedora](media/menu/fedora.svg)](installation/fedora.md#troubleshooting)
+- [OpenWrt troubleshooting](installation/openwrt.md#troubleshooting)
+- [Raspberry Pi OS troubleshooting](installation/raspberry-pi-os.md#troubleshooting)
+- [Debian troubleshooting](installation/debian.md#troubleshooting)
+- [Ubuntu troubleshooting](installation/ubuntu.md#troubleshooting)
+- [Rocky Linux troubleshooting](installation/rocky-linux.md#troubleshooting)
+- [Fedora troubleshooting](installation/fedora.md#troubleshooting)
 
-[![Report issue](media/menu/report-issue.svg)](https://github.com/SNodeC/Packages/issues)
+If the guides do not resolve the problem, [report an issue](https://github.com/SNodeC/Packages/issues).
 
 If the problem remains, include the distribution, release, package architecture, package name and error message. Remove passwords and other credentials from logs.
 
