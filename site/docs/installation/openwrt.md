@@ -11,8 +11,8 @@
 <!-- snodec:begin menu -->
 <p>
 <a href="#requirements"><img src="../media/menu/requirements.svg" alt="Requirements"></a>
-<a href="#choose-packages"><img src="../media/menu/choose-packages.svg" alt="Choose packages"></a>
 <a href="#quick-install"><img src="../media/menu/menu-quick-install.svg" alt="Quick install"></a>
+<a href="#choose-packages"><img src="../media/menu/choose-packages.svg" alt="Choose packages"></a>
 <a href="#manual-repository-setup"><img src="../media/menu/manual.svg" alt="Manual setup"></a>
 <a href="#updates"><img src="../media/menu/updates.svg" alt="Updates"></a>
 <a href="../../status/README.md#page-overview"><img src="../media/menu/status.svg" alt="Status"></a>
@@ -35,14 +35,6 @@ printf 'OpenWrt: %s\nPackage architecture: %s\n' "$DISTRIB_RELEASE" "$DISTRIB_AR
 RISC-V is named `riscv64_riscv64` on 24.10 and `riscv64_generic` on 25.12; read the name for your installed release.
 
 Use `DISTRIB_ARCH`, not `uname -m`. Several devices can share a package architecture. OpenWrt 24.10 uses `opkg`/IPK; 25.12 uses `apk`/APK.
-
-## Choose packages
-
-See the [SNode.C catalog](../catalogs/snodec.md#page-overview) and [MQTTSuite catalog](../catalogs/mqttsuite.md#page-overview) for package roles and after-install configuration.
-
-- **[Complete sets](#complete-sets)**: install all components of the currently offered projects.
-
-- **[Selected packages](#selected-packages)**: configure the signed source, then install only the components you need.
 
 ## Quick install
 
@@ -74,6 +66,14 @@ apk info -e snodec mqttsuite
 ```
 
 On 24.10, installed package names and versions are listed; on 25.12, both requested names are printed and the command succeeds. Next: [SNode.C configuration](../catalogs/snodec.md#after-installation) or [MQTTSuite configuration and deployment](../catalogs/mqttsuite.md#after-installation).
+
+## Choose packages
+
+See the [SNode.C catalog](../catalogs/snodec.md#page-overview) and [MQTTSuite catalog](../catalogs/mqttsuite.md#page-overview) for package roles and after-install configuration.
+
+- **[Complete sets](#complete-sets)**: install all components of the currently offered projects.
+
+- **[Selected packages](#selected-packages)**: configure the signed source, then install only the components you need.
 
 ### Selected packages
 

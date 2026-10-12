@@ -11,8 +11,8 @@
 <!-- snodec:begin menu -->
 <p>
 <a href="#requirements"><img src="../media/menu/requirements.svg" alt="Requirements"></a>
-<a href="#choose-packages"><img src="../media/menu/choose-packages.svg" alt="Choose packages"></a>
 <a href="#quick-install"><img src="../media/menu/menu-quick-install.svg" alt="Quick install"></a>
+<a href="#choose-packages"><img src="../media/menu/choose-packages.svg" alt="Choose packages"></a>
 <a href="#manual-repository-setup"><img src="../media/menu/manual.svg" alt="Manual setup"></a>
 <a href="#updates"><img src="../media/menu/updates.svg" alt="Updates"></a>
 <a href="../../status/README.md#page-overview"><img src="../media/menu/status.svg" alt="Status"></a>
@@ -38,14 +38,6 @@ sudo apt-get install ca-certificates curl
 ```
 
 The matrix covers Trixie (stable), Forky (testing) and Sid (unstable). Use the installed suite’s name, not a moving `stable` or `testing` alias. For Sid, append `--suite sid` to the installer command; `/etc/os-release` may report a testing codename. Use `--suite forky` if Forky is not detected. This selects a repository; it does not upgrade the operating system.
-
-## Choose packages
-
-See the [SNode.C catalog](../catalogs/snodec.md#page-overview) and [MQTTSuite catalog](../catalogs/mqttsuite.md#page-overview) for package roles and after-install configuration.
-
-- **[Complete sets](#complete-sets)**: install all components of the currently offered projects.
-
-- **[Selected packages](#selected-packages)**: configure the signed source, then install only the components you need.
 
 ## Quick install
 
@@ -73,6 +65,14 @@ dpkg-query -W -f='${Package} ${Version} ${Status}\n' snodec mqttsuite
 ```
 
 The requested packages show versions and `install ok installed`. Missing or incomplete entries are not a successful installation. Next: [SNode.C configuration](../catalogs/snodec.md#after-installation) or [MQTTSuite configuration and deployment](../catalogs/mqttsuite.md#after-installation).
+
+## Choose packages
+
+See the [SNode.C catalog](../catalogs/snodec.md#page-overview) and [MQTTSuite catalog](../catalogs/mqttsuite.md#page-overview) for package roles and after-install configuration.
+
+- **[Complete sets](#complete-sets)**: install all components of the currently offered projects.
+
+- **[Selected packages](#selected-packages)**: configure the signed source, then install only the components you need.
 
 ### Selected packages
 
