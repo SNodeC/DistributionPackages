@@ -11,6 +11,7 @@
 
 Signed packages for the SNode.C ecosystem. Choose a project and distribution, install using its signed package source, and inspect availability separately from ongoing builds.
 
+<!-- snodec:begin menu -->
 <p>
 <a href="#quick-start"><img src="docs/media/menu/start.svg" alt="Start"></a>
 <a href="#install"><img src="docs/media/menu/install.svg" alt="Install"></a>
@@ -19,7 +20,10 @@ Signed packages for the SNode.C ecosystem. Choose a project and distribution, in
 <a href="docs/publication.md#page-overview"><img src="docs/media/menu/architecture.svg" alt="Architecture"></a>
 <a href="#contributing"><img src="docs/media/menu/contribute.svg" alt="Contribute"></a>
 </p>
+<!-- snodec:end menu -->
 <a id="packages"></a>
+
+[Documentation index](docs/README.md#page-overview): installation guides, package catalogs, status meanings and troubleshooting.
 
 ## Projects
 
@@ -36,18 +40,9 @@ Start with your installed system, not an ongoing build: use the [distribution ch
 
 ## Install
 
-<p>
-<a href="docs/installation/openwrt.md#page-overview"><img src="docs/media/menu/openwrt.svg" alt="OpenWrt"></a>
-<a href="docs/installation/raspberry-pi-os.md#page-overview"><img src="docs/media/menu/raspberrypi.svg" alt="Raspberry Pi OS"></a>
-<a href="docs/installation/debian.md#page-overview"><img src="docs/media/menu/debian.svg" alt="Debian"></a>
-<a href="docs/installation/ubuntu.md#page-overview"><img src="docs/media/menu/ubuntu.svg" alt="Ubuntu"></a>
-<a href="docs/installation/rocky-linux.md#page-overview"><img src="docs/media/menu/rocky.svg" alt="Rocky Linux"></a>
-<a href="docs/installation/fedora.md#page-overview"><img src="docs/media/menu/fedora.svg" alt="Fedora"></a>
-</p>
-
 Select the guide matching your installed distribution, release and package architecture. Each guide covers requirements, quick installation, manual repository setup and updates.
 
-## Platforms
+<a id="platforms"></a>
 
 The supported release and architecture matrix is generated from the publisher's target definitions. Availability is reported per project and target.
 
@@ -56,9 +51,7 @@ The supported release and architecture matrix is generated from the publisher's 
 
 ## Signing keys
 
-[![Signing keys](docs/media/menu/keys.svg)](keys/README.md#page-overview)
-
-Identify and verify the key for your package manager. Keys are shared across architectures; keep signature verification enabled.
+Verify downloads with the [signing keys](keys/README.md#page-overview) for your package manager. Keys are shared across architectures; keep signature verification enabled.
 
 <a id="help"></a>
 

@@ -8,6 +8,7 @@
 
 # Debian
 
+<!-- snodec:begin menu -->
 <p>
 <a href="#requirements"><img src="../media/menu/requirements.svg" alt="Requirements"></a>
 <a href="#choose-packages"><img src="../media/menu/choose-packages.svg" alt="Choose packages"></a>
@@ -17,6 +18,7 @@
 <a href="../../status/README.md#page-overview"><img src="../media/menu/status.svg" alt="Status"></a>
 <a href="#troubleshooting"><img src="../media/menu/troubleshoot.svg" alt="Troubleshoot"></a>
 </p>
+<!-- snodec:end menu -->
 
 ## Requirements
 
@@ -41,9 +43,9 @@ The matrix covers Trixie (stable), Forky (testing) and Sid (unstable). Use the i
 
 See the [SNode.C catalog](../catalogs/snodec.md#page-overview) and [MQTTSuite catalog](../catalogs/mqttsuite.md#page-overview) for package roles and after-install configuration.
 
-<a href="#complete-sets"><img src="../media/menu/complete-sets.svg" alt="Complete sets" align="absmiddle"></a> Install all components of the currently offered projects.
+- **[Complete sets](#complete-sets)**: install all components of the currently offered projects.
 
-<a href="#selected-packages"><img src="../media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> Configure the signed source, then install only the components you need.
+- **[Selected packages](#selected-packages)**: configure the signed source, then install only the components you need.
 
 ## Quick install
 
@@ -163,7 +165,7 @@ dpkg-query -W -f='${Package} ${Version} ${Status}\n' snodec mqttsuite
 
 The requested packages show versions and `install ok installed`. Missing or incomplete entries are not a successful installation. Next: [SNode.C configuration](../catalogs/snodec.md#after-installation) or [MQTTSuite configuration and deployment](../catalogs/mqttsuite.md#after-installation).
 
-<a href="#install-selected-components"><img src="../media/menu/selected-packages.svg" alt="Selected packages" align="absmiddle"></a> The repository is ready; name only the components you need.
+The repository is ready; [install only the selected components](#install-selected-components) you need.
 
 ## Updates
 

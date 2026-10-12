@@ -78,7 +78,7 @@ def render(root, state):
     with tempfile.TemporaryDirectory(prefix='snodec-navigation-') as temporary:
         control = Path(temporary) / 'control'
         subprocess.run(['git', '-c', 'http.https://github.com/.extraheader=', 'clone',
-                        '--quiet', '--depth=1', '--filter=blob:none', '--sparse', '--branch', 'v1.1',
+                        '--quiet', '--depth=1', '--filter=blob:none', '--sparse', '--branch', 'main',
                         'https://github.com/SNodeC/.github.git', str(control)], env=dict(PATH=os.defpath, HOME=temporary), check=True, timeout=120)
         subprocess.run(['git', '-C', str(control), 'sparse-checkout', 'set', 'tools/snodec_sync',
                         'navigation', 'brand', 'catalog.yml', '--skip-checks'], env=dict(PATH=os.defpath, HOME=temporary), check=True, timeout=120)
@@ -87,21 +87,16 @@ def render(root, state):
             subprocess.run([sys.executable, '-m', 'pip', 'install', '--quiet', '--no-cache-dir',
                             '--target', temporary, 'PyYAML'], env=environment, check=True, timeout=120)
         paths = ['status/README.md', *(f"status/{config['package']}.md" for config in PROJECTS.values())]
-        labels = [*(row['suite'] for row in targets()), 'Install guide', '↑ menu']
         # Isolated read-only worker: no feed paths, CI credentials or signing environment.
         worker = """import json, sys
 sys.path.insert(0, sys.argv[1])
-from snodec_sync.navigation import render_header, _menu_svg, _section_list, _config
-paths, labels, titles = json.load(sys.stdin)
-print(json.dumps([{path: render_header('Packages', path) for path in paths},
-                 {label: _menu_svg(label.removeprefix('↑ '), 160,
-                  'up' if label == '↑ menu' else 'right' if label == 'Install guide' else '', label) for label in labels},
-                 _section_list(_config('Packages')[1], 'status/README.md', titles)]))
+from snodec_sync.navigation import render_header
+print(json.dumps({path: render_header('Packages', path) for path in json.load(sys.stdin)}))
 """
         result = subprocess.run([sys.executable, '-c', worker, str(control / 'tools')],
-                                input=json.dumps([paths, labels, {f"status/{config['package']}.md": f"# {config['title']} package status · latest release {release}" for config, project, release, *_ in projects}]), text=True, capture_output=True,
+                                input=json.dumps(paths), text=True, capture_output=True,
                                 cwd=temporary, env=environment, check=True, timeout=120)
-        headers, buttons, section_pages = json.loads(result.stdout)
+        headers = json.loads(result.stdout)
     colors = {'current': '#1a7f37', 'outdated': '#9a6700', 'pending': '#57606a', 'running': '#0969da',
               'publishing': '#8250df', 'published': '#1a7f37', 'failed': '#cf222e', 'cancelled': '#6e7681',
               'skipped': '#9a6700', 'superseded': '#57606a', 'not-built': '#57606a'}
@@ -118,12 +113,6 @@ print(json.dumps([{path: render_header('Packages', path) for path in paths},
     rows.sort(key=lambda row: (list(DISTRIBUTIONS).index(row['distribution']), releases.index((row['distribution'], row['suite'])), row['arch']))
     platforms = []
     template = (ROOT / 'ci/templates/package-status.md.tmpl').read_text()
-    menu_dir = root / 'status/menu'
-    menu_dir.mkdir(exist_ok=True)
-    def button(label, href):
-        slug = re.sub(r'[^a-z0-9]+', '-', label.lower()).strip('-')
-        (menu_dir / f'{slug}.svg').write_text(buttons[label])
-        return f'<a href="{href}"><img src="menu/{slug}.svg" alt="{label}" title="{label}" align="absmiddle"></a>'
     for config, project, release, version, revision in projects:
         navigation = ' '.join(
             f'<a href="{href}"><img src="../docs/media/menu/{asset}.svg" alt="{label}" align="absmiddle"></a>' for label, asset, href in [
@@ -156,17 +145,17 @@ print(json.dumps([{path: render_header('Packages', path) for path in paths},
             links = ([f'[Build log]({log})'] if log else []) + [f'[Packages](../{packages}/)']
             sections.setdefault(row['distribution'], {}).setdefault(row['suite'], []).append(
                 f"| `{row['arch']}` | {current} | {stamp(published_at)} | {in_build} | {' · '.join(links)} |")
-        body, menu = [], []
+        body, menu = [], ['<a id="distributions"></a>', '| Distribution | Jump to release |\n| --- | --- |']
         for distribution, releases in sections.items():
             title, guide = DISTRIBUTIONS[distribution]
-            menu.append(f'**{title}** ' + ' '.join(button(suite, f'#{distribution}-{suite.replace(".", "")}') for suite in releases))
-            body += [f'## {title}', button('Install guide', f'../docs/installation/{guide}.md#page-overview')]
+            menu.append(f'| {title} | ' + ' · '.join(f'[{suite}](#{distribution}-{suite.replace(".", "")})' for suite in releases) + ' |')
+            body += [f'## {title}', f'[{title} install guide](../docs/installation/{guide}.md#page-overview)']
             for suite, lines in releases.items():
                 body += [f'<a id="{distribution}-{suite.replace(".", "")}"></a>\n\n### {title} {suite}',
-                         button('↑ menu', '#page-overview'),
+                         '[↑ Distributions](#distributions)',
                          '| Architecture | Available | Published (UTC) | In build | Links |\n| --- | --- | --- | --- | --- |\n' + '\n'.join(lines)]
         legend = ' · '.join(f'{dot(label)}&nbsp;{label.replace("-", " ").capitalize().replace(" ", "&nbsp;")}' for label in colors)
-        page = template.replace('<!-- header -->', headers[f"status/{config['package']}.md"]).replace('<!-- title -->', config['title']).replace('<!-- release -->', release).replace('<!-- navigation -->', navigation).replace('<!-- menu -->', '\n\n'.join(menu)).replace('<!-- body -->', '\n\n'.join(body)).replace('<!-- legend -->', legend)
+        page = template.replace('<!-- header -->', headers[f"status/{config['package']}.md"]).replace('<!-- title -->', config['title']).replace('<!-- release -->', release).replace('<!-- navigation -->', navigation).replace('<!-- menu -->', '\n\n'.join(menu[:1]) + '\n\n' + '\n'.join(menu[1:])).replace('<!-- body -->', '\n\n'.join(body)).replace('<!-- legend -->', legend)
         (root / f"status/{config['package']}.md").write_text(page)
     for distribution, (title, guide) in DISTRIBUTIONS.items():
         selected = sorted((row for row in rows if row['distribution'] == distribution), key=lambda row: (row['suite'], row['arch']))
@@ -177,12 +166,12 @@ print(json.dumps([{path: render_header('Packages', path) for path in paths},
         return '| Project | Latest release | Status |\n| --- | --- | --- |\n' + '\n'.join(
             f'| [{config["title"]}](https://github.com/SNodeC/{project}#project-overview) | {release} | [{config["title"]} status →]({prefix}{config["package"]}.md#page-overview) |' for config, project, release, *_ in projects)
     intro = '<!-- Generated by DistributionPackages; do not edit. -->\n\n'
-    (root / 'status/README.md').write_text(intro + headers['status/README.md'] + '\n\n# Package status\n\n[![Install](../docs/media/menu/install.svg)](../README.md#install) [![Troubleshoot](../docs/media/menu/troubleshoot.svg)](../docs/troubleshooting.md#page-overview)\n\n' + overview('') + '\n\n## Sections\n\n' + section_pages + '\n')
+    (root / 'status/README.md').write_text(intro + headers['status/README.md'] + '\n\n# Package status\n\n<!-- snodec:begin menu -->\n[![Install](../docs/media/menu/install.svg)](../README.md#install) [![Troubleshoot](../docs/media/menu/troubleshoot.svg)](../docs/troubleshooting.md#page-overview)\n<!-- snodec:end menu -->\n\n' + overview('') + '\n')
     (root / 'docs/status.md').unlink(missing_ok=True)
     readme = root / 'README.md'
     if readme.exists():
         text = readme.read_text()
-        for name, table in [('projects', overview('status/')), ('platforms', '| Distribution | Releases | Architectures |\n| --- | --- | --- |\n' + '\n'.join(platforms))]:
+        for name, table in [('projects', overview('status/')), ('platforms', '| Distribution guide | Releases | Architectures |\n| --- | --- | --- |\n' + '\n'.join(platforms))]:
             text = re.sub(f'(<!-- packages:begin {name} -->).*?(<!-- packages:end {name} -->)', lambda match: match[1] + '\n' + table + '\n' + match[2], text, flags=re.S)
         readme.write_text(text)
 

@@ -13,6 +13,22 @@ from ci.publish import publication
 
 class PackagePagesTest(unittest.TestCase):
     def setUp(self):
+        original_run = subprocess.run
+        # Tests can select a checkout via environment; no production override or cache.
+        tooling = os.environ.get('SNODEC_TEST_TOOLING', '')
+        def fixtures(args, **kwargs):
+            if 'clone' in args and 'https://github.com/SNodeC/.github.git' in args:
+                control = Path(args[-1])
+                for name in ('tools', 'navigation', 'brand'):
+                    shutil.copytree(Path(tooling) / name, control / name)
+                shutil.copy2(Path(tooling) / 'catalog.yml', control / 'catalog.yml')
+                return subprocess.CompletedProcess(args, 0)
+            if 'sparse-checkout' in args:
+                return subprocess.CompletedProcess(args, 0)
+            return original_run(args, **kwargs)
+        if os.environ.get('SNODEC_TEST_TOOLING'):
+            self.addCleanup(patch.stopall)
+            patch('ci.publish.publication.subprocess.run', side_effect=fixtures).start()
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
@@ -266,6 +282,17 @@ class PackagePagesTest(unittest.TestCase):
 
 
 
+
+    def test_navigation_is_a_jump_table_and_body_links_are_text(self):
+        publication.render(self.root, self.state)
+        text = self.text()
+        self.assertIn('| Distribution | Jump to release |', text)
+        self.assertIn('[sid](#debian-sid)', text)
+        self.assertIn('[↑ Distributions](#distributions)', text)
+        self.assertIn('[Debian install guide](../docs/installation/debian.md#page-overview)', text)
+        self.assertNotIn('src="menu/', text)
+        self.assertIn('<!-- snodec:begin menu -->', text)
+        self.assertNotIn('section-pages', (self.root / 'status/README.md').read_text())
 
 
 if __name__ == '__main__':
