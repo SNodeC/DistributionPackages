@@ -299,6 +299,28 @@ class PackagePagesTest(unittest.TestCase):
             self.assertIn('[MQTTSuite status](', overview)
             self.assertNotIn('status →', overview)
 
+    def test_state_shapes_accessible_names_and_centered_geometry(self):
+        import xml.etree.ElementTree as ET
+        publication.render(self.root, self.state)
+        ns = '{http://www.w3.org/2000/svg}'
+        badges = self.root / 'status/badges'
+        self.assertEqual(len(list(badges.glob('*.svg'))), 11)
+        for path in badges.glob('*.svg'):
+            svg = ET.parse(path).getroot()
+            self.assertEqual((svg.attrib['width'], svg.attrib['height'], svg.attrib['viewBox']), ('14', '14', '0 0 14 14'))
+            self.assertEqual(svg.find(ns + 'title').text, path.stem.replace('-', ' '))
+            circles = list(svg.iter(ns + 'circle'))
+            self.assertTrue(all(c.attrib['cx'] == c.attrib['cy'] == '7' for c in circles))
+            self.assertNotIn('text', [n.tag.removeprefix(ns) for n in svg])
+        for label in ('pending', 'superseded', 'not-built', 'cancelled'):
+            circle = ET.parse(badges / f'{label}.svg').getroot().find(ns + 'circle')
+            self.assertEqual((circle.attrib['r'], circle.attrib['stroke-width'], circle.attrib['stroke']), ('5.25', '1.5', '#848d97'))
+        self.assertNotEqual((badges / 'published.svg').read_bytes(), (badges / 'current.svg').read_bytes())
+        for label in ('published', 'publishing', 'failed', 'skipped', 'cancelled'):
+            self.assertIsNotNone(ET.parse(badges / f'{label}.svg').getroot().find(ns + 'path'))
+        for label in ('current', 'published', 'outdated', 'skipped', 'running', 'publishing', 'failed', 'pending', 'superseded', 'not-built', 'cancelled'):
+            self.assertEqual(self.text().count(f'alt="{label.replace("-", " ")}"'), 1)
+
 
 if __name__ == '__main__':
     unittest.main()

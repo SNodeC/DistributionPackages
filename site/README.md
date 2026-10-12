@@ -1,10 +1,10 @@
 <!-- Published from DistributionPackages/site; edit that source, not this snapshot. -->
 <a id="project-overview"></a>
 
-<p><picture><source media="(max-width: 600px)" srcset="docs/media/hero-mobile.svg"><img src="docs/media/banner.svg" alt="SNodeC Packages" width="100%"></picture></p>
+<p><picture><source media="(max-width: 600px)" srcset="docs/media/hero-mobile.svg"><img src="docs/media/banner.svg" alt="Packages — Signed packages for the SNode.C ecosystem." width="100%"></picture></p>
 
 <!-- snodec:begin organization -->
-<p><a href="https://github.com/SNodeC" title="SNodeC organization"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/nav/organization-dark.svg"><img align="right" src="docs/media/nav/organization-light.svg" alt="SNodeC organization" width="160" height="28"></picture></a><br clear="all"></p>
+<p><a href="https://github.com/SNodeC" title="SNodeC organization"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/nav/organization-dark.svg"><img align="right" src="docs/media/nav/organization-light.svg" alt="SNodeC organization" title="SNodeC organization" width="160" height="28"></picture></a><br clear="all"></p>
 <!-- snodec:end organization -->
 
 # SNodeC Packages

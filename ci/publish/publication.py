@@ -97,13 +97,23 @@ print(json.dumps({path: render_header('Packages', path) for path in json.load(sy
                                 input=json.dumps(paths), text=True, capture_output=True,
                                 cwd=temporary, env=environment, check=True, timeout=120)
         headers = json.loads(result.stdout)
-    colors = {'current': '#1a7f37', 'outdated': '#9a6700', 'pending': '#57606a', 'running': '#0969da',
-              'publishing': '#8250df', 'published': '#1a7f37', 'failed': '#cf222e', 'cancelled': '#6e7681',
-              'skipped': '#9a6700', 'superseded': '#57606a', 'not-built': '#57606a'}
+    indicators = {
+        'current': '<circle cx="7" cy="7" r="6" fill="#1a7f37"/>',
+        'published': '<circle cx="7" cy="7" r="6" fill="#1a7f37"/><path d="M4 7.2l2 2 4-4.2" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
+        'outdated': '<circle cx="7" cy="7" r="6" fill="#9a6700"/>',
+        'skipped': '<circle cx="7" cy="7" r="5.25" fill="none" stroke="#9a6700" stroke-width="1.5"/><path d="M4.5 7h5" fill="none" stroke="#9a6700" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
+        'running': '<circle cx="7" cy="7" r="6" fill="#0969da"/><circle cx="7" cy="7" r="2" fill="white"/>',
+        'publishing': '<circle cx="7" cy="7" r="6" fill="#8250df"/><path d="M7 4v6M4.5 6.5L7 4l2.5 2.5" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
+        'failed': '<circle cx="7" cy="7" r="6" fill="#cf222e"/><path d="M4.8 4.8l4.4 4.4M9.2 4.8l-4.4 4.4" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
+        'pending': '<circle cx="7" cy="7" r="5.25" fill="none" stroke="#848d97" stroke-width="1.5"/>',
+        'superseded': '<circle cx="7" cy="7" r="5.25" fill="none" stroke="#848d97" stroke-width="1.5" stroke-dasharray="2.2 1.6"/>',
+        'not-built': '<circle cx="7" cy="7" r="5.25" fill="none" stroke="#848d97" stroke-width="1.5"/><circle cx="7" cy="7" r="1.4" fill="#848d97"/>',
+        'cancelled': '<circle cx="7" cy="7" r="5.25" fill="none" stroke="#848d97" stroke-width="1.5"/><path d="M3.3 10.7L10.7 3.3" fill="none" stroke="#848d97" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
+    }
     badges = root / 'status/badges'
     badges.mkdir(parents=True, exist_ok=True)
-    for label, color in colors.items():
-        (badges / f'{label}.svg').write_text(f'<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" role="img" aria-label="{label.replace("-", " ")}"><circle cx="7" cy="7.8" r="6" fill="{color}"/></svg>\n')
+    for label, body in indicators.items():
+        (badges / f'{label}.svg').write_text(f'<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" role="img" aria-label="{label.replace("-", " ")}"><title>{label.replace("-", " ")}</title>{body}</svg>\n')
     for obsolete in [*(root / 'status').glob('*.svg'), *(root / 'status/menu').glob('*.svg')]:
         obsolete.unlink()
     dot = lambda label: f'<img src="badges/{label}.svg" alt="{label.replace("-", " ")}" title="{label.replace("-", " ").capitalize()}" width="14" height="14" align="absmiddle">'
@@ -154,7 +164,7 @@ print(json.dumps({path: render_header('Packages', path) for path in json.load(sy
                 body += [f'<a id="{distribution}-{suite.replace(".", "")}"></a>\n\n### {title} {suite}',
                          '[↑ Distributions](#distributions)',
                          '| Architecture | Available | Published (UTC) | In build | Links |\n| --- | --- | --- | --- | --- |\n' + '\n'.join(lines)]
-        legend = ' · '.join(f'{dot(label)}&nbsp;{label.replace("-", " ").capitalize().replace(" ", "&nbsp;")}' for label in colors)
+        legend = ' · '.join(f'{dot(label)}&nbsp;{label.replace("-", " ").capitalize().replace(" ", "&nbsp;")}' for label in indicators)
         page = template.replace('<!-- header -->', headers[f"status/{config['package']}.md"]).replace('<!-- title -->', config['title']).replace('<!-- release -->', release).replace('<!-- navigation -->', navigation).replace('<!-- menu -->', '\n\n'.join(menu[:1]) + '\n\n' + '\n'.join(menu[1:])).replace('<!-- body -->', '\n\n'.join(body)).replace('<!-- legend -->', legend)
         (root / f"status/{config['package']}.md").write_text(page)
     for distribution, (title, guide) in DISTRIBUTIONS.items():
