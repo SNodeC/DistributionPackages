@@ -125,7 +125,7 @@ print(json.dumps({path: render_header('Packages', path) for path in json.load(sy
     template = (ROOT / 'ci/templates/package-status.md.tmpl').read_text()
     for config, project, release, version, revision in projects:
         navigation = ' '.join(
-            f'<a href="{href}"><img src="../docs/media/menu/{asset}.svg" alt="{label}" align="absmiddle"></a>' for label, asset, href in [
+            f'<a href="{href}"><img src="../docs/media/menu/{asset}.svg" alt="{label}"></a>' for label, asset, href in [
             ('Install', 'install', '../README.md#install'), ('Catalog', 'catalog', f'../docs/catalogs/{config["package"]}.md#page-overview'),
             ('Troubleshoot', 'troubleshoot', '../docs/troubleshooting.md#page-overview')] if label != 'Catalog' or (root / href.removeprefix('../').split('#')[0]).is_file())
         sections = {}
