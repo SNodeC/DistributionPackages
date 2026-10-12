@@ -3,7 +3,7 @@
 <!-- snodec:begin page-header -->
 <a id="page-overview"></a>
 <p><picture><source media="(max-width: 640px)" srcset="../media/nav/banner-installation-compact.svg"><img src="../media/nav/banner-installation.svg" alt="Packages — Installation" width="100%"></picture></p>
-<p><a href="README.md#page-overview" title="Up to Installation"><picture><source media="(prefers-color-scheme: dark)" srcset="../media/nav/up-installation-dark.svg"><img src="../media/nav/up-installation-light.svg" alt="Up to Installation" width="160" height="28"></picture></a><a href="https://github.com/SNodeC" title="SNodeC organization"><picture><source media="(prefers-color-scheme: dark)" srcset="../media/nav/organization-dark.svg"><img align="right" src="../media/nav/organization-light.svg" alt="SNodeC organization" width="160" height="28"></picture></a><a href="../../README.md#project-overview" title="Packages repository"><picture><source media="(prefers-color-scheme: dark)" srcset="../media/nav/repository-dark.svg"><img align="right" src="../media/nav/repository-light.svg" alt="Packages repository" width="160" height="28"></picture></a><br clear="all"></p>
+<p><a href="README.md#page-overview" title="Up to Installation"><picture><source media="(prefers-color-scheme: dark)" srcset="../media/nav/up-installation-dark.svg"><img src="../media/nav/up-installation-light.svg" alt="Up to Installation" title="Up to Installation" width="160" height="28"></picture></a><a href="https://github.com/SNodeC" title="SNodeC organization"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="../media/nav/organization-icon-dark.svg"><source media="(max-width: 640px)" srcset="../media/nav/organization-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="../media/nav/organization-dark.svg"><img align="right" src="../media/nav/organization-light.svg" alt="SNodeC organization" title="SNodeC organization"></picture></a><a href="../../README.md#project-overview" title="Packages repository"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="../media/nav/repository-icon-dark.svg"><source media="(max-width: 640px)" srcset="../media/nav/repository-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="../media/nav/repository-dark.svg"><img align="right" src="../media/nav/repository-light.svg" alt="Packages repository" title="Packages repository"></picture></a><br clear="all"></p>
 <!-- snodec:end page-header -->
 
 # OpenWrt
@@ -11,8 +11,8 @@
 <!-- snodec:begin menu -->
 <p>
 <a href="#requirements"><img src="../media/menu/requirements.svg" alt="Requirements"></a>
-<a href="#choose-packages"><img src="../media/menu/choose-packages.svg" alt="Choose packages"></a>
 <a href="#quick-install"><img src="../media/menu/menu-quick-install.svg" alt="Quick install"></a>
+<a href="#choose-packages"><img src="../media/menu/choose-packages.svg" alt="Choose packages"></a>
 <a href="#manual-repository-setup"><img src="../media/menu/manual.svg" alt="Manual setup"></a>
 <a href="#updates"><img src="../media/menu/updates.svg" alt="Updates"></a>
 <a href="../../status/README.md#page-overview"><img src="../media/menu/status.svg" alt="Status"></a>
@@ -35,14 +35,6 @@ printf 'OpenWrt: %s\nPackage architecture: %s\n' "$DISTRIB_RELEASE" "$DISTRIB_AR
 RISC-V is named `riscv64_riscv64` on 24.10 and `riscv64_generic` on 25.12; read the name for your installed release.
 
 Use `DISTRIB_ARCH`, not `uname -m`. Several devices can share a package architecture. OpenWrt 24.10 uses `opkg`/IPK; 25.12 uses `apk`/APK.
-
-## Choose packages
-
-See the [SNode.C catalog](../catalogs/snodec.md#page-overview) and [MQTTSuite catalog](../catalogs/mqttsuite.md#page-overview) for package roles and after-install configuration.
-
-- **[Complete sets](#complete-sets)**: install all components of the currently offered projects.
-
-- **[Selected packages](#selected-packages)**: configure the signed source, then install only the components you need.
 
 ## Quick install
 
@@ -74,6 +66,14 @@ apk info -e snodec mqttsuite
 ```
 
 On 24.10, installed package names and versions are listed; on 25.12, both requested names are printed and the command succeeds. Next: [SNode.C configuration](../catalogs/snodec.md#after-installation) or [MQTTSuite configuration and deployment](../catalogs/mqttsuite.md#after-installation).
+
+## Choose packages
+
+See the [SNode.C catalog](../catalogs/snodec.md#page-overview) and [MQTTSuite catalog](../catalogs/mqttsuite.md#page-overview) for package roles and after-install configuration.
+
+- **[Complete sets](#complete-sets)**: install all components of the currently offered projects.
+
+- **[Selected packages](#selected-packages)**: configure the signed source, then install only the components you need.
 
 ### Selected packages
 
