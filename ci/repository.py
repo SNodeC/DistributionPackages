@@ -1,6 +1,9 @@
 """Capture a release-tag generation; commit IDs are evidence, not pinned refs."""
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+import http.client
+from math import ceil
 import tempfile
 import hashlib
 import json
@@ -8,8 +11,11 @@ import os
 from pathlib import Path
 import re
 import shutil
+import socket
 import subprocess
 import sys
+import time
+import urllib.error
 import urllib.request
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -199,7 +205,7 @@ def reuse(bundle, target, destination):
         directory = f'{row["distribution"]}/pool/{row["suite"]}' if filename.endswith('.deb') else profile['directory']
         path = destination / filename
         ref = os.environ.get('PUBLISHED_REF') or profile['context']['packages_commit']
-        urllib.request.urlretrieve(f'https://raw.githubusercontent.com/SNodeC/Packages/{ref}/{directory}/{name}', path)
+        fetch(f'https://raw.githubusercontent.com/SNodeC/Packages/{ref}/{directory}/{name}', path)
         if digest(path) != checksum:
             raise RuntimeError(f'Published dependency checksum mismatch: {name}')
     if row['family'] != 'openwrt':
@@ -209,9 +215,50 @@ def reuse(bundle, target, destination):
             (destination / f'{prefix}.packages').write_text('\n'.join(names) + '\n')
 
 
-def fetch(url):
-    with urllib.request.urlopen(url, timeout=120) as response:
-        return response.read()
+def fetch(url, destination=None):
+    """Retry transient transport failures, never validation or local I/O failures."""
+    delays = (60, 300, 900)
+    for attempt in range(len(delays) + 1):
+        try:
+            with tempfile.TemporaryDirectory(dir=destination.parent if destination is not None else None) as directory:
+                path = Path(directory) / 'download'
+                with urllib.request.urlopen(url, timeout=120) as response, path.open('wb') as output:
+                    shutil.copyfileobj(response, output)
+                    length = response.headers.get('Content-Length')
+                    if length is not None and output.tell() < int(length):
+                        raise urllib.error.ContentTooShortError('Incomplete download', None)
+                if destination is None:
+                    return path.read_bytes()
+                os.replace(path, destination)
+                return
+        except (urllib.error.URLError, OSError, http.client.IncompleteRead) as error:
+            if isinstance(error, urllib.error.HTTPError):
+                retryable = error.code in (429, 502, 503, 504)
+            else:
+                reason = getattr(error, 'reason', error)
+                retryable = (isinstance(error, urllib.error.ContentTooShortError)
+                             or isinstance(reason, (ConnectionResetError, ConnectionAbortedError,
+                                                    TimeoutError, http.client.IncompleteRead))
+                             or isinstance(reason, socket.gaierror) and reason.errno == socket.EAI_AGAIN)
+            if not retryable or attempt == len(delays):
+                raise
+            delay = delays[attempt]
+            if isinstance(error, urllib.error.HTTPError) and error.code in (429, 503):
+                header = (error.headers or {}).get('Retry-After', '').strip()
+                try:
+                    if header.isascii() and header.isdigit():
+                        seconds = int(header)
+                    else:
+                        deadline = parsedate_to_datetime(header)
+                        if deadline.tzinfo is None:
+                            raise ValueError('Retry-After date lacks a timezone')
+                        seconds = ceil(deadline.timestamp() - time.time())
+                    delay = min(1800, max(0, seconds))
+                except (ValueError, TypeError, OverflowError):
+                    pass  # Missing or malformed Retry-After: retain bounded backoff.
+            print(f'Transient download failure ({error}); retry {attempt + 1}/3 in {delay} seconds',
+                  file=sys.stderr)
+            time.sleep(delay)
 
 
 def download_sdk(row, destination):
@@ -226,7 +273,7 @@ def download_sdk(row, destination):
     checksum, filename = entries[0]
     filename = filename.lstrip('*')
     archive = destination.parent / filename
-    urllib.request.urlretrieve(base + filename, archive)
+    fetch(base + filename, archive)
     if digest(archive) != checksum:
         raise RuntimeError('SDK checksum mismatch')
     destination.mkdir()

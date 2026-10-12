@@ -73,6 +73,8 @@ A release capture remains the generation identity across repositories. Uploaded 
 
 Each SNode.C publication dispatches its exact Packages commit to MQTTSuite. The application validates the source capture and SNode.C revision before using that dependency. A failed dispatch after a successful publication makes the publication workflow red; rerunning it retries the handoff without replacing the published package.
 
+Shared Python downloads in `ci.repository.fetch` make at most four attempts for recognized transient transport failures, with fallback delays of 1, 5 and 15 minutes. HTTP 429 and 503 responses can supply `Retry-After` as seconds or an HTTP date; valid values are bounded to 0–30 minutes, and missing or malformed values retain the fallback delay. Downloads stream into private temporary storage, which is removed before retrying; a destination is replaced only after a complete transfer. Certificate, authentication, missing-file, unclassified transport and local filesystem errors fail closed. Checksum and captured-source validation remain outside the retry loop. The same transport serves retained dependency packages, OpenWrt SDK metadata and archives, and MQTTSuite's captured-publication baseline. A running package generation keeps its captured implementation; merging this change affects new captures, not existing builds or reruns of an old capture.
+
 ## Revision numbering
 
 SNode.C and MQTTSuite have independent package revision counters. A SNode.C release reserves the next number for both projects; an MQTTSuite-only release advances only MQTTSuite. Numbers are shared across targets of the same project.
