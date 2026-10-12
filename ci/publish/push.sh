@@ -34,7 +34,7 @@ for attempt in {1..30}; do
     git -C "$root" rm -rf --ignore-unmatch -- status.json status/ >/dev/null
     git -C "$root" ls-tree -r --name-only -z "$remote" -- status.json status/ |
         xargs -0 -r git -C "$root" checkout "$remote" --
-    python3 -m ci.publish.publication render "$root"
+    python3 -m ci.publish.publication render "$root" || echo "::warning::Package status rendering failed; signed feed publication continues"
     previous=$remote
     sleep "$((RANDOM % 5 + 1))"
 done

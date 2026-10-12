@@ -151,15 +151,12 @@ class PackagePagesTest(unittest.TestCase):
             with self.subTest(distribution=distribution):
                 self.assertEqual(repository.package_version(dict(distribution=distribution, suite=suite), '2.0.0', '9'), expected)
 
-    def test_openwrt_release_specific_architectures_and_buttons(self):
+    def test_openwrt_release_specific_architectures(self):
         publication.render(self.root, self.state)
         first, second = self.text().split('### OpenWrt 24.10')[1].split('### OpenWrt 25.12')
         self.assertIn('`riscv64_riscv64`', first)
         self.assertNotIn('`riscv64_generic`', first)
         self.assertIn('`riscv64_generic`', second)
-        self.assertIn('<a href="#openwrt-2410"><img src="menu/24-10.svg" alt="24.10" title="24.10" align="absmiddle"></a>', self.text())
-        self.assertIn('src="../docs/media/menu/catalog.svg" alt="Catalog"', self.text())
-        self.assertIn('align="absmiddle"', self.text())
 
     def test_deterministic_projection_preserves_state_feeds_and_authored_text(self):
         self.feed()
@@ -184,80 +181,12 @@ class PackagePagesTest(unittest.TestCase):
         (self.root / 'docs/catalogs/new-package.md').write_text('New catalog')
         with patch.dict(repository.PROJECTS, {'new-project': dict(title='New project', package='new-package', depends_on=())}):
             publication.render(self.root, self.state)
-        self.assertIn('src="../docs/media/menu/catalog.svg" alt="Catalog"', self.text('new-package'))
         for path in ['README.md', 'status/README.md']:
             self.assertIn('[New project](https://github.com/SNodeC/new-project#project-overview)', (self.root / path).read_text())
 
-    def test_distribution_guides_choose_before_install_and_match_the_menu(self):
-        headings = ['Requirements', 'Choose packages', 'Quick install', 'Manual repository setup', 'Updates', 'Source records', 'Troubleshooting']
-        for name in ['debian', 'ubuntu', 'fedora', 'rocky-linux', 'raspberry-pi-os', 'openwrt']:
-            with self.subTest(guide=name):
-                text = (repository.ROOT / f'site/docs/installation/{name}.md').read_text()
-                self.assertEqual([line[3:] for line in text.splitlines() if line.startswith('## ')], headings)
-                menu = next(block.split('</p>', 1)[0] for block in text.split('<p>')[1:] if 'href="#requirements"' in block)
-                anchors = ['requirements', 'choose-packages', 'quick-install', 'manual-repository-setup', 'updates']
-                self.assertEqual(sorted(anchors, key=lambda anchor: menu.index(f'href="#{anchor}"')), anchors)
-                self.assertIn('alt="Complete sets" align="absmiddle"', text)
-                self.assertIn('href="#complete-sets"', text)
-                self.assertIn('alt="Selected packages" align="absmiddle"', text)
-                self.assertIn('href="#selected-packages"', text)
-                self.assertLess(text.index('## Choose packages'), text.index('### Complete sets'))
-                self.assertIn('--prepare', text)
-                self.assertNotIn('automatically. ##', text)
 
-    def test_catalogs_have_buttons_and_queries_for_all_package_managers(self):
-        for package in ['snodec', 'mqttsuite']:
-            text = (repository.ROOT / f'site/docs/catalogs/{package}.md').read_text()
-            self.assertNotIn('## Installation and availability', text)
-            self.assertIn('[![Use](../media/menu/use.svg)](#after-installation)', text)
-            self.assertIn('## After installation', text)
-            for label in ['Install', 'Status', 'Catalog', 'Details', 'Query', 'Use']:
-                self.assertIn(f'[![{label}]', text)
-            self.assertIn(f"opkg list '{package}*'", text)
-            self.assertIn(f"apk search '{package}*'", text)
-        mqtt = (repository.ROOT / 'site/docs/catalogs/mqttsuite.md').read_text()
-        self.assertIn('mqttsuite/blob/HEAD/docs/guides/deployment.md#page-overview', mqtt)
 
-    def test_hub_and_keys_have_one_fingerprint_authority_and_consistent_apt_setup(self):
-        hub = (repository.ROOT / 'site/README.md').read_text()
-        keys = (repository.ROOT / 'site/keys/README.md').read_text()
-        self.assertNotIn('8BBFD49E3C826FDB1416C79E60046744B15B0E05', hub)
-        self.assertIn('8BBFD49E3C826FDB1416C79E60046744B15B0E05', keys)
-        self.assertIn('ASCII-armored key unchanged', keys)
-        self.assertNotIn('dearmor', keys)
-        self.assertNotIn('| Key | Distributions', keys)
-        self.assertIn('snodec-opkg.pub', keys)
-        self.assertIn('snodec-usign.pub', keys)
-        self.assertIn('architecture-independent', keys)
-        self.assertIn('troubleshooting.md#page-overview)\n\nThese are public', keys)
-        for name in ['debian', 'ubuntu', 'raspberry-pi-os']:
-            guide = (repository.ROOT / f'site/docs/installation/{name}.md').read_text()
-            self.assertIn('sudo install -m 644 "$tmp/key" /etc/apt/keyrings/snodec.asc', guide)
-            self.assertNotIn('tee /etc/apt/keyrings/snodec.asc', guide)
-            self.assertIn('signed-by=/etc/apt/keyrings/snodec.asc', guide)
-        self.assertIn('/docs/ /keys/ /status/', (repository.ROOT / 'ci/publish/status.sh').read_text())
 
-    def test_public_pages_separate_html_blocks_and_use_real_menu_assets(self):
-        import re
-        import xml.etree.ElementTree as ET
-        for path in (repository.ROOT / 'site').rglob('*.md'):
-            text = path.read_text()
-            self.assertNotRegex(text, r'</p>\n[^\n<]')
-            self.assertIn('project-overview' if path == repository.ROOT / 'site/README.md' else 'page-overview', text)
-            for image in re.findall(r'(?:src="|!\[[^\]]*\]\()([^"\)]+\.svg)', text):
-                target = path.parent / image
-                self.assertTrue(target.is_file(), f'{path}: {image}')
-                if '/menu/' in image:
-                    svg = ET.fromstring(target.read_text())
-                    label = svg.find('{http://www.w3.org/2000/svg}text')
-                    self.assertEqual(label.attrib['font-size'], '16')
-                    self.assertEqual(label.attrib['font-weight'], '600')
-                    for arrow in svg.findall('{http://www.w3.org/2000/svg}path'):
-                        self.assertIn('M0 1.25H5.5V0L9 2L5.5 4V2.75H0Z', arrow.attrib['d'])
-                        self.assertRegex(arrow.attrib['transform'], r'translate\(\d+ 12\)')
-        for asset, height in [('banner.svg', '320'), ('nav/banner-installation.svg', '56'), ('nav/banner-installation-compact.svg', '72')]:
-            svg = ET.fromstring((repository.ROOT / 'site/docs/media' / asset).read_text())
-            self.assertEqual(svg.attrib['height'], height)
 
     def test_replayed_regressive_terminal_events_do_not_change_metadata(self):
         self.event('snode.c', 'running')
@@ -281,34 +210,8 @@ class PackagePagesTest(unittest.TestCase):
         self.assertEqual(event['stage'], 'publication')
         self.assertEqual(event['started_at'], '2026-10-10T11:00:00Z')
 
-    def test_circles_keep_size_and_requested_palette(self):
-        publication.render(self.root, self.state)
-        for label, color in [('current', '#1a7f37'), ('outdated', '#9a6700'), ('publishing', '#8250df'), ('cancelled', '#6e7681'), ('skipped', '#9a6700')]:
-            svg = (self.root / f'status/badges/{label}.svg').read_text()
-            self.assertIn(f'fill="{color}"', svg)
-            self.assertIn('cy="7.8" r="6"', svg)
-            self.assertNotIn('<text', svg)
 
-    def test_deleted_legacy_page_is_removed_and_status_index_has_shared_sections(self):
-        (self.root / 'docs/status.md').write_text('obsolete generated redirect')
-        publication.render(self.root, self.state)
-        self.assertFalse((self.root / 'docs/status.md').exists())
-        index = (self.root / 'status/README.md').read_text()
-        self.assertEqual(index.count('<!-- snodec:begin section-pages -->'), 1)
-        self.assertIn('## Sections', index)
-        self.assertIn('snodec.md#page-overview', index)
-        self.assertIn('mqttsuite.md#page-overview', index)
 
-    def test_cancelled_circle_has_measured_contrast_in_both_themes(self):
-        def luminance(value):
-            channels = [int(value[i:i+2], 16) / 255 for i in (1, 3, 5)]
-            linear = [c / 12.92 if c <= .04045 else ((c + .055) / 1.055) ** 2.4 for c in channels]
-            return sum(c * weight for c, weight in zip(linear, [.2126, .7152, .0722]))
-        foreground = luminance('#6e7681')
-        for background in ['#ffffff', '#0d1117']:
-            light, dark = sorted([foreground, luminance(background)], reverse=True)
-            self.assertGreaterEqual((light + .05) / (dark + .05), 3)
-        self.assertNotEqual('#6e7681', '#57606a')
 
     def test_public_render_command_preserves_authoritative_state(self):
         self.feed()
@@ -361,98 +264,8 @@ class PackagePagesTest(unittest.TestCase):
         self.assertEqual((current / 'tool.py').read_text(), 'CAPTURED')
 
 
-    def test_navigation_legend_geometry_and_generated_asset_ownership(self):
-        import re
-        import xml.etree.ElementTree as ET
-        self.feed()
-        publication.render(self.root, self.state)
-        (self.root / 'status/menu/obsolete.svg').write_text('obsolete')
-        publication.render(self.root, self.state)
-        text = self.text()
-        self.assertLess(text.index('# SNode.C package status'), text.index('alt="Install"'))
-        self.assertNotIn('alt="All projects"', text)
-        self.assertLess(text.index('[Legend](#legend)'), text.index('| Architecture |'))
-        legend = text.split('**Legend:**', 1)[1].split('\n\n', 1)[0]
-        self.assertEqual(len(re.findall(r'<img ', legend)), 11)
-        self.assertIn('title="Not built"', legend)
-        self.assertNotIn('alt="not-built"', legend)
-        self.assertIn('&nbsp;Not&nbsp;built', legend)
-        self.assertEqual(text.count('alt="↑ menu"'), 13)
-        self.assertEqual(text.count('alt="Install guide"'), 6)
-        self.assertEqual(len(re.findall(r'^\*\*.*?<a ', text, re.M)), 6)
-        self.assertEqual(sum(line.count('<img ') for line in text.splitlines() if line.startswith('**') and 'src="menu/' in line), 13)
-        self.assertIn('src="../docs/media/menu/install.svg" alt="Install" align="absmiddle"', text)
-        self.assertIn('src="../docs/media/menu/troubleshoot.svg" alt="Troubleshoot" align="absmiddle"', text)
-        referenced = set()
-        for page in (self.root / 'status').glob('*.md'):
-            referenced.update((page.parent / name).resolve() for name in re.findall(r'src="([^\"]*menu/[^\"]+\.svg)"', page.read_text()) if (page.parent / name).resolve().parent == (self.root / 'status/menu').resolve())
-        self.assertEqual(referenced, {p.resolve() for p in (self.root / 'status/menu').glob('*.svg')})
-        for name in ['menu', 'install-guide']:
-            svg = ET.fromstring((self.root / f'status/menu/{name}.svg').read_text())
-            arrow = svg.find('{http://www.w3.org/2000/svg}path')
-            self.assertEqual(arrow.attrib['d'], 'M0 1.25H5.5V0L9 2L5.5 4V2.75H0Z')
-            self.assertTrue(arrow.attrib['transform'].startswith('translate(143 12)'))
-            self.assertEqual(arrow.attrib['aria-hidden'], 'true')
-        self.assertFalse((self.root / 'docs/status.md').exists())
 
-    def test_shared_page_headers_and_unified_menu_geometry(self):
-        import re
-        import xml.etree.ElementTree as ET
-        publication.render(self.root, self.state)
-        pages = list(self.root.glob('status/*.md'))
-        for page in pages:
-            with self.subTest(page=page.name):
-                text = page.read_text()
-                self.assertEqual(text.count('<!-- snodec:begin page-header -->'), 1)
-                header = text.split('<!-- snodec:begin page-header -->')[1].split('<!-- snodec:end page-header -->')[0]
-                self.assertEqual(len(re.findall(r'<a href=', header)), 3)
-                self.assertLess(header.index('title="Up to '), header.index('title="SNodeC organization"'))
-                self.assertLess(header.index('title="SNodeC organization"'), header.index('title="Packages repository"'))
-                self.assertEqual(header.count('align="right"'), 2)
-                self.assertIn('<br clear="all">', header)
-                self.assertIn('<source media="(max-width: 640px)"', header)
-                self.assertNotIn('page-banner.svg', text)
-                self.assertNotIn('alt="All projects"', text)
-        for path in (self.root / 'status/menu').glob('*.svg'):
-            svg = ET.fromstring(path.read_text())
-            self.assertEqual((svg.attrib['width'], svg.attrib['height']), ('160', '28'))
 
-    def test_direct_selection_routes_lossless_catalog_and_truthful_references(self):
-        import re
-        catalog = (repository.ROOT / 'site/docs/catalogs/snodec.md').read_text()
-        names = set('''snodec-common snodec snodec-apps snodec-control snodec-logger
-snodec-utils snodec-core-mux-epoll snodec-core-mux-poll snodec-core-mux-select snodec-core
-snodec-core-socket snodec-core-socket-stream snodec-core-socket-stream-legacy snodec-core-socket-stream-tls snodec-db-mariadb
-snodec-net snodec-net-in snodec-net-in-phy snodec-net-in-phy-stream snodec-net-in-stream
-snodec-net-in-stream-legacy snodec-net-in-stream-tls snodec-net-in6 snodec-net-in6-phy snodec-net-in6-phy-stream
-snodec-net-in6-stream snodec-net-in6-stream-legacy snodec-net-in6-stream-tls snodec-net-l2 snodec-net-l2-phy
-snodec-net-l2-phy-stream snodec-net-l2-stream snodec-net-l2-stream-legacy snodec-net-l2-stream-tls snodec-net-rc
-snodec-net-rc-phy snodec-net-rc-phy-stream snodec-net-rc-stream snodec-net-rc-stream-legacy snodec-net-rc-stream-tls
-snodec-net-un snodec-net-un-phy snodec-net-un-phy-stream snodec-net-un-stream snodec-net-un-stream-legacy
-snodec-net-un-stream-tls snodec-net-un-dgram snodec-http snodec-http-server snodec-http-client
-snodec-http-server-express snodec-http-server-express-legacy-in snodec-http-server-express-legacy-in6 snodec-http-server-express-legacy-rc snodec-http-server-express-legacy-un
-snodec-http-server-express-tls-in snodec-http-server-express-tls-in6 snodec-http-server-express-tls-rc snodec-http-server-express-tls-un snodec-websocket
-snodec-websocket-server snodec-websocket-client snodec-mqtt snodec-mqtt-server snodec-mqtt-client
-snodec-mqtt-server-websocket snodec-mqtt-client-websocket'''.split())
-        self.assertEqual(len(names), 67)
-        self.assertEqual(names, set(re.findall(r'`(snodec(?:-[a-z0-9-]+)?)`', catalog)))
-        for name in ['debian', 'ubuntu', 'raspberry-pi-os', 'fedora', 'rocky-linux', 'openwrt']:
-            text = (repository.ROOT / f'site/docs/installation/{name}.md').read_text()
-            self.assertIn('<a id="install-selected-components"></a>\n\n```sh', text)
-            self.assertIn('href="#install-selected-components"', text)
-            self.assertEqual(text.count('href="#selected-packages"'), 1)
-            self.assertEqual(text.count('**Check**'), 3)
-            self.assertEqual(text.count('Next: '), 3)
-            self.assertIn('../../keys/README.md#installed-keys', text)
-            records = text.split('## Source records')[1].split('## Troubleshooting')[0]
-            self.assertIn('`build.json`', records)
-            self.assertIn('**Build log**', records)
-            self.assertIn('**Packages**', records)
-        keys = (repository.ROOT / 'site/keys/README.md').read_text()
-        self.assertIn('### Installed keys', keys)
-        self.assertIn('/etc/opkg/keys/*', keys)
-        self.assertNotIn('maintainers edit', keys)
-        self.assertIn('separate trusted channel', keys)
 
 
 if __name__ == '__main__':

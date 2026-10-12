@@ -435,7 +435,6 @@ def main():
             if (root / 'install').exists():
                 shutil.rmtree(root / 'install')
             shutil.copytree(ROOT / 'install', root / 'install')
-            render(root, state)
         except Exception as error:
             print(f'Publication rejected: {error}', file=sys.stderr)
             run('git', '-C', str(root), 'reset', '--hard', 'HEAD')

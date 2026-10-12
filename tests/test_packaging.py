@@ -576,7 +576,7 @@ class StatusEventsTest(unittest.TestCase):
             cleanup.cleanup(self.seed,self.rows[0])
             publication.write(self.bundle/'context.json',{'selected':'modified'})
             publication.write(self.bundle/'sources.json',{'selected':'modified'})
-        with patch('sys.argv',['publication','feed',str(self.seed),str(self.bundle),json.dumps(self.rows[0]),'snode.c','unused']), patch.object(publication,'publish',side_effect=publish), redirect_stdout(stdout), redirect_stderr(stderr):
+        with patch('sys.argv',['publication','feed',str(self.seed),str(self.bundle),json.dumps(self.rows[0]),'snode.c','unused']), patch.object(publication,'publish',side_effect=publish), patch.object(publication,'render',side_effect=RuntimeError('Unavailable documentation renderer')), redirect_stdout(stdout), redirect_stderr(stderr):
             self.assertEqual(publication.main(),0)
         self.assertEqual(stdout.getvalue(),'published\n')
         self.assertIn('Removed ',stderr.getvalue())
