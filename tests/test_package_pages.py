@@ -293,6 +293,11 @@ class PackagePagesTest(unittest.TestCase):
         self.assertNotIn('src="menu/', text)
         self.assertIn('<!-- snodec:begin menu -->', text)
         self.assertNotIn('section-pages', (self.root / 'status/README.md').read_text())
+        for path in ('README.md', 'status/README.md'):
+            overview = (self.root / path).read_text()
+            self.assertIn('[SNode.C status](', overview)
+            self.assertIn('[MQTTSuite status](', overview)
+            self.assertNotIn('status →', overview)
 
 
 if __name__ == '__main__':
