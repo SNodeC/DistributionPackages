@@ -164,7 +164,7 @@ print(json.dumps({path: render_header('Packages', path) for path in json.load(sy
                 body += [f'<a id="{distribution}-{suite.replace(".", "")}"></a>\n\n### {title} {suite}',
                          '[↑ Distributions](#distributions)',
                          '| Architecture | Available | Published (UTC) | In build | Links |\n| --- | --- | --- | --- | --- |\n' + '\n'.join(lines)]
-        legend = ' · '.join(f'{dot(label)}&#8288;&nbsp;{label.replace("-", " ").capitalize().replace(" ", "&nbsp;")}' for label in indicators)
+        legend = ' · '.join(f'{dot(label)}&nbsp;{label.replace("-", " ").capitalize().replace(" ", "&nbsp;")}' for label in indicators)
         page = template.replace('<!-- header -->', headers[f"status/{config['package']}.md"]).replace('<!-- title -->', config['title']).replace('<!-- release -->', release).replace('<!-- navigation -->', navigation).replace('<!-- menu -->', '\n\n'.join(menu[:1]) + '\n\n' + '\n'.join(menu[1:])).replace('<!-- body -->', '\n\n'.join(body)).replace('<!-- legend -->', legend)
         (root / f"status/{config['package']}.md").write_text(page)
     for distribution, (title, guide) in DISTRIBUTIONS.items():
