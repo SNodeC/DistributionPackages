@@ -311,13 +311,13 @@ class JobIdentityTest(unittest.TestCase):
                            head_repository={'full_name': 'SNodeC/snode.c'}, run_attempt=2,
                            display_title='Packages · 456 · -', html_url='https://example.invalid/run')
         self.job = dict(run_id=456, run_attempt=1, html_url='https://example.invalid/job',
-                        name=f"Build and test · {self.row['distribution']} · {self.row['suite']} · {self.row['arch']}")
+                        name=f"{self.row['distribution']} · {self.row['suite']} · {self.row['arch']}")
 
     def test_job_url_requires_exact_repository_run_attempt_and_target(self):
         with patch.object(dispatch, 'api', side_effect=[self.origin, self.job]) as api:
             self.assertEqual(dispatch.receive(self.payload)['run_url'], self.job['html_url'])
             self.assertEqual(api.call_args.args, ('repos/SNodeC/snode.c/actions/jobs/789',))
-        for changes in [dict(run_id=999), dict(run_attempt=2), dict(name='prepare')]:
+        for changes in [dict(run_id=999), dict(run_attempt=2), dict(name='prepare'), dict(name='Build and test · ' + self.job['name'])]:
             with self.subTest(changes=changes), patch.object(dispatch, 'api', side_effect=[self.origin, self.job | changes]):
                 with self.assertRaises(ValueError):
                     dispatch.receive(self.payload)

@@ -59,7 +59,7 @@ def receive(payload):
             raise ValueError('Invalid job identity')
         job = api(f'repos/SNodeC/{project}/actions/jobs/{job_id}')
         if (str(job['run_id']) != build_run or str(job['run_attempt']) != attempt
-                or job['name'] != f"Build and test · {row['distribution']} · {row['suite']} · {row['arch']}"):
+                or job['name'] != f"{row['distribution']} · {row['suite']} · {row['arch']}"):
             raise ValueError('Job does not belong to the validated target and build attempt')
         job_url = job['html_url']
     name = f'packages-{project}-{row["id"]}-{attempt}'
