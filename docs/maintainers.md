@@ -57,9 +57,9 @@ Superseded files remain for 30 days after leaving the active index. Cleanup runs
 
 | Workflow | Responsibility |
 | --- | --- |
-| [SNode.C packages.yml](https://github.com/SNodeC/snode.c/blob/master/.github/workflows/packages.yml) | Capture version-tag releases, allocate revisions, build/test unsigned packages and request publication |
-| [MQTTSuite packages.yml](https://github.com/SNodeC/mqttsuite/blob/master/.github/workflows/packages.yml) | Same lifecycle, using the corresponding published SNode.C dependency |
-| [release.yml](https://github.com/SNodeC/DistributionPackages/blob/main/.github/workflows/release.yml) | Validate completed upstream artifacts, sign, publish and dispatch dependent targets |
+| [SNode.C build-distribution-packages.yml](https://github.com/SNodeC/snode.c/blob/master/.github/workflows/build-distribution-packages.yml) | Capture version-tag releases, allocate revisions, build/test unsigned packages and request publication |
+| [MQTTSuite build-distribution-packages.yml](https://github.com/SNodeC/mqttsuite/blob/master/.github/workflows/build-distribution-packages.yml) | Same lifecycle, using the corresponding published SNode.C dependency |
+| [sign-and-publish-packages.yml](https://github.com/SNodeC/DistributionPackages/blob/main/.github/workflows/sign-and-publish-packages.yml) | Validate completed upstream artifacts, sign, publish and dispatch dependent targets |
 
 The manual-only **Render package status** workflow in DistributionPackages runs the default-branch renderer against the current Packages state, with the existing publication concurrency group and metadata retry transaction. It does not build, sign or publish packages, and is not triggered automatically after merge. Run it only after explicit approval. Locally: `python3 -m ci.publish.publication render /path/to/Packages`. The local renderer preserves authored documentation, feed records and `status.json`. The approved manual workflow also hands off the current `site/` README, documentation and keys guide through the same metadata retry transaction; it removes obsolete documentation without changing key bytes or installer behavior.
 

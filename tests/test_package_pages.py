@@ -258,7 +258,7 @@ class PackagePagesTest(unittest.TestCase):
         self.assertIn('2.0.0 · r9', self.text())
 
     def test_manual_workflow_only_renders_with_existing_publication_concurrency(self):
-        workflow = (repository.ROOT / '.github/workflows/render-status.yml').read_text()
+        workflow = (repository.ROOT / '.github/workflows/publish-guides-and-status.yml').read_text()
         self.assertIn('workflow_dispatch:', workflow)
         self.assertNotIn('schedule:', workflow)
         self.assertNotIn('push:', workflow)
@@ -268,7 +268,7 @@ class PackagePagesTest(unittest.TestCase):
         self.assertNotIn('SIGNING_KEY:', workflow)
 
     def test_current_doc_overlay_preserves_capture_pinned_executables(self):
-        workflow = (repository.ROOT / '.github/workflows/release.yml').read_text()
+        workflow = (repository.ROOT / '.github/workflows/sign-and-publish-packages.yml').read_text()
         shell = workflow.split('          # Separate authored presentation', 1)[1].split('\n', 1)[1].split("          echo 'paths<<EOF'", 1)[0]
         shell = shell.replace('$DOCS_BRANCH', 'trunk')
         current = self.root / 'feed'

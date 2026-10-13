@@ -17,7 +17,7 @@ class HandoffTest(unittest.TestCase):
     def test_receipt_requires_upstream_workflow_capture_and_attempt(self):
         target = publication.targets()[0]['id']
         payload = dict(project='snode.c', target=target, capture='456', run='456', attempt='1')
-        origin = dict(event='push', head_branch='v2.0.0', path='.github/workflows/packages.yml',
+        origin = dict(event='push', head_branch='v2.0.0', path='.github/workflows/build-distribution-packages.yml',
                       head_repository={'full_name': 'SNodeC/snode.c'}, run_attempt=2,
                       display_title='Packages · 456 · -', html_url='https://example.invalid/456')
         with patch.object(dispatch, 'api', return_value=origin):
@@ -36,7 +36,7 @@ class HandoffTest(unittest.TestCase):
     def test_receipt_locates_capture_for_application_tag_and_dependency_build(self):
         target = publication.targets()[0]['id']
         payload = dict(project='mqttsuite', target=target, capture='123', run='123', attempt='1')
-        origin = dict(event='push', head_branch='v1.0.2', path='.github/workflows/packages.yml',
+        origin = dict(event='push', head_branch='v1.0.2', path='.github/workflows/build-distribution-packages.yml',
                       head_repository={'full_name': 'SNodeC/mqttsuite'}, run_attempt=1,
                       display_title='Packages · 123 · -', html_url='https://example.invalid/123')
         with patch.object(dispatch, 'api', return_value=origin):
@@ -77,6 +77,7 @@ class HandoffTest(unittest.TestCase):
             with patch.object(dispatch, 'run', return_value='[{"workflow_runs": []}]'), patch.object(dispatch, 'api') as send:
                 dispatch.build(bundle, 'mqttsuite', target, 'a' * 40)
                 self.assertEqual(send.call_args.args[0], 'repos/SNodeC/mqttsuite/dispatches')
+                self.assertEqual(send.call_args.args[1]['event_type'], 'build-dependent-packages')
                 self.assertEqual(send.call_args.args[1]['client_payload'], dict(capture='123', target=target, publication='a' * 40))
             existing = json.dumps([dict(workflow_runs=[dict(display_title=f'Packages · 123 · {target}')])])
             with patch.object(dispatch, 'run', return_value=existing), patch.object(dispatch, 'api') as send:
@@ -306,7 +307,7 @@ class JobIdentityTest(unittest.TestCase):
     def setUp(self):
         self.row = publication.targets()[0]
         self.payload = dict(project='snode.c', target=self.row['id'], capture='456', run='456', attempt='1', job='789')
-        self.origin = dict(event='push', head_branch='v2.0.0', path='.github/workflows/packages.yml',
+        self.origin = dict(event='push', head_branch='v2.0.0', path='.github/workflows/build-distribution-packages.yml',
                            head_repository={'full_name': 'SNodeC/snode.c'}, run_attempt=2,
                            display_title='Packages · 456 · -', html_url='https://example.invalid/run')
         self.job = dict(run_id=456, run_attempt=1, html_url='https://example.invalid/job',
