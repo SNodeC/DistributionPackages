@@ -60,6 +60,7 @@ jobs:
             tar -x -C "$RUNNER_TEMP/package-site" --strip-components=1
           echo "PACKAGE_SITE=$RUNNER_TEMP/package-site" >> "$GITHUB_ENV"
           git -C feed checkout --detach "$commit"
+          echo "signer-platform=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
           cp "$RUNNER_TEMP/package-site/README.md" feed/README.md
           rm -rf feed/docs
           cp -a "$RUNNER_TEMP/package-site/docs" feed/docs
@@ -81,10 +82,16 @@ jobs:
           path: published
           sparse-checkout: ${{ steps.scope.outputs.paths }}
           sparse-checkout-cone-mode: false
+      - name: Cache compiled OpenWrt signers
+        if: fromJSON(steps.source.outputs.target).family == 'openwrt'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/openwrt-signers
+          key: openwrt-signers-${{ runner.os }}-${{ runner.arch }}-${{ steps.scope.outputs.signer-platform }}-${{ hashFiles('feed/ci/publish/tools.sh') }}
       - name: Install signing tools
         env:
           FAMILY: ${{ fromJSON(steps.source.outputs.target).family }}
-        run: bash feed/ci/publish/tools.sh "$FAMILY"
+        run: bash feed/ci/publish/tools.sh "$FAMILY" "$RUNNER_TEMP/openwrt-signers"
       - name: Sign and publish the package snapshot
         id: write
         env:
