@@ -136,6 +136,42 @@ class HandoffTest(unittest.TestCase):
             self.assertEqual(values[rows[1]['id'] + '/mqttsuite']['status'], 'cancelled')
             self.assertEqual(values[rows[2]['id'] + '/mqttsuite']['status'], 'pending')
 
+    def test_pending_retry_scope_preserves_other_projects_and_targets(self):
+        rows = publication.targets()[:3]
+        for owner, target in [('mqttsuite', rows[0]), ('snode.c', None), ('mqttsuite', None)]:
+            with self.subTest(owner=owner, dependent=target is not None), tempfile.TemporaryDirectory() as temporary:
+                root, bundle = Path(temporary) / 'root', Path(temporary) / 'bundle'
+                release = 'snode.c' if target or owner == 'snode.c' else 'mqttsuite'
+                revisions = {'snode.c': '15', 'mqttsuite': '15'} if release == 'snode.c' else {'mqttsuite': '15'}
+                context = dict(run_id='capture', run_url='capture-url', destination='SNodeC/Packages', release_project=release)
+                for name, value in dict(context=context, targets=rows, revisions=revisions, profiles={}, sources={}).items():
+                    publication.write(bundle / (name + '.json'), value)
+                state = dict(repository='SNodeC/Packages', branch='main', targets={}, runs={})
+                generation = publication.record_run(bundle, state, context)
+                for row in rows:
+                    for project in revisions:
+                        publication.update(state, row, generation, project, 'published', 1, f'{project}/{row["id"]}')
+                before = json.loads(json.dumps(state))
+                publication.write(root / 'status.json', state)
+                args = [json.dumps(target), owner] if target else ['-', '-']
+                env = {'BUILD_PROJECT': owner, 'TARGET_ID': target['id'] if target else '-',
+                       'GITHUB_RUN_ATTEMPT': '2', 'BUILD_RUN_URL': 'retry-job', 'BUILD_ATTEMPT': ''}
+                with patch.dict(os.environ, env), patch.object(publication, 'render'), patch('sys.argv',
+                        ['publication', 'status', str(root), str(bundle), *args, 'pending']):
+                    publication.main()
+                after = publication.read(root / 'status.json')
+                self.assertEqual(after['runs'], before['runs'])
+                for row in rows:
+                    for project in revisions:
+                        key = f'{row["id"]}/{project}'
+                        if project == owner and (target is None or row == target):
+                            self.assertEqual(after['targets'][key]['status'], 'pending')
+                            self.assertEqual(after['targets'][key]['attempt'], 2)
+                            self.assertEqual(after['targets'][key]['job_url'], 'retry-job')
+                        else:
+                            self.assertEqual(after['targets'][key], before['targets'][key])
+                            self.assertEqual(after['timeline'][key], before['timeline'][key])
+
     def test_dependency_retry_does_not_consume_application_attempt_numbers(self):
         row = publication.targets()[0]
         generation = dict(revisions={'snode.c': '1', 'mqttsuite': '1'}, run_id='capture', run_url='url',
