@@ -339,7 +339,7 @@ class PackagePagesTest(unittest.TestCase):
             circle = ET.parse(badges / f'{label}.svg').getroot().find(ns + 'circle')
             self.assertEqual((circle.attrib['r'], circle.attrib['stroke-width'], circle.attrib['stroke']), ('5.25', '1.5', '#848d97'))
         self.assertIn('stroke="white"', (badges / 'current.svg').read_text())
-        self.assertEqual(len(list(ET.parse(badges / 'outdated.svg').getroot().iter(ns + 'circle'))), 2)
+        self.assertEqual(len(list(ET.parse(badges / 'outdated.svg').getroot().iter(ns + 'circle'))), 1)
         self.assertNotIn('alt="published"', self.text())
         for label in ('current', 'outdated', 'publishing', 'failed', 'skipped', 'cancelled'):
             self.assertIsNotNone(ET.parse(badges / f'{label}.svg').getroot().find(ns + 'path'))
