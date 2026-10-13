@@ -320,10 +320,14 @@ class PackagePagesTest(unittest.TestCase):
 
     def test_state_shapes_accessible_names_and_centered_geometry(self):
         import xml.etree.ElementTree as ET
+        obsolete = self.root / 'status/badges/published.svg'
+        obsolete.parent.mkdir(parents=True, exist_ok=True)
+        obsolete.write_text('obsolete')
         publication.render(self.root, self.state)
+        self.assertFalse(obsolete.exists())
         ns = '{http://www.w3.org/2000/svg}'
         badges = self.root / 'status/badges'
-        self.assertEqual(len(list(badges.glob('*.svg'))), 11)
+        self.assertEqual(len(list(badges.glob('*.svg'))), 10)
         for path in badges.glob('*.svg'):
             svg = ET.parse(path).getroot()
             self.assertEqual((svg.attrib['width'], svg.attrib['height'], svg.attrib['viewBox']), ('14', '14', '0 0 14 14'))
@@ -334,10 +338,12 @@ class PackagePagesTest(unittest.TestCase):
         for label in ('pending', 'superseded', 'not-built', 'cancelled'):
             circle = ET.parse(badges / f'{label}.svg').getroot().find(ns + 'circle')
             self.assertEqual((circle.attrib['r'], circle.attrib['stroke-width'], circle.attrib['stroke']), ('5.25', '1.5', '#848d97'))
-        self.assertNotEqual((badges / 'published.svg').read_bytes(), (badges / 'current.svg').read_bytes())
-        for label in ('published', 'publishing', 'failed', 'skipped', 'cancelled'):
+        self.assertIn('stroke="white"', (badges / 'current.svg').read_text())
+        self.assertEqual(len(list(ET.parse(badges / 'outdated.svg').getroot().iter(ns + 'circle'))), 2)
+        self.assertNotIn('alt="published"', self.text())
+        for label in ('current', 'outdated', 'publishing', 'failed', 'skipped', 'cancelled'):
             self.assertIsNotNone(ET.parse(badges / f'{label}.svg').getroot().find(ns + 'path'))
-        for label in ('current', 'published', 'outdated', 'skipped', 'running', 'publishing', 'failed', 'pending', 'superseded', 'not-built', 'cancelled'):
+        for label in ('current', 'outdated', 'skipped', 'running', 'publishing', 'failed', 'pending', 'superseded', 'not-built', 'cancelled'):
             self.assertEqual(self.text().count(f'alt="{label.replace("-", " ")}"'), 1)
 
 
