@@ -61,6 +61,8 @@ Verify downloads with the [signing keys](keys/README.md#page-overview) for your 
 
 ## How publication works
 
+Packages is the generated destination for signed feeds, installation guides and recorded build status; DistributionPackages owns publication. See the organization [workflow graph](https://github.com/SNodeC/.github/blob/main/docs/workflow-graph.md#page-overview) for the build, signing and dependent-build chain.
+
 [Read the column meanings and publication model](docs/publication.md#page-overview). Maintainer operations belong to DistributionPackages.
 
 ## Contributing
