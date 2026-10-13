@@ -34,7 +34,7 @@ Signed packages for the SNode.C ecosystem. Choose a project and distribution, in
 
 ## Quick start
 
-Start with your installed system, not an ongoing build: use the [distribution chooser](#install), check the guide’s requirements, then choose **complete sets** or **selected packages**. Follow its Check and Next steps to confirm installation and configure your applications. Status pages are optional: consult them to compare available packages with a replacement build.
+Start with your installed system, not an ongoing build: pick your distribution's guide under [Install](#install) and check its requirements. Use **Quick install** for the complete package sets or **Custom install** for selected packages, then follow the guide's Check and Next steps to confirm the installation and configure your applications. Status pages are optional: consult them to compare available packages with a replacement build.
 
 <a id="distributions"></a>
 
@@ -44,7 +44,7 @@ Select the guide matching your installed distribution, release and package archi
 
 <a id="platforms"></a>
 
-The supported release and architecture matrix is generated from the publisher's target definitions. Availability is reported per project and target.
+The supported releases and architectures are generated from the publisher's target definitions. Package availability per project, release and architecture is on the [status pages](status/README.md#page-overview).
 
 <!-- packages:begin platforms -->
 <!-- packages:end platforms -->

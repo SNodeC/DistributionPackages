@@ -1,6 +1,7 @@
 """Recorded filesystem facts drive all package-status presentation."""
 import copy
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -78,6 +79,24 @@ class PackagePagesTest(unittest.TestCase):
         self.assertIn('2.0.0 · r9', (self.root / 'README.md').read_text())
         self.assertIn('1.0.2 · r9', (self.root / 'status/README.md').read_text())
         self.assertNotIn('Available targets', (self.root / 'README.md').read_text())
+
+    def test_platform_releases_follow_target_and_status_order(self):
+        publication.render(self.root, self.state)
+        table = (self.root / 'README.md').read_text().split('<!-- packages:begin platforms -->', 1)[1].split('<!-- packages:end platforms -->', 1)[0]
+        cells = {}
+        for distribution, (title, guide) in publication.DISTRIBUTIONS.items():
+            with self.subTest(distribution=distribution):
+                expected = list(dict.fromkeys(row['suite'] for row in publication.targets()
+                                              if row['distribution'] == distribution))
+                line = next(line for line in table.splitlines() if line.startswith(f'| [{title}]('))
+                cells[distribution] = line.split('|')[2].strip()
+                self.assertEqual(cells[distribution].split(', '), expected)
+                for config in repository.PROJECTS.values():
+                    jump = next(line for line in self.text(config['package']).splitlines()
+                                if line.startswith(f'| {title} |'))
+                    self.assertEqual(re.findall(r'\[([^]]+)\]\(', jump), expected)
+        self.assertEqual(cells['debian'], 'trixie, forky, sid')
+        self.assertEqual(cells['rocky'], '9, 10')
 
     def test_cancelled_and_skipped_replacements_keep_old_packages(self):
         self.feed(revision=5)

@@ -41,7 +41,7 @@ Use **Raspberry Pi 3, 4 or 5 with 64-bit Raspberry Pi OS** (`arm64`). The [offic
 
 ## Quick install
 
-### Complete sets
+Install the complete package sets:
 
 ```sh
 (
@@ -68,7 +68,7 @@ The requested packages show versions and `install ok installed`. Missing or inco
 
 ## Custom install
 
-### Selected packages
+Prepare the repository without installing packages, then install only what you need:
 
 ```sh
 (

@@ -45,7 +45,7 @@ sudo dnf config-manager --set-enabled crb
 
 ## Quick install
 
-### Complete sets
+Install the complete package sets:
 
 ```sh
 (
@@ -72,7 +72,7 @@ Both requested packages show their installed version, release and architecture; 
 
 ## Custom install
 
-### Selected packages
+Prepare the repository without installing packages, then install only what you need:
 
 ```sh
 (

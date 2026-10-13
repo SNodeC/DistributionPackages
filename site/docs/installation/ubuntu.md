@@ -41,7 +41,7 @@ Noble is Ubuntu 24.04 LTS; Resolute is Ubuntu 26.04 LTS.
 
 ## Quick install
 
-### Complete sets
+Install the complete package sets:
 
 ```sh
 (
@@ -68,7 +68,7 @@ The requested packages show versions and `install ok installed`. Missing or inco
 
 ## Custom install
 
-### Selected packages
+Prepare the repository without installing packages, then install only what you need:
 
 ```sh
 (

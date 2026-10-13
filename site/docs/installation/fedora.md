@@ -38,7 +38,7 @@ sudo dnf install ca-certificates curl
 
 ## Quick install
 
-### Complete sets
+Install the complete package sets:
 
 ```sh
 (
@@ -65,7 +65,7 @@ Both requested packages show their installed version, release and architecture; 
 
 ## Custom install
 
-### Selected packages
+Prepare the repository without installing packages, then install only what you need:
 
 ```sh
 (
