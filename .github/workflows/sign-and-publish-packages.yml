@@ -1,8 +1,9 @@
 name: Sign and publish distribution packages
+# Sign and publish validated artifacts, then request any dependent target build.
 run-name: Publish ${{ github.event.client_payload.project }} · ${{ github.event.client_payload.target }}
 on:
   repository_dispatch:
-    types: [package-built]
+    types: [sign-and-publish-packages]
 permissions:
   contents: read
   actions: read

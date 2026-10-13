@@ -37,7 +37,7 @@ Both upstream projects use the same `Build distribution packages` workflow, with
 
 The legacy App credential name does not select a distribution. No package-signing private key is required in either source repository. Keep all three package-signing secrets in DistributionPackages only.
 
-A version-tag push captures sources, allocates revisions and prepares the build matrix in that same source workflow. Successful source jobs upload unsigned artifacts and send `package-built` back to DistributionPackages. After each SNode.C publication, the publisher sends `package-build` for that target to MQTTSuite, including the exact Packages commit. These dispatches implement one release chain; ordinary commits do not enter it.
+A version-tag push captures sources, allocates revisions and prepares the build matrix in that same source workflow. Successful source jobs upload unsigned artifacts and send `sign-and-publish-packages` back to DistributionPackages. After each SNode.C publication, the publisher sends `build-dependent-packages` for that target to MQTTSuite, including the exact Packages commit. These dispatches implement one release chain; ordinary commits do not enter it.
 
 Only version-tag creation or movement starts builds. No ordinary push or README change starts package CI. README automation, if present upstream, remains independent. The migration never creates or moves upstream tags automatically.
 

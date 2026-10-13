@@ -28,7 +28,7 @@ def build(bundle, project, target, publication):
             read(bundle / 'context.json')['captured_at'])):
         if any(item['display_title'] == title for item in page['workflow_runs']):
             return
-    api(f'repos/SNodeC/{project}/dispatches', dict(event_type='package-build', client_payload=dict(
+    api(f'repos/SNodeC/{project}/dispatches', dict(event_type='build-dependent-packages', client_payload=dict(
         capture=capture, target=target, publication=publication)))
 
 
@@ -41,7 +41,7 @@ def receive(payload):
     if not all(value.isdecimal() and int(value) > 0 for value in (capture, build_run, attempt)):
         raise ValueError('Invalid run identity')
     origin = api(f'repos/SNodeC/{project}/actions/runs/{build_run}')
-    if (origin['event'] not in {'push', 'repository_dispatch'} or origin['path'] != '.github/workflows/packages.yml'
+    if (origin['event'] not in {'push', 'repository_dispatch'} or origin['path'] != '.github/workflows/build-distribution-packages.yml'
             or origin['head_repository']['full_name'] != f'SNodeC/{project}'
             or origin['run_attempt'] < int(attempt)):
         raise ValueError('Artifact must come from the current upstream package build attempt')
@@ -59,7 +59,7 @@ def receive(payload):
             raise ValueError('Invalid job identity')
         job = api(f'repos/SNodeC/{project}/actions/jobs/{job_id}')
         if (str(job['run_id']) != build_run or str(job['run_attempt']) != attempt
-                or job['name'] != f"Build and test · {row['distribution']} · {row['suite']} · {row['arch']}"):
+                or job['name'] != f"{row['distribution']} · {row['suite']} · {row['arch']}"):
             raise ValueError('Job does not belong to the validated target and build attempt')
         job_url = job['html_url']
     name = f'packages-{project}-{row["id"]}-{attempt}'
@@ -109,7 +109,7 @@ if __name__ == '__main__':
     elif command == 'built':
         bundle, target, project = args
         capture = read(Path(bundle) / 'context.json')['run_id']
-        api('repos/SNodeC/DistributionPackages/dispatches', dict(event_type='package-built', client_payload=dict(
+        api('repos/SNodeC/DistributionPackages/dispatches', dict(event_type='sign-and-publish-packages', client_payload=dict(
             capture=capture, project=project, target=target, run=os.environ['GITHUB_RUN_ID'],
             attempt=os.environ['GITHUB_RUN_ATTEMPT'], **({'job': os.environ['BUILD_JOB_ID']} if os.environ.get('BUILD_JOB_ID') else {}))))
     else:

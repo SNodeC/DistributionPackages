@@ -1,4 +1,5 @@
-name: Render package status
+name: Publish package guides and render status
+# Publish authored README, guides and keys guide, and render status without rebuilding.
 on:
   workflow_dispatch:
 permissions:
