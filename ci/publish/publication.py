@@ -168,7 +168,7 @@ print(json.dumps({path: render_header('Packages', path) for path in json.load(sy
         page = template.replace('<!-- header -->', headers[f"status/{config['package']}.md"]).replace('<!-- title -->', config['title']).replace('<!-- release -->', release).replace('<!-- navigation -->', navigation).replace('<!-- menu -->', '\n\n'.join(menu[:1]) + '\n\n' + '\n'.join(menu[1:])).replace('<!-- body -->', '\n\n'.join(body)).replace('<!-- legend -->', legend)
         (root / f"status/{config['package']}.md").write_text(page)
     for distribution, (title, guide) in DISTRIBUTIONS.items():
-        selected = sorted((row for row in rows if row['distribution'] == distribution), key=lambda row: (row['suite'], row['arch']))
+        selected = [row for row in rows if row['distribution'] == distribution]
         suites = list(dict.fromkeys(row['suite'] for row in selected))
         architectures = list(dict.fromkeys(row['arch'] for row in selected))
         platforms.append(f"| [{title}](docs/installation/{guide}.md#page-overview) | {', '.join(suites)} | {', '.join(architectures) if len(architectures) < 8 else str(max(sum(row['suite'] == suite for row in selected) for suite in suites)) + ' per release (names can differ)'} |")

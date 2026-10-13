@@ -41,7 +41,7 @@ The matrix covers Trixie (stable), Forky (testing) and Sid (unstable). Use the i
 
 ## Quick install
 
-### Complete sets
+Install the complete package sets:
 
 ```sh
 (
@@ -70,7 +70,7 @@ The requested packages show versions and `install ok installed`. Missing or inco
 
 ## Custom install
 
-### Selected packages
+Prepare the repository without installing packages, then install only what you need:
 
 ```sh
 (

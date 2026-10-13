@@ -38,7 +38,7 @@ Use `DISTRIB_ARCH`, not `uname -m`. Several devices can share a package architec
 
 ## Quick install
 
-### Complete sets
+Install the complete package sets:
 
 ```sh
 (
@@ -71,7 +71,7 @@ On 24.10, installed package names and versions are listed; on 25.12, both reques
 
 ## Custom install
 
-### Selected packages
+Prepare the repository without installing packages, then install only what you need:
 
 ```sh
 (
