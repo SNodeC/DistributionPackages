@@ -13,7 +13,7 @@ Signed packages for the SNode.C ecosystem. Choose a project and distribution, in
 
 <!-- snodec:begin menu -->
 <p>
-<a href="#quick-start"><img src="docs/media/menu/start.svg" alt="Start"></a>
+
 <a href="#install"><img src="docs/media/menu/install.svg" alt="Install"></a>
 <a href="status/README.md#page-overview"><img src="docs/media/menu/status.svg" alt="Status"></a>
 <a href="docs/troubleshooting.md#page-overview"><img src="docs/media/menu/troubleshoot.svg" alt="Troubleshoot"></a>
@@ -31,10 +31,6 @@ Signed packages for the SNode.C ecosystem. Choose a project and distribution, in
 <!-- packages:end projects -->
 
 <a id="installation"></a>
-
-## Quick start
-
-Start with your installed system, not an ongoing build: pick your distribution's guide under [Install](#install) and check its requirements. Use **Quick install** for the complete package sets or **Custom install** for selected packages, then follow the guide's Check and Next steps to confirm the installation and configure your applications. Status pages are optional: consult them to compare available packages with a replacement build.
 
 <a id="distributions"></a>
 
