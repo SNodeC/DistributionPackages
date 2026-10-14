@@ -33,6 +33,32 @@ class HandoffTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     dispatch.receive(payload)
 
+    def test_manual_publication_requires_own_capture_and_default_branch(self):
+        target = publication.targets()[0]['id']
+        for project in ('snode.c', 'mqttsuite'):
+            payload = dict(project=project, target=target, capture='123', run='123', attempt='1')
+            origin = dict(event='workflow_dispatch', head_branch='trunk',
+                          path='.github/workflows/build-distribution-packages.yml',
+                          head_repository={'full_name': f'SNodeC/{project}'}, run_attempt=1,
+                          display_title='Packages · 123 · -', html_url='https://example.invalid/123')
+            def response(path):
+                return {'default_branch': 'trunk'} if path == f'repos/SNodeC/{project}' else origin
+            with self.subTest(project=project), patch.object(dispatch, 'api', side_effect=response):
+                result = dispatch.receive(payload)
+                self.assertEqual(result['capture_repository'], f'SNodeC/{project}')
+                self.assertEqual(result['artifact'], f'packages-{project}-{target}-1')
+                with self.assertRaises(ValueError):
+                    dispatch.receive(payload | {'capture': '456'})
+            for changes in (dict(head_branch='feature/manual'), dict(run_attempt=0),
+                            dict(path='.github/workflows/other.yml'),
+                            dict(head_repository={'full_name': 'other/fork'}),
+                            dict(display_title=f'Packages · 123 · {target}')):
+                invalid = origin | changes
+                with self.subTest(project=project, changes=changes), patch.object(dispatch, 'api',
+                        side_effect=lambda path: {'default_branch': 'trunk'} if path == f'repos/SNodeC/{project}' else invalid):
+                    with self.assertRaises(ValueError):
+                        dispatch.receive(payload)
+
     def test_receipt_locates_capture_for_application_tag_and_dependency_build(self):
         target = publication.targets()[0]['id']
         payload = dict(project='mqttsuite', target=target, capture='123', run='123', attempt='1')

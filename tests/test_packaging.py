@@ -127,7 +127,8 @@ class PackagingTest(unittest.TestCase):
             (root / 'status/old-target.svg').write_text('obsolete')
             publication.render(root, {'targets': {}})
             before = {p.name: p.read_bytes() for p in (root / 'status/badges').iterdir()}
-            self.assertEqual(set(before), {label + ".svg" for label in ["current", "outdated", "pending", "running", "publishing", "published", "failed", "cancelled", "skipped", "superseded", "not-built"]})
+            self.assertEqual(set(before), {label + ".svg" for label in ["current", "outdated", "pending", "running", "publishing", "failed", "cancelled", "skipped", "superseded", "not-built"]})
+            self.assertNotIn("published.svg", before)
             for name, svg in before.items():
                 self.assertIn(b'width="14" height="14"', svg)
                 self.assertIn(b'<circle cx="7" cy="7"', svg)

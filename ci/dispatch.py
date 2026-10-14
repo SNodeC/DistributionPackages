@@ -41,7 +41,7 @@ def receive(payload):
     if not all(value.isdecimal() and int(value) > 0 for value in (capture, build_run, attempt)):
         raise ValueError('Invalid run identity')
     origin = api(f'repos/SNodeC/{project}/actions/runs/{build_run}')
-    if (origin['event'] not in {'push', 'repository_dispatch'} or origin['path'] != '.github/workflows/build-distribution-packages.yml'
+    if (origin['event'] not in {'push', 'repository_dispatch', 'workflow_dispatch'} or origin['path'] != '.github/workflows/build-distribution-packages.yml'
             or origin['head_repository']['full_name'] != f'SNodeC/{project}'
             or origin['run_attempt'] < int(attempt)):
         raise ValueError('Artifact must come from the current upstream package build attempt')
@@ -50,6 +50,10 @@ def receive(payload):
     if origin['event'] == 'push':
         if capture != build_run or not re.fullmatch(r'v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', origin['head_branch']):
             raise ValueError('Capture must be the originating version-tag run')
+    elif origin['event'] == 'workflow_dispatch':
+        if (capture != build_run or origin['display_title'] != f'Packages · {capture} · -'
+                or origin['head_branch'] != api(f'repos/SNodeC/{project}')['default_branch']):
+            raise ValueError('Manual capture must be its own default-branch package run')
     elif project != 'mqttsuite' or origin['display_title'] != f'Packages · {capture} · {row["id"]}':
         raise ValueError('Only a published SNode.C target dispatches a dependent build')
     job_url = origin['html_url']
@@ -65,7 +69,7 @@ def receive(payload):
     name = f'packages-{project}-{row["id"]}-{attempt}'
     return dict(project=project, target=json.dumps(row), capture=capture, run=build_run,
                 attempt=attempt, artifact=name, run_url=job_url,
-                capture_repository='SNodeC/' + (project if origin['event'] == 'push' else 'snode.c'))
+                capture_repository='SNodeC/' + (project if origin['event'] != 'repository_dispatch' else 'snode.c'))
 
 
 def baseline(bundle, target, ref):
