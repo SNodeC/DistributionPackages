@@ -84,7 +84,7 @@ jobs:
           sparse-checkout-cone-mode: false
       - name: Cache compiled OpenWrt signers
         if: fromJSON(steps.source.outputs.target).family == 'openwrt'
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/openwrt-signers
           key: openwrt-signers-${{ runner.os }}-${{ runner.arch }}-${{ steps.scope.outputs.signer-platform }}-${{ hashFiles('feed/ci/publish/tools.sh') }}
