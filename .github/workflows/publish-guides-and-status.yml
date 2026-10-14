@@ -28,7 +28,7 @@ jobs:
           owner: SNodeC
           repositories: Packages
           permission-contents: write
-      - name: Render and commit recorded package status
+      - name: Publish guides and render package availability indicators
         env:
           PACKAGES_TOKEN: ${{ steps.publisher.outputs.token }}
         run: bash feed/ci/publish/status.sh published render

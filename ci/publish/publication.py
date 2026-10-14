@@ -98,9 +98,8 @@ print(json.dumps({path: render_header('Packages', path) for path in json.load(sy
                                 cwd=temporary, env=environment, check=True, timeout=120)
         headers = json.loads(result.stdout)
     indicators = {
-        'current': '<circle cx="7" cy="7" r="6" fill="#1a7f37"/>',
-        'published': '<circle cx="7" cy="7" r="6" fill="#1a7f37"/><path d="M4 7.2l2 2 4-4.2" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
-        'outdated': '<circle cx="7" cy="7" r="6" fill="#9a6700"/>',
+        'current': '<circle cx="7" cy="7" r="6" fill="#1a7f37"/><path d="M4 7.2l2 2 4-4.2" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
+        'outdated': '<circle cx="7" cy="7" r="6" fill="#9a6700"/><path d="M7 3.2V7l2.3 1.5" fill="none" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>',
         'skipped': '<circle cx="7" cy="7" r="5.25" fill="none" stroke="#9a6700" stroke-width="1.5"/><path d="M4.5 7h5" fill="none" stroke="#9a6700" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
         'running': '<circle cx="7" cy="7" r="6" fill="#0969da"/><circle cx="7" cy="7" r="2" fill="white"/>',
         'publishing': '<circle cx="7" cy="7" r="6" fill="#8250df"/><path d="M7 4v6M4.5 6.5L7 4l2.5 2.5" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
@@ -114,8 +113,8 @@ print(json.dumps({path: render_header('Packages', path) for path in json.load(sy
     badges.mkdir(parents=True, exist_ok=True)
     for label, body in indicators.items():
         (badges / f'{label}.svg').write_text(f'<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" role="img" aria-label="{label.replace("-", " ")}"><title>{label.replace("-", " ")}</title>{body}</svg>\n')
-    for obsolete in [*(root / 'status').glob('*.svg'), *(root / 'status/menu').glob('*.svg')]:
-        obsolete.unlink()
+    for obsolete in [badges / 'published.svg', *(root / 'status').glob('*.svg'), *(root / 'status/menu').glob('*.svg')]:
+        obsolete.unlink(missing_ok=True)
     dot = lambda label: f'<img src="badges/{label}.svg" alt="{label.replace("-", " ")}" title="{label.replace("-", " ").capitalize()}" width="14" height="14" align="absmiddle">'
     stamp = lambda value: datetime.fromisoformat(value.replace('Z', '+00:00')).astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M') if value else '—'
     rows = targets()
