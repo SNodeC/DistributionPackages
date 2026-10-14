@@ -292,8 +292,10 @@ class PackagePagesTest(unittest.TestCase):
         git('update-ref', 'refs/remotes/origin/trunk', 'HEAD')
         tmp = self.root / 'runner'
         tmp.mkdir()
-        env = os.environ | {'RUNNER_TEMP': str(tmp), 'GITHUB_ENV': str(self.root / 'env')}
+        env = os.environ | {'RUNNER_TEMP': str(tmp), 'GITHUB_ENV': str(self.root / 'env'),
+                            'GITHUB_OUTPUT': str(self.root / 'output'), 'ImageOS': 'ubuntu24', 'ImageVersion': 'fixture'}
         subprocess.run(['bash', '-e', '-o', 'pipefail', '-c', 'commit=' + commit + '\n' + shell], cwd=self.root, env=env, check=True, capture_output=True)
+        self.assertIn('signer-platform=ubuntu24-fixture', (self.root / 'output').read_text())
         self.assertEqual((current / 'README.md').read_bytes(), (repository.ROOT / 'site/README.md').read_bytes())
         self.assertFalse((current / 'docs/old.md').exists())
         self.assertEqual((current / 'tool.py').read_text(), 'CAPTURED')
