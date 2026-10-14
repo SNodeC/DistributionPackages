@@ -598,7 +598,7 @@ class StatusEventsTest(unittest.TestCase):
         self.assertEqual(publication.read(self.seed/'status.json')['targets'][self.rows[0]['id']+'/snode.c']['status'],'published')
         for name,data in original.items():
             self.assertEqual((self.bundle/name).read_bytes(),data)
-        self.assertIn('# SNodeC Packages', (self.seed/'README.md').read_text())
+        self.assertIn('# SNode.C Packages', (self.seed/'README.md').read_text())
         self.assertIn('<!-- packages:begin projects -->', (self.seed/'README.md').read_text())
         self.assertNotIn('# DistributionPackages', (self.seed/'README.md').read_text())
         self.assertEqual((self.seed/'install/install.sh').read_bytes(),(repository.ROOT/'install/install.sh').read_bytes())
