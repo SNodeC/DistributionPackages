@@ -154,7 +154,7 @@ class PackagingTest(unittest.TestCase):
             self.assertNotIn('## Needs attention', text)
             self.assertIn('latest release —', text)
             self.assertFalse((root/'docs/status.md').exists())
-            self.assertIn('snodec.md#page-overview', (root/'status/README.md').read_text())
+            self.assertIn('snodec.md#banner', (root/'status/README.md').read_text())
             self.assertFalse((root/'README.md').exists())
             self.assertFalse((root/'install').exists())
 

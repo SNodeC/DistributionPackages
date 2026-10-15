@@ -1,22 +1,22 @@
 <!-- Published from DistributionPackages/site; edit that source, not this snapshot. -->
 
 <!-- snodec:begin page-header -->
-<a id="page-overview"></a>
+<a id="banner"></a><a id="page-overview"></a>
 <p><picture><source media="(max-width: 640px)" srcset="../media/nav/banner-catalogs-compact.svg"><img src="../media/nav/banner-catalogs.svg" alt="Packages — Catalogs" width="100%"></picture></p>
-<p><a href="README.md#page-overview" title="Up to Catalogs"><picture><source media="(prefers-color-scheme: dark)" srcset="../media/nav/up-catalogs-dark.svg"><img src="../media/nav/up-catalogs-light.svg" alt="Up to Catalogs" title="Up to Catalogs" width="160" height="28"></picture></a><a href="https://github.com/SNodeC" title="SNode.C organization"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="../media/nav/organization-icon-dark.svg"><source media="(max-width: 640px)" srcset="../media/nav/organization-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="../media/nav/organization-dark.svg"><img align="right" src="../media/nav/organization-light.svg" alt="SNode.C organization" title="SNode.C organization"></picture></a><a href="../../README.md#project-overview" title="Packages repository"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="../media/nav/repository-icon-dark.svg"><source media="(max-width: 640px)" srcset="../media/nav/repository-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="../media/nav/repository-dark.svg"><img align="right" src="../media/nav/repository-light.svg" alt="Packages repository" title="Packages repository"></picture></a><br clear="all"></p>
+<p><a href="README.md#banner" title="Up to Catalogs"><picture><source media="(prefers-color-scheme: dark)" srcset="../media/nav/up-catalogs-dark.svg"><img src="../media/nav/up-catalogs-light.svg" alt="Up to Catalogs" title="Up to Catalogs" width="160" height="28"></picture></a><a href="https://github.com/VolkerChristian#banner" title="Volker Christian account"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="../media/nav/account-icon-dark.svg"><source media="(max-width: 640px)" srcset="../media/nav/account-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="../media/nav/account-dark.svg"><img align="right" src="../media/nav/account-light.svg" alt="Volker Christian account" title="Volker Christian account"></picture></a><a href="https://github.com/SNodeC#banner" title="SNode.C organization"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="../media/nav/organization-icon-dark.svg"><source media="(max-width: 640px)" srcset="../media/nav/organization-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="../media/nav/organization-dark.svg"><img align="right" src="../media/nav/organization-light.svg" alt="SNode.C organization" title="SNode.C organization"></picture></a><a href="../../README.md#banner" title="Packages repository"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="../media/nav/repository-icon-dark.svg"><source media="(max-width: 640px)" srcset="../media/nav/repository-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="../media/nav/repository-dark.svg"><img align="right" src="../media/nav/repository-light.svg" alt="Packages repository" title="Packages repository"></picture></a><br clear="all"></p>
 <!-- snodec:end page-header -->
 
 # SNode.C package catalog
 
 <!-- snodec:begin menu -->
-[![Install](../media/menu/install.svg)](../../README.md#install) [![Status](../media/menu/status.svg)](../../status/snodec.md#page-overview) [![Catalog](../media/menu/catalog.svg)](#package-catalog) [![Details](../media/menu/details.svg)](#distribution-details) [![Query](../media/menu/query.svg)](#query-available-packages) [![Use](../media/menu/use.svg)](#after-installation)
+[![Install](../media/menu/install.svg)](../../README.md#install) [![Status](../media/menu/status.svg)](../../status/snodec.md#banner) [![Catalog](../media/menu/catalog.svg)](#package-catalog) [![Details](../media/menu/details.svg)](#distribution-details) [![Query](../media/menu/query.svg)](#query-available-packages) [![Use](../media/menu/use.svg)](#after-installation)
 <!-- snodec:end menu -->
 
 Package names are shared by OpenWrt, Raspberry Pi OS, Debian, Ubuntu, Rocky Linux and Fedora. Architectures affect availability and binary contents, not names.
 
 ## Package catalog
 
-Each library package installs `lib<package>.so.<ABI>` and its real `.so.<version>` file; `<ABI>` identifies the binary interface and `<version>` follows the source release. [Package status](../../status/snodec.md#page-overview) shows current versions.
+Each library package installs `lib<package>.so.<ABI>` and its real `.so.<version>` file; `<ABI>` identifies the binary interface and `<version>` follows the source release. [Package status](../../status/snodec.md#banner) shows current versions.
 
 | Package | Payload / role |
 | --- | --- |
@@ -86,4 +86,4 @@ apk search 'snodec*'
 
 ## After installation
 
-Use `snodec-control --help` to inspect framework configuration. Runtime modules, development files and demonstration programs are different components; installing packages does not configure a network service. Continue with the [framework documentation](https://github.com/SNodeC/snode.c#project-overview).
+Use `snodec-control --help` to inspect framework configuration. Runtime modules, development files and demonstration programs are different components; installing packages does not configure a network service. Continue with the [framework documentation](https://github.com/SNodeC/snode.c#banner).

@@ -217,7 +217,7 @@ class PackagePagesTest(unittest.TestCase):
         with patch.dict(repository.PROJECTS, {'new-project': dict(title='New project', package='new-package', depends_on=())}):
             publication.render(self.root, self.state)
         for path in ['README.md', 'status/README.md']:
-            self.assertIn('[New project](https://github.com/SNodeC/new-project#project-overview)', (self.root / path).read_text())
+            self.assertIn('[New project](https://github.com/SNodeC/new-project#banner)', (self.root / path).read_text())
 
 
 
@@ -310,7 +310,7 @@ class PackagePagesTest(unittest.TestCase):
         self.assertIn('| Distribution | Jump to release |', text)
         self.assertIn('[sid](#debian-sid)', text)
         self.assertIn('[↑ Distributions](#distributions)', text)
-        self.assertIn('[Debian install guide](../docs/installation/debian.md#page-overview)', text)
+        self.assertIn('[Debian install guide](../docs/installation/debian.md#banner)', text)
         self.assertNotIn('src="menu/', text)
         self.assertIn('<!-- snodec:begin menu -->', text)
         self.assertNotIn('section-pages', (self.root / 'status/README.md').read_text())
