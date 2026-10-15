@@ -1,15 +1,15 @@
 <!-- Published from DistributionPackages/site; edit that source, not this snapshot. -->
 
 <!-- snodec:begin page-header -->
-<a id="page-overview"></a>
+<a id="banner"></a><a id="page-overview"></a>
 <p><picture><source media="(max-width: 640px)" srcset="media/nav/banner-documentation-compact.svg"><img src="media/nav/banner-documentation.svg" alt="Packages — Documentation" width="100%"></picture></p>
-<p><a href="README.md#page-overview" title="Up to Documentation"><picture><source media="(prefers-color-scheme: dark)" srcset="media/nav/up-documentation-dark.svg"><img src="media/nav/up-documentation-light.svg" alt="Up to Documentation" title="Up to Documentation" width="160" height="28"></picture></a><a href="https://github.com/SNodeC" title="SNode.C organization"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="media/nav/organization-icon-dark.svg"><source media="(max-width: 640px)" srcset="media/nav/organization-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="media/nav/organization-dark.svg"><img align="right" src="media/nav/organization-light.svg" alt="SNode.C organization" title="SNode.C organization"></picture></a><a href="../README.md#project-overview" title="Packages repository"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="media/nav/repository-icon-dark.svg"><source media="(max-width: 640px)" srcset="media/nav/repository-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="media/nav/repository-dark.svg"><img align="right" src="media/nav/repository-light.svg" alt="Packages repository" title="Packages repository"></picture></a><br clear="all"></p>
+<p><a href="README.md#banner" title="Up to Documentation"><picture><source media="(prefers-color-scheme: dark)" srcset="media/nav/up-documentation-dark.svg"><img src="media/nav/up-documentation-light.svg" alt="Up to Documentation" title="Up to Documentation" width="160" height="28"></picture></a><a href="https://github.com/VolkerChristian#banner" title="Volker Christian account"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="media/nav/account-icon-dark.svg"><source media="(max-width: 640px)" srcset="media/nav/account-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="media/nav/account-dark.svg"><img align="right" src="media/nav/account-light.svg" alt="Volker Christian account" title="Volker Christian account"></picture></a><a href="https://github.com/SNodeC#banner" title="SNode.C organization"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="media/nav/organization-icon-dark.svg"><source media="(max-width: 640px)" srcset="media/nav/organization-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="media/nav/organization-dark.svg"><img align="right" src="media/nav/organization-light.svg" alt="SNode.C organization" title="SNode.C organization"></picture></a><a href="../README.md#banner" title="Packages repository"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="media/nav/repository-icon-dark.svg"><source media="(max-width: 640px)" srcset="media/nav/repository-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="media/nav/repository-dark.svg"><img align="right" src="media/nav/repository-light.svg" alt="Packages repository" title="Packages repository"></picture></a><br clear="all"></p>
 <!-- snodec:end page-header -->
 
 # Troubleshooting
 
 <!-- snodec:begin menu -->
-[![Install](media/menu/install.svg)](../README.md#install) [![Status](media/menu/status.svg)](../status/README.md#page-overview) [![Terms](media/menu/terms.svg)](#terms)
+[![Install](media/menu/install.svg)](../README.md#install) [![Status](media/menu/status.svg)](../status/README.md#banner) [![Terms](media/menu/terms.svg)](#terms)
 <!-- snodec:end menu -->
 
 ## Common problems
@@ -20,7 +20,7 @@
 | Signature verification fails | Check the system clock, repository URL and installed [signing key](../keys/README.md#verify-identity). Keep signature verification enabled. |
 | Dependencies cannot be installed | Keep the official repositories enabled for the installed release. Do not mix distributions, releases or package architectures. Check the guide for additional dependency repositories. |
 | Download fails just after publication | Refresh package indexes and retry after GitHub's raw-content caches update. |
-| A newer package is unavailable | Compare **Available** with **In build** on [Package status](../status/README.md#page-overview). A successful compilation alone does not mean publication succeeded. |
+| A newer package is unavailable | Compare **Available** with **In build** on [Package status](../status/README.md#banner). A successful compilation alone does not mean publication succeeded. |
 | The latest rebuild failed | The previous published packages remain available. Check **In build** and open **Build log** for the replacement attempt. A published replacement shows `—` in In build. |
 | An application does not start | Inspect its `--help` output, configuration and logs. Verify installation completed and configure listeners, credentials, certificates and any required database before starting it. |
 | A package cannot be downloaded from a browser | Open **Packages** on the project status page to find its filename. Package managers use signed repository indexes, not GitHub directory views. |
