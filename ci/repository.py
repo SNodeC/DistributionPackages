@@ -131,7 +131,7 @@ def prepare(published_root, bundle):
                 commit = refs.get(f'refs/tags/{source_tag}^{{}}', refs[f'refs/tags/{source_tag}'])
                 with tempfile.TemporaryDirectory() as tmp:
                     source = Path(tmp) / repo
-                    run('git', 'clone', '--depth', '1', '--branch', source_tag, '--recurse-submodules',
+                    run('git', 'clone', '--depth', '1', '--revision', commit, '--recurse-submodules',
                         f'https://github.com/SNodeC/{repo}.git', str(source))
                     if run('git', '-C', str(source), 'rev-parse', 'HEAD') != commit:
                         raise RuntimeError('Source tag changed during capture')
