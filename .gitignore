@@ -1,2 +1,5 @@
 /sdks/
 __pycache__/
+
+/build/
+/checkouts/

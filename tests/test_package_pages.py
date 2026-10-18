@@ -68,7 +68,7 @@ class PackagePagesTest(unittest.TestCase):
     def test_idle_all_current_and_full_coverage(self):
         for row in publication.targets():
             self.feed(row)
-            for project in repository.PROJECTS:
+            for project in self.generation['revisions']:
                 self.event(project, 'published', row)
         publication.render(self.root, self.state)
         for package in ['snodec', 'mqttsuite']:
@@ -91,10 +91,13 @@ class PackagePagesTest(unittest.TestCase):
                 line = next(line for line in table.splitlines() if line.startswith(f'| [{title}]('))
                 cells[distribution] = line.split('|')[2].strip()
                 self.assertEqual(cells[distribution].split(', '), expected)
-                for config in repository.PROJECTS.values():
-                    jump = next(line for line in self.text(config['package']).splitlines()
-                                if line.startswith(f'| {title} |'))
-                    self.assertEqual(re.findall(r'\[([^]]+)\]\(', jump), expected)
+                for project, config in repository.PROJECTS.items():
+                    if not any(repository.supports(project, row) for row in publication.targets() if row['distribution'] == distribution):
+                        self.assertNotIn(f'| {title} |', self.text(config['package']))
+                    else:
+                        jump = next(line for line in self.text(config['package']).splitlines()
+                                    if line.startswith(f'| {title} |'))
+                        self.assertEqual(re.findall(r'\[([^]]+)\]\(', jump), expected)
         self.assertEqual(cells['debian'], 'trixie, forky, sid')
         self.assertEqual(cells['rocky'], '9, 10')
 
