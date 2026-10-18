@@ -14,98 +14,84 @@ from ci.publish import publication, openwrt
 
 
 class HandoffTest(unittest.TestCase):
-    def test_receipt_requires_upstream_workflow_capture_and_attempt(self):
+    def test_receipt_requires_coordinator_and_upstream_build_identity(self):
         target = publication.targets()[0]['id']
-        payload = dict(project='snode.c', target=target, capture='456', run='456', attempt='1')
-        origin = dict(event='push', head_branch='v2.0.0', path='.github/workflows/build-distribution-packages.yml',
+        payload = dict(project='snode.c', target=target, capture='123', run='456', attempt='1')
+        capture = dict(event='repository_dispatch', path='.github/workflows/orchestrate-packages.yml',
+                       head_repository={'full_name': dispatch.COORDINATOR})
+        origin = dict(event='repository_dispatch', path='.github/workflows/build-distribution-packages.yml',
                       head_repository={'full_name': 'SNodeC/snode.c'}, run_attempt=2,
-                      display_title='Packages · 456 · -', html_url='https://example.invalid/456')
-        with patch.object(dispatch, 'api', return_value=origin):
+                      display_title='Packages · 123 · -', html_url='https://example.invalid/456')
+        with patch.object(dispatch, 'api', side_effect=[capture, origin]):
             result = dispatch.receive(payload)
-            # A retry of another matrix job must not invalidate this successful attempt's artifact.
             self.assertEqual(result['artifact'], f'packages-snode.c-{target}-1')
-            self.assertEqual(result['attempt'], '1')
-            self.assertEqual(result['capture_repository'], 'SNodeC/snode.c')
-        for changes in [dict(event='pull_request'), dict(path='.github/workflows/untrusted.yml'),
+            self.assertEqual(result['capture_repository'], dispatch.COORDINATOR)
+        for changes in [dict(event='push'), dict(event='pull_request'), dict(path='.github/workflows/untrusted.yml'),
                         dict(head_repository={'full_name': 'other/fork'}), dict(run_attempt=0),
-                        dict(display_title='Packages · 999 · -'), dict(head_branch='master'), dict(event='repository_dispatch')]:
-            with self.subTest(changes=changes), patch.object(dispatch, 'api', return_value=origin | changes):
+                        dict(display_title='Packages · 999 · -')]:
+            with self.subTest(changes=changes), patch.object(dispatch, 'api', side_effect=[capture, origin | changes]):
+                with self.assertRaises(ValueError):
+                    dispatch.receive(payload)
+        for changes in [dict(event='push'), dict(path='.github/workflows/untrusted.yml'),
+                        dict(head_repository={'full_name': 'SNodeC/snode.c'})]:
+            with self.subTest(capture=changes), patch.object(dispatch, 'api', return_value=capture | changes):
                 with self.assertRaises(ValueError):
                     dispatch.receive(payload)
 
-    def test_manual_publication_requires_own_capture_and_default_branch(self):
-        target = publication.targets()[0]['id']
-        for project in ('snode.c', 'mqttsuite'):
-            payload = dict(project=project, target=target, capture='123', run='123', attempt='1')
-            origin = dict(event='workflow_dispatch', head_branch='trunk',
-                          path='.github/workflows/build-distribution-packages.yml',
-                          head_repository={'full_name': f'SNodeC/{project}'}, run_attempt=1,
-                          display_title='Packages · 123 · -', html_url='https://example.invalid/123')
-            def response(path):
-                return {'default_branch': 'trunk'} if path == f'repos/SNodeC/{project}' else origin
-            with self.subTest(project=project), patch.object(dispatch, 'api', side_effect=response):
-                result = dispatch.receive(payload)
-                self.assertEqual(result['capture_repository'], f'SNodeC/{project}')
-                self.assertEqual(result['artifact'], f'packages-{project}-{target}-1')
+    def test_release_intake_matches_tag_commit_repository_and_workflow(self):
+        payload = dict(project='mqttsuite', tag='v1.2.3', sha='a' * 40, run='123')
+        origin = dict(event='push', path='.github/workflows/build-distribution-packages.yml',
+                      head_repository={'full_name': 'SNodeC/mqttsuite'}, head_branch='v1.2.3', head_sha='a' * 40)
+        with patch.object(dispatch, 'api', return_value=origin), patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(dispatch.intake(payload)['sha'], 'a' * 40)
+            for changes in [dict(project='unknown'), dict(tag='main'), dict(tag='v01.2.3'),
+                            dict(tag='v1.2.3;touch injected'), dict(sha='main'), dict(run='../123')]:
+                with self.subTest(payload=changes), self.assertRaises(ValueError):
+                    dispatch.intake(payload | changes)
+        for changes in [dict(event='pull_request'), dict(head_branch='main'), dict(head_sha='b' * 40),
+                        dict(path='.github/workflows/other.yml'), dict(head_repository={'full_name': 'other/fork'})]:
+            with self.subTest(origin=changes), patch.object(dispatch, 'api', return_value=origin | changes):
                 with self.assertRaises(ValueError):
-                    dispatch.receive(payload | {'capture': '456'})
-            for changes in (dict(head_branch='feature/manual'), dict(run_attempt=0),
-                            dict(path='.github/workflows/other.yml'),
-                            dict(head_repository={'full_name': 'other/fork'}),
-                            dict(display_title=f'Packages · 123 · {target}')):
-                invalid = origin | changes
-                with self.subTest(project=project, changes=changes), patch.object(dispatch, 'api',
-                        side_effect=lambda path: {'default_branch': 'trunk'} if path == f'repos/SNodeC/{project}' else invalid):
-                    with self.assertRaises(ValueError):
-                        dispatch.receive(payload)
+                    dispatch.intake(payload)
+        for current, expected in [('200', True), ('100', False)]:
+            pages = json.dumps([dict(workflow_runs=[dict(id=100, display_title='Release · mqttsuite · v1.2.3 · 123')])])
+            with patch.object(dispatch, 'api', return_value=origin), patch.object(dispatch, 'run', return_value=pages), \
+                 patch.dict(os.environ, {'GITHUB_RUN_ID': current}):
+                self.assertEqual(dispatch.intake(payload)['duplicate'], str(expected).lower())
 
-    def test_receipt_locates_capture_for_application_tag_and_dependency_build(self):
-        target = publication.targets()[0]['id']
-        payload = dict(project='mqttsuite', target=target, capture='123', run='123', attempt='1')
-        origin = dict(event='push', head_branch='v1.0.2', path='.github/workflows/build-distribution-packages.yml',
-                      head_repository={'full_name': 'SNodeC/mqttsuite'}, run_attempt=1,
-                      display_title='Packages · 123 · -', html_url='https://example.invalid/123')
-        with patch.object(dispatch, 'api', return_value=origin):
-            self.assertEqual(dispatch.receive(payload)['capture_repository'], 'SNodeC/mqttsuite')
-            with self.assertRaises(ValueError):
-                dispatch.receive(payload | {'capture': '999'})
-        origin.update(event='repository_dispatch', display_title=f'Packages · 123 · {target}')
-        with patch.object(dispatch, 'api', return_value=origin):
-            self.assertEqual(dispatch.receive(payload | {'run': '456'})['capture_repository'], 'SNodeC/snode.c')
-
-    def test_source_plan_selects_full_release_or_single_dependent_target(self):
+    def test_plan_selects_release_or_single_target_from_coordinator_capture(self):
         with tempfile.TemporaryDirectory() as temporary:
             bundle = Path(temporary)
             rows = publication.targets()[:2]
             publication.write(bundle / 'targets.json', rows)
             publication.write(bundle / 'revisions.json', {'snode.c': '1', 'mqttsuite': '2'})
-            for project in ['snode.c', 'mqttsuite']:
-                publication.write(bundle / 'context.json', dict(run_id='123', release_project=project))
-                env = os.environ | {'PYTHONPATH': str(repository.ROOT), 'CAPTURE_RUN': '123'}
-                result = subprocess.run(['python3', '-m', 'ci.dispatch', 'plan', str(bundle), project, '-'],
-                                        env=env, text=True, capture_output=True)
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(json.loads(result.stdout.splitlines()[0].split('=', 1)[1])['include'], rows)
             publication.write(bundle / 'context.json', dict(run_id='123', release_project='snode.c'))
-            command = ['python3', '-m', 'ci.dispatch', 'plan', str(bundle), 'mqttsuite', rows[0]['id']]
-            result = subprocess.run(command, env=env | {'PUBLISHED_REF': 'a' * 40}, text=True, capture_output=True)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(json.loads(result.stdout.splitlines()[0].split('=', 1)[1])['include'], rows[:1])
-            for overrides in [{'CAPTURE_RUN': '999', 'PUBLISHED_REF': 'a' * 40}, {'PUBLISHED_REF': 'main'}]:
-                result = subprocess.run(command, env=env | overrides, text=True, capture_output=True)
-                self.assertNotEqual(result.returncode, 0)
+            with patch.dict(os.environ, {'CAPTURE_RUN': '123', 'PUBLISHED_REF': 'a' * 40}):
+                self.assertEqual(json.loads(dispatch.plan(bundle, 'snode.c', '-')['matrix'])['include'], rows)
+                self.assertEqual(json.loads(dispatch.plan(bundle, 'mqttsuite', rows[0]['id'])['matrix'])['include'], rows[:1])
+                for project, target in [('mqttsuite', '-'), ('unknown', '-'), ('snode.c', 'unknown')]:
+                    with self.subTest(project=project, target=target), self.assertRaises(ValueError):
+                        dispatch.plan(bundle, project, target)
+            for overrides in [{'CAPTURE_RUN': '999', 'PUBLISHED_REF': 'a' * 40}, {'CAPTURE_RUN': '123', 'PUBLISHED_REF': 'main'}]:
+                with patch.dict(os.environ, overrides), self.assertRaises(ValueError):
+                    dispatch.plan(bundle, 'snode.c', '-')
 
     def test_dispatch_retry_reuses_existing_run_and_keeps_exact_publication(self):
         with tempfile.TemporaryDirectory() as temporary:
             bundle = Path(temporary)
-            publication.write(bundle / 'context.json', dict(run_id='123', captured_at='2026-10-10T00:00:00Z'))
-            target = publication.targets()[0]['id']
+            rows = publication.targets()[:1]
+            publication.write(bundle / 'context.json', dict(run_id='123', captured_at='2026-10-10T00:00:00Z', release_project='snode.c'))
+            publication.write(bundle / 'targets.json', rows)
+            publication.write(bundle / 'revisions.json', {'snode.c': '1', 'mqttsuite': '2'})
+            target = rows[0]['id']
             with patch.object(dispatch, 'run', return_value='[{"workflow_runs": []}]'), patch.object(dispatch, 'api') as send:
                 dispatch.build(bundle, 'mqttsuite', target, 'a' * 40)
                 self.assertEqual(send.call_args.args[0], 'repos/SNodeC/mqttsuite/dispatches')
-                self.assertEqual(send.call_args.args[1]['event_type'], 'build-dependent-packages')
+                self.assertEqual(send.call_args.args[1]['event_type'], 'build-packages')
                 self.assertEqual(send.call_args.args[1]['client_payload'], dict(capture='123', target=target, publication='a' * 40))
-            existing = json.dumps([dict(workflow_runs=[dict(display_title=f'Packages · 123 · {target}')])])
+                dispatch.build(bundle, 'snode.c', '-', 'b' * 40)
+                self.assertEqual(send.call_args.args[1]['client_payload']['target'], '-')
+            existing = json.dumps([dict(workflow_runs=[dict(display_title=f'Packages · 123 · {target}', path='.github/workflows/build-distribution-packages.yml')])])
             with patch.object(dispatch, 'run', return_value=existing), patch.object(dispatch, 'api') as send:
                 dispatch.build(bundle, 'mqttsuite', target, 'a' * 40)
                 send.assert_not_called()
@@ -118,13 +104,15 @@ class HandoffTest(unittest.TestCase):
             sources = {'snode.c': {'refs/tags/v2.0.0': 'commit'}}
             publication.write(bundle / 'context.json', dict(run_id='123'))
             publication.write(bundle / 'revisions.json', {'snode.c': '5', 'mqttsuite': '7'})
-            publication.write(bundle / 'profiles.json', {row['id']: dict(sources=sources, directory='debian/dists/trixie')})
+            publication.write(bundle / 'profiles.json', {row['id']: dict(sources=sources, baseline={}, directory='debian/dists/trixie')})
             info = dict(context=dict(run_id='123', build_project='snode.c'), sources=sources, revision='5')
-            with patch.object(dispatch, 'Path', side_effect=lambda path: root / path), patch.object(repository, 'fetch', return_value=json.dumps(dict(targets={row['arch']: info})).encode()) as fetch:
+            with patch.dict(os.environ, {'BUILD_PROJECT': 'mqttsuite'}), \
+                 patch.object(dispatch, 'Path', side_effect=lambda path: root / path), \
+                 patch.object(repository, 'fetch', return_value=json.dumps(dict(targets={row['arch']: info})).encode()) as fetch:
                 dispatch.baseline(bundle, row['id'], 'a' * 40)
                 self.assertIn('/' + 'a' * 40 + '/', fetch.call_args.args[0])
                 self.assertEqual(publication.read(root / 'published-snodec/build.json'), info)
-            with patch.object(repository, 'fetch', return_value=json.dumps(info | {'revision': '6'}).encode()):
+            with patch.dict(os.environ, {'BUILD_PROJECT': 'mqttsuite'}), patch.object(repository, 'fetch', return_value=json.dumps(info | {'revision': '6'}).encode()):
                 with self.assertRaisesRegex(ValueError, 'corresponding'):
                     dispatch.baseline(bundle, row['id'], 'b' * 40)
 
@@ -163,7 +151,7 @@ class HandoffTest(unittest.TestCase):
             self.assertEqual(values[rows[1]['id'] + '/mqttsuite']['status'], 'cancelled')
             self.assertEqual(values[rows[2]['id'] + '/mqttsuite']['status'], 'pending')
 
-    def test_pending_retry_scope_preserves_other_projects_and_targets(self):
+    def test_coordinator_retry_preserves_build_attempts_and_target_status_scope(self):
         rows = publication.targets()[:3]
         for owner, target in [('mqttsuite', rows[0]), ('snode.c', None), ('mqttsuite', None)]:
             with self.subTest(owner=owner, dependent=target is not None), tempfile.TemporaryDirectory() as temporary:
@@ -191,7 +179,7 @@ class HandoffTest(unittest.TestCase):
                 for row in rows:
                     for project in revisions:
                         key = f'{row["id"]}/{project}'
-                        if project == owner and (target is None or row == target):
+                        if project == owner and target is not None and row == target:
                             self.assertEqual(after['targets'][key]['status'], 'pending')
                             self.assertEqual(after['targets'][key]['attempt'], 2)
                             self.assertEqual(after['targets'][key]['job_url'], 'retry-job')
@@ -333,29 +321,31 @@ class JobIdentityTest(unittest.TestCase):
     def setUp(self):
         self.row = publication.targets()[0]
         self.payload = dict(project='snode.c', target=self.row['id'], capture='456', run='456', attempt='1', job='789')
-        self.origin = dict(event='push', head_branch='v2.0.0', path='.github/workflows/build-distribution-packages.yml',
+        self.origin = dict(event='repository_dispatch', head_branch='v2.0.0', path='.github/workflows/build-distribution-packages.yml',
                            head_repository={'full_name': 'SNodeC/snode.c'}, run_attempt=2,
                            display_title='Packages · 456 · -', html_url='https://example.invalid/run')
+        self.capture = dict(event='repository_dispatch', path='.github/workflows/orchestrate-packages.yml',
+                            head_repository={'full_name': dispatch.COORDINATOR})
         self.job = dict(run_id=456, run_attempt=1, html_url='https://example.invalid/job',
                         name=f"{self.row['distribution']} · {self.row['suite']} · {self.row['arch']}")
 
     def test_job_url_requires_exact_repository_run_attempt_and_target(self):
-        with patch.object(dispatch, 'api', side_effect=[self.origin, self.job]) as api:
+        with patch.object(dispatch, 'api', side_effect=[self.capture, self.origin, self.job]) as api:
             self.assertEqual(dispatch.receive(self.payload)['run_url'], self.job['html_url'])
             self.assertEqual(api.call_args.args, ('repos/SNodeC/snode.c/actions/jobs/789',))
         for changes in [dict(run_id=999), dict(run_attempt=2), dict(name='prepare'), dict(name='Build and test · ' + self.job['name'])]:
-            with self.subTest(changes=changes), patch.object(dispatch, 'api', side_effect=[self.origin, self.job | changes]):
+            with self.subTest(changes=changes), patch.object(dispatch, 'api', side_effect=[self.capture, self.origin, self.job | changes]):
                 with self.assertRaises(ValueError):
                     dispatch.receive(self.payload)
         for job in ['0', '-1', '../789', '']:
-            with self.subTest(job=job), patch.object(dispatch, 'api', return_value=self.origin):
+            with self.subTest(job=job), patch.object(dispatch, 'api', side_effect=[self.capture, self.origin]):
                 with self.assertRaises(ValueError):
                     dispatch.receive(self.payload | {'job': job})
 
-    def test_old_payload_preserves_run_url_without_job_api(self):
-        with patch.object(dispatch, 'api', return_value=self.origin) as api:
+    def test_finalizer_preserves_run_url_without_job_api(self):
+        with patch.object(dispatch, 'api', side_effect=[self.capture, self.origin]) as api:
             self.assertEqual(dispatch.receive({key: value for key, value in self.payload.items() if key != 'job'})['run_url'], self.origin['html_url'])
-            self.assertEqual(api.call_count, 1)
+            self.assertEqual(api.call_count, 2)
 
     def test_built_payload_carries_job_id(self):
         with tempfile.TemporaryDirectory() as temporary:

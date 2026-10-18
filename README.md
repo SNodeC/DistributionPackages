@@ -13,9 +13,10 @@ Build recipes, authenticated handoffs, signing and publication for SNode.C distr
 
 ## Operations
 
-This repository authenticates, signs and publishes successful product-package builds, then requests MQTTSuite and native IDP builds after SNode.C publication. Its manual publication workflow copies guides and renders recorded package status. See the organization [workflow graph](https://github.com/SNodeC/.github/blob/main/docs/workflow-graph.md#banner) for the complete chain and trigger contracts.
+This repository captures notified release commits, allocates package revisions and schedules the dependency graph in [`ci/projects.json`](ci/projects.json). Source repositories build unsigned packages through shared workflows; this coordinator authenticates, signs and publishes each target before scheduling its dependents. The manual documentation workflow remains separate. See [CI orchestration](docs/ci-orchestration.md#banner) for the trigger contracts, retries and migration order.
 
 - [Documentation](docs/README.md#banner)
+- [CI orchestration](docs/ci-orchestration.md#banner)
 - [Publication and maintenance](docs/maintainers.md#banner)
 - [CI setup](docs/setup.md#banner)
 - [Authored Packages documentation](site/README.md#banner) (source template; navigation is resolved in the published Packages snapshot)
@@ -23,7 +24,7 @@ This repository authenticates, signs and publishes successful product-package bu
 
 ## Interfaces
 
-Product workflows call the captured scripts in `ci/`. Signing accepts only deliberately allow-listed projects and verified run identities. Public documentation lives under `site/`; generated status is rendered from Packages records by `ci/publish/publication.py`. Catalogue changes do not grant signing rights.
+Product workflows call the reusable notification and build workflows here. The JSON registry is the project and dependency authority; signing accepts only registered projects and verified coordinator captures and source run identities. Public documentation lives under `site/`; generated status is rendered from Packages records by `ci/publish/publication.py`. Catalogue changes do not grant signing rights.
 
 ## Local verification
 

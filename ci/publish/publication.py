@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 import sys
 
-from ci.repository import ROOT, matrix, linux_matrix, run, select, project_file, digest, PROJECTS, REPOSITORIES, supports, package_owner, project_revision, package_version
+from ci.repository import ROOT, matrix, linux_matrix, run, select, project_file, digest, PROJECTS, REPOSITORIES, supports, package_owner, project_revision, package_version, affected
 
 
 def targets():
@@ -229,7 +229,7 @@ def reserve(root, project, run_id):
     path = root / 'status.json'
     state = read(path, dict(repository='SNodeC/Packages', branch='main', counters=dict.fromkeys(REPOSITORIES, 0), runs={}, targets={}))
     allocations = state.setdefault('allocations', {})
-    selected = REPOSITORIES if project == 'snode.c' else (project,)
+    selected = affected(project)
     if run_id not in allocations:
         for repo in selected:
             state['counters'][repo] = state['counters'].get(repo, 0) + 1
@@ -264,12 +264,12 @@ def publish(root, bundle, incoming, row, generation, project):
         raise RuntimeError('Project is not selected for this release')
     current, _ = published(root, row)
     baseline = original['baseline']
-    if PROJECTS[project]['depends_on'] and original['context']['release_project'] == 'snode.c':
-        # The application must follow this target's successful library publication.
-        # Allow an idempotent retry of this application's own completed publication.
-        if (project_revision(current, 'snode.c') != int(generation['revisions']['snode.c'])
-                or current.get('sources', {}).get('snode.c') != original['sources']['snode.c']):
-            raise RuntimeError('Corresponding SNode.C release has not been published or was superseded')
+    selected_dependencies = set(PROJECTS[project]['depends_on']).intersection(generation['revisions'])
+    if selected_dependencies:
+        for dependency in selected_dependencies:
+            if (project_revision(current, dependency) != int(generation['revisions'][dependency])
+                    or current.get('sources', {}).get(dependency) != original['sources'][dependency]):
+                raise RuntimeError('Corresponding dependency release has not been published or was superseded')
         baseline = current
     others = [repo for repo in REPOSITORIES if repo != project]
     # Verify dependencies against the actual build manifest, and preserve unrelated
@@ -367,12 +367,11 @@ def event(state, generation, row, project, status, attempt):
         raise ValueError('Unknown build target or project')
     update(state, row, generation, project, status, attempt, os.environ.get('BUILD_RUN_URL'))
     current = state['targets'].get(f"{row['id']}/{project}", {})
-    if (project == 'snode.c' and generation['context']['release_project'] == 'snode.c'
-            and current.get('run_id') == generation['run_id'] and current.get('attempt') == attempt
+    if (current.get('run_id') == generation['run_id'] and current.get('attempt') == attempt
             and current.get('status') in {'failed', 'cancelled', 'skipped', 'superseded'}):
         # No application job has run yet. Its own attempt 1 supersedes this dependency placeholder.
         for dependent in generation['revisions']:
-            if project in PROJECTS[dependent]['depends_on'] and supports(dependent, row):
+            if dependent != project and dependent in affected(project) and supports(dependent, row):
                 update(state, row, generation, dependent, 'skipped', 0)
 
 
@@ -449,8 +448,7 @@ def main():
         if target == '-' and project == '-' and status == 'pending':
             for row in generation['targets']:
                 for project in (project for project in generation['revisions'] if supports(project, row)):
-                    event(state, generation, row, project, status,
-                          attempt if project == context['release_project'] else 0)
+                    event(state, generation, row, project, status, 0)
         else:
             event(state, generation, json.loads(target), project, status, attempt)
     elif command == 'finalize':

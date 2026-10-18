@@ -11,6 +11,7 @@ Setup and maintenance of package publication.
 ## Sections
 
 <!-- snodec:begin section-pages -->
+- [CI orchestration](ci-orchestration.md#banner)
 - [Repository maintenance](maintainers.md#banner)
 - [CI setup and activation](setup.md#banner)
 <!-- snodec:end section-pages -->

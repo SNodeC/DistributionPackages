@@ -26,19 +26,18 @@ Packages needs no Actions secrets, workflows or build system. Its main branch is
 
 ## Connect upstream releases
 
-Configure the App installation and central signing credentials before creating or moving a version tag. Preparation and unsigned builds run directly in the source repository.
+Configure the App installation and central signing credentials before creating or moving a version tag. Capture and scheduling run in DistributionPackages; unsigned builds run in the source repository through the central reusable workflow.
 
-The upstream projects use the same `Build distribution packages` workflow, with their own project identity. In **each source repository**, set:
+The upstream projects use thin `build-distribution-packages.yml` entry points with identity taken from the calling repository. In **each source repository**, set:
 
 | Type | Name | Value |
 | --- | --- | --- |
 | Variable | `PACKAGES_APP_CLIENT_ID` | The same App client ID as DistributionPackages |
 | Secret | `OPENWRT_APP_PRIVATE_KEY` | Existing App private key; retained credential name |
 
-The legacy App credential name does not select a distribution. No package-signing private key is required in either source repository. Keep all three package-signing secrets in DistributionPackages only.
+The legacy App credential name does not select a distribution. No package-signing private key is required in any source repository. Keep all three package-signing secrets in DistributionPackages only.
 
-A version-tag push captures sources, allocates revisions and prepares the build matrix in that same source workflow. Successful source jobs upload unsigned artifacts and send `sign-and-publish-packages` back to DistributionPackages. After each SNode.C publication, the publisher sends `build-dependent-packages` for that target to MQTTSuite, including the exact Packages commit. These dispatches implement one release chain; ordinary commits do not enter it.
-
+A version-tag push sends `release-packages` with its tag, commit and originating workflow run. DistributionPackages validates that notification, captures immutable inputs and allocates revisions. It dispatches `build-packages` to the released project. Source jobs report status and unsigned artifacts back to the coordinator. Each successful signed publication unlocks the ready dependents for that target, using its exact Packages commit. See [CI orchestration](ci-orchestration.md#banner) for the complete contract.
 Only version-tag creation or movement starts builds. No ordinary push or README change starts package CI. README automation, if present upstream, remains independent. The migration never creates or moves upstream tags automatically.
 
 ## Validate and activate
@@ -46,9 +45,9 @@ Only version-tag creation or movement starts builds. No ordinary push or README 
 1. Verify all current indexes and their referenced files exist in Packages/main.
 2. Verify signing keys match the original feed and configure all credentials above.
 3. Verify the project counters in `Packages/status.json` match the last allocated revisions; use zero for a fresh package repository.
-4. Review the source scripts and workflow validation results.
+4. Drain all existing captures, builds and publication requests before migrating. Merge the central reusable workflows and coordinator first, then the thin entry points in all three source repositories; do not release during this interval.
 5. With explicit approval, exercise a version-tag event.
-6. Confirm each target publishes SNode.C before its MQTTSuite build starts, and an application-only event does not rebuild SNode.C.
+6. Confirm each target publishes SNode.C before its MQTTSuite and supported IDP builds start, and an application-only event does not rebuild SNode.C.
 7. Update devices using the new installer or documented manual repository URLs.
 
 There is no timer or additional Packages workflow. Creation of the new repositories and pushing source files do not trigger package builds. A CI run cannot be claimed validated until it has actually executed with the signing and GitHub App credentials.

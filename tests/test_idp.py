@@ -22,8 +22,13 @@ class IdpTest(unittest.TestCase):
         for row in publication.targets():
             self.assertEqual(repository.supports('snode.c-idp', row), row['family'] != 'openwrt')
         row = next(row for row in publication.targets() if row['family'] == 'openwrt')
-        with self.assertRaises(ValueError):
-            dispatch.build(Path('unused'), 'snode.c-idp', row['id'], 'a' * 40)
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = Path(tmp)
+            publication.write(bundle / 'context.json', dict(run_id='123', release_project='snode.c'))
+            publication.write(bundle / 'revisions.json', {'snode.c-idp': '1'})
+            publication.write(bundle / 'targets.json', [row])
+            with patch.dict('os.environ', {'CAPTURE_RUN': '123', 'PUBLISHED_REF': 'a' * 40}), self.assertRaises(ValueError):
+                dispatch.plan(bundle, 'snode.c-idp', row['id'])
 
     def test_old_counter_state_adds_idp_without_resetting_products(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -39,9 +44,9 @@ class IdpTest(unittest.TestCase):
                       head_repository={'full_name': 'SNodeC/snode.c-idp'}, run_attempt=1,
                       display_title=f'Packages · 100 · {row["id"]}', html_url='https://example.test/run')
         payload = dict(project='snode.c-idp', target=row['id'], capture='100', run='101', attempt='1')
-        with patch.object(dispatch, 'api', return_value=origin):
-            self.assertEqual(dispatch.receive(payload)['capture_repository'], 'SNodeC/snode.c')
-        with patch.object(dispatch, 'api', return_value=origin | {'head_repository': {'full_name': 'someone/fork'}}):
+        with patch.object(dispatch, 'capture_run'), patch.object(dispatch, 'api', return_value=origin):
+            self.assertEqual(dispatch.receive(payload)['capture_repository'], dispatch.COORDINATOR)
+        with patch.object(dispatch, 'capture_run'), patch.object(dispatch, 'api', return_value=origin | {'head_repository': {'full_name': 'someone/fork'}}):
             with self.assertRaises(ValueError):
                 dispatch.receive(payload)
 

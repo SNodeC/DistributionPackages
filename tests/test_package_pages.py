@@ -212,12 +212,12 @@ class PackagePagesTest(unittest.TestCase):
                 self.assertIn(f'<a id="{anchor}"></a>', self.text(package))
 
     def test_third_project_requires_only_registry_entry(self):
-        with patch.dict(repository.PROJECTS, {'new-project': dict(title='New project', package='new-package', depends_on=())}):
+        with patch.dict(repository.PROJECTS, {'new-project': dict(title='New project', package='new-package', depends_on=(), families=['linux', 'openwrt', 'raspberrypi'])}):
             publication.render(self.root, self.state)
         self.assertTrue((self.root / 'status/new-package.md').exists())
         self.assertNotIn('alt="Catalog"', self.text('new-package'))
         (self.root / 'docs/catalogs/new-package.md').write_text('New catalog')
-        with patch.dict(repository.PROJECTS, {'new-project': dict(title='New project', package='new-package', depends_on=())}):
+        with patch.dict(repository.PROJECTS, {'new-project': dict(title='New project', package='new-package', depends_on=(), families=['linux', 'openwrt', 'raspberrypi'])}):
             publication.render(self.root, self.state)
         for path in ['README.md', 'status/README.md']:
             self.assertIn('[New project](https://github.com/SNodeC/new-project#banner)', (self.root / path).read_text())

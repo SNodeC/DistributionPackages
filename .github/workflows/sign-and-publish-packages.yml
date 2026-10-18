@@ -3,7 +3,7 @@ name: Sign and publish distribution packages
 run-name: Publish ${{ github.event.client_payload.project }} · ${{ github.event.client_payload.target }}
 on:
   repository_dispatch:
-    types: [sign-and-publish-packages]
+    types: [sign-and-publish-packages, package-build-status]
 permissions:
   contents: read
   actions: read
@@ -30,7 +30,6 @@ jobs:
           client-id: ${{ vars.PACKAGES_APP_CLIENT_ID }}
           private-key: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
           owner: SNodeC
-          repositories: Packages,snode.c,mqttsuite,snode.c-idp
           permission-contents: write
           permission-actions: read
       - name: Validate upstream build identity
@@ -68,7 +67,24 @@ jobs:
           echo 'paths<<EOF' >> "$GITHUB_OUTPUT"
           python3 -m ci.publish.publication scope "$TARGET" >> "$GITHUB_OUTPUT"
           echo EOF >> "$GITHUB_OUTPUT"
+      - name: Apply build status to the captured graph
+        continue-on-error: ${{ github.event.action == 'sign-and-publish-packages' }}
+        env:
+          PACKAGES_TOKEN: ${{ steps.publisher.outputs.token }}
+          TARGET: ${{ steps.source.outputs.target }}
+          TARGET_ID: ${{ github.event.client_payload.target }}
+          BUILD_PROJECT: ${{ steps.source.outputs.project }}
+          BUILD_ATTEMPT: ${{ steps.source.outputs.attempt }}
+          BUILD_RUN_URL: ${{ steps.source.outputs.run_url }}
+          BUILD_STATUS: ${{ steps.source.outputs.status }}
+        run: |
+          if [ "$TARGET_ID" = '-' ]; then
+            bash feed/ci/publish/status.sh published finalize bundle "$BUILD_STATUS"
+          else
+            bash feed/ci/publish/status.sh published status bundle "$TARGET" "$BUILD_PROJECT" "$BUILD_STATUS"
+          fi
       - uses: actions/download-artifact@v8
+        if: github.event.action == 'sign-and-publish-packages'
         with:
           repository: SNodeC/${{ steps.source.outputs.project }}
           run-id: ${{ steps.source.outputs.run }}
@@ -76,6 +92,7 @@ jobs:
           name: ${{ steps.source.outputs.artifact }}
           path: incoming
       - uses: actions/checkout@v6
+        if: github.event.action == 'sign-and-publish-packages'
         with:
           repository: SNodeC/Packages
           ref: main
@@ -84,16 +101,18 @@ jobs:
           sparse-checkout: ${{ steps.scope.outputs.paths }}
           sparse-checkout-cone-mode: false
       - name: Cache compiled OpenWrt signers
-        if: fromJSON(steps.source.outputs.target).family == 'openwrt'
+        if: github.event.action == 'sign-and-publish-packages' && fromJSON(steps.source.outputs.target).family == 'openwrt'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/openwrt-signers
           key: openwrt-signers-${{ runner.os }}-${{ runner.arch }}-${{ steps.scope.outputs.signer-platform }}-${{ hashFiles('feed/ci/publish/tools.sh') }}
       - name: Install signing tools
+        if: github.event.action == 'sign-and-publish-packages'
         env:
           FAMILY: ${{ fromJSON(steps.source.outputs.target).family }}
         run: bash feed/ci/publish/tools.sh "$FAMILY" "$RUNNER_TEMP/openwrt-signers"
       - name: Sign and publish the package snapshot
+        if: github.event.action == 'sign-and-publish-packages'
         id: write
         env:
           TARGET: ${{ steps.source.outputs.target }}
@@ -113,14 +132,14 @@ jobs:
             published bundle "$TARGET" "$BUILD_PROJECT" "$status"
           exit "$result"
       - name: Dispatch dependent project after successful publication
-        if: steps.source.outputs.project == 'snode.c'
+        if: github.event.action == 'sign-and-publish-packages' && steps.write.outcome == 'success'
         env:
           GH_TOKEN: ${{ steps.publisher.outputs.token }}
           TARGET_ID: ${{ github.event.client_payload.target }}
           PUBLICATION: ${{ steps.write.outputs.snapshot }}
-        run: python3 -m ci.dispatch dependents bundle "$TARGET_ID" "$PUBLICATION"
+        run: python3 -m ci.dispatch dependents bundle "$TARGET_ID" "$PUBLICATION" published
       - name: Report publication failure
-        if: ${{ always() && steps.source.outcome == 'success' && steps.write.outcome != 'success' }}
+        if: ${{ always() && github.event.action == 'sign-and-publish-packages' && steps.source.outcome == 'success' && steps.write.outcome != 'success' }}
         continue-on-error: true
         timeout-minutes: 3
         env:

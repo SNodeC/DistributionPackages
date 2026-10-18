@@ -1,0 +1,53 @@
+<!-- snodec:begin page-header -->
+<a id="banner"></a><a id="page-overview"></a>
+<p><picture><source media="(max-width: 640px)" srcset="media/nav/banner-documentation-compact.svg"><img src="media/nav/banner-documentation.svg" alt="DistributionPackages — Documentation" width="100%"></picture></p>
+<p><a href="README.md#banner" title="Up to Documentation"><picture><source media="(prefers-color-scheme: dark)" srcset="media/nav/up-documentation-dark.svg"><img src="media/nav/up-documentation-light.svg" alt="Up to Documentation" title="Up to Documentation" width="160" height="28"></picture></a><a href="https://github.com/VolkerChristian#banner" title="Volker Christian account"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="media/nav/account-icon-dark.svg"><source media="(max-width: 640px)" srcset="media/nav/account-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="media/nav/account-dark.svg"><img align="right" src="media/nav/account-light.svg" alt="Volker Christian account" title="Volker Christian account"></picture></a><a href="https://github.com/SNodeC#banner" title="SNode.C organization"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="media/nav/organization-icon-dark.svg"><source media="(max-width: 640px)" srcset="media/nav/organization-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="media/nav/organization-dark.svg"><img align="right" src="media/nav/organization-light.svg" alt="SNode.C organization" title="SNode.C organization"></picture></a><a href="../README.md#banner" title="DistributionPackages repository"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="media/nav/repository-icon-dark.svg"><source media="(max-width: 640px)" srcset="media/nav/repository-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="media/nav/repository-dark.svg"><img align="right" src="media/nav/repository-light.svg" alt="DistributionPackages repository" title="DistributionPackages repository"></picture></a><br clear="all"></p>
+<!-- snodec:end page-header -->
+
+# CI orchestration
+
+## Ownership and graph
+
+[`ci/projects.json`](../ci/projects.json) is the single project registry: repository name, display title, package prefix, direct dependencies and supported target families. Targets remain in `ci/targets/`. Registry loading validates references, package prefixes, families and cycles, then orders projects topologically. Every supported dependent family must also be supported by its prerequisites.
+
+A release selects the changed project and its transitive dependents. SNode.C selects SNode.C, MQTTSuite and IDP; an application release selects that application. IDP has native Linux and Raspberry Pi OS targets only. Exact published dependencies outside the selected subgraph are retained. Build recipes still define how each product is compiled; the registry does not invent a recipe for a new product.
+
+DistributionPackages owns capture, allocation, scheduling, status updates, signing and publication. Packages stores published files and the existing revision/status records. Source repositories own their unsigned build jobs. Source workflows no longer write Packages. The coordinator's capture job finishes after scheduling; its green result alone does not mean the entire release has published. Check the per-project target status in Packages and the downstream build/publication runs.
+
+## Release and publication sequence
+
+1. A source `vMAJOR.MINOR.PATCH` tag push calls `notify-release.yml`. It sends `release-packages` with `project`, `tag`, exact `sha` and originating `run`. Ordinary branch pushes do not start package builds.
+2. `orchestrate-packages.yml` checks the originating repository, workflow path, push event, tag and SHA through the GitHub API. Repeated notifications of the same source run reuse the existing coordinator run rather than allocating another generation.
+3. The coordinator reserves revisions for the affected graph. It captures the notified commit, resolves the latest release tags of affected dependents once, and records the published prerequisite versions and source identities for every target. Source versions must match their tags.
+4. The coordinator uploads `source-pair`, containing profiles, targets, revisions, context, source archives, captured tooling and archive checksums. Its run ID identifies the generation. Tag movement after capture cannot change its source bytes. A moved tag creates a separate release only through a new notification.
+5. `build-packages` carries `capture`, `target` and the exact `publication` commit. The initial released project uses target `-` for its supported matrix; downstream requests name one target. Source entry points call the shared `build-packages.yml`, authenticate the coordinator capture, verify tooling provenance and consume the immutable artifacts.
+6. Builds check the exact dependency snapshot and use the existing native/OpenWrt recipes, target matrix and runner slots. They upload unsigned packages and report `running`, `failed` or `cancelled` through `package-build-status`; successful artifacts request `sign-and-publish-packages`. Payloads identify the project, capture, target, source run, attempt and build job where available.
+7. The serialized central writer validates the source workflow, run, attempt, target and job before changing status or signing. Publication verifies the corresponding captured dependencies and preserves unrelated products. Existing signed-feed checks and package revision rules still apply.
+8. After publication, the coordinator traverses the selected graph. A dependent becomes eligible only when every direct prerequisite has the expected source identity and package revision for that target. Independent branches can proceed independently; joins wait for every prerequisite. Repeated handoffs find the existing matching build run.
+
+The existing status reducer propagates failed prerequisites to selected descendants and prevents older revisions or attempts from overwriting newer state. Publication remains per target: one failed architecture does not block a different architecture's dependent builds. Cancellation of one workflow does not cancel separately dispatched runs.
+
+## Credentials and adding a project
+
+Use the existing variables and secrets in [CI setup](setup.md#banner). Source workflows pass `OPENWRT_APP_PRIVATE_KEY` explicitly to reusable workflows; package-signing secrets stay only in DistributionPackages. The central App installation needs access to each registered source repository and Packages. Source runtime tokens are scoped to DistributionPackages; central validation/publication tokens cover the App's installed repositories. Restrict the installation to the intended repositories.
+
+To add a product, add its registry entry and build recipe, provide its initial matching release tag, grant the App repository access and copy an existing thin source entry point. Configure `PACKAGES_APP_CLIENT_ID` and `OPENWRT_APP_PRIVATE_KEY` in that repository. Both reusable workflow references use DistributionPackages `main`. Test the graph and recipe before enabling releases; an organization catalogue entry alone does not authorize signing.
+
+## Retry and recovery
+
+Re-run failed source build jobs to retry compilation within the same captured generation. Their new attempt is recorded and unsigned artifact names include that attempt. Re-run a failed central publication to retry signing, publishing or downstream dispatch. Re-run the existing coordinator run if capture or initial dispatch failed; once its capture artifact exists, retries reuse it. Duplicate source notifications do not substitute for retrying the coordinator that already accepted them.
+
+Keep capture and unsigned artifact retention long enough for recovery. After required artifacts expire, retries cannot reconstruct the immutable generation: issue a new authorized tag event to capture a new generation. This design removes the former source-specific manual release entry points. Do not change a published tag merely to recover a transient job failure. No workflow automatically moves tags, deploys applications or upgrades machines.
+
+## Migration and local verification
+
+Drain the existing source captures, build jobs and publication queue before merging. Merge DistributionPackages first, then the three source entry points. Do not create release tags in between. Old source workflow handoffs use a different capture contract and cannot be replayed through the new coordinator. Existing feed contents, installer URLs and deployed machines are unchanged. The older capture descriptions in the preserved [maintenance notes](maintainers.md#banner) describe the pre-migration pipeline; this guide defines the new orchestration contract.
+
+Run the local suite and the thin-entry validation without dispatching GitHub workflows:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 tests/check_package_workflows.py /path/to/snode.c/.github/workflows/build-distribution-packages.yml /path/to/mqttsuite/.github/workflows/build-distribution-packages.yml /path/to/snode.c-idp/.github/workflows/build-distribution-packages.yml
+```
+
+Tests exercise graph validation, exact dependency publication, immutable capture after tag movement, handoff authentication, retries, concurrent status writers and signing/publication fixtures. Local validation does not prove live App permissions or GitHub event delivery. After the coordinated merge, deliberately start an authorized release and monitor capture, source build jobs, central publication and Packages target status until every expected target reaches its terminal state.
