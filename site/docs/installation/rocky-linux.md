@@ -6,188 +6,37 @@
 <p><a href="README.md#banner" title="Up to Installation"><picture><source media="(prefers-color-scheme: dark)" srcset="../media/nav/up-installation-dark.svg"><img src="../media/nav/up-installation-light.svg" alt="Up to Installation" title="Up to Installation" width="160" height="28"></picture></a><a href="https://github.com/VolkerChristian#banner" title="Volker Christian account"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="../media/nav/account-icon-dark.svg"><source media="(max-width: 640px)" srcset="../media/nav/account-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="../media/nav/account-dark.svg"><img align="right" src="../media/nav/account-light.svg" alt="Volker Christian account" title="Volker Christian account"></picture></a><a href="https://github.com/SNodeC#banner" title="SNode.C organization"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="../media/nav/organization-icon-dark.svg"><source media="(max-width: 640px)" srcset="../media/nav/organization-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="../media/nav/organization-dark.svg"><img align="right" src="../media/nav/organization-light.svg" alt="SNode.C organization" title="SNode.C organization"></picture></a><a href="../../README.md#banner" title="Packages repository"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="../media/nav/repository-icon-dark.svg"><source media="(max-width: 640px)" srcset="../media/nav/repository-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="../media/nav/repository-dark.svg"><img align="right" src="../media/nav/repository-light.svg" alt="Packages repository" title="Packages repository"></picture></a><br clear="all"></p>
 <!-- snodec:end page-header -->
 
-# Rocky Linux
+# Rocky Linux installation
 
-<!-- snodec:begin menu -->
-<p>
-<a href="#requirements"><img src="../media/menu/requirements.svg" alt="Requirements"></a>
-<a href="#quick-install"><img src="../media/menu/menu-quick-install.svg" alt="Quick install"></a>
-<a href="#choose-packages"><img src="../media/menu/menu-custom-install.svg" alt="Custom install"></a>
-<a href="#manual-repository-setup"><img src="../media/menu/manual.svg" alt="Manual setup"></a>
-<a href="#updates"><img src="../media/menu/updates.svg" alt="Updates"></a>
-<a href="../../status/README.md#banner"><img src="../media/menu/status.svg" alt="Status"></a>
-<a href="#troubleshooting"><img src="../media/menu/troubleshoot.svg" alt="Troubleshoot"></a>
-</p>
-<!-- snodec:end menu -->
+Choose a project first. Each guide provides focused quick installation, component choices, verification and updates. Dependencies are selected by the package manager.
 
-## Requirements
-
-Supported releases: `9`, `10`. Match the release and package architecture installed on your device. Keep official repositories enabled for dependencies.
-
-Use an account with `sudo`, or run administrative commands directly as root. Install `curl` and CA certificates before downloading the installer.
-
-```sh
-. /etc/os-release
-printf 'Distribution: %s\nRelease: %s\n' "$ID" "$VERSION_ID"
-rpm --eval '%{_arch}'
-```
-
-```sh
-sudo dnf install ca-certificates curl
-```
-
-Rocky Linux 10 requires x86-64-v3 on x86 systems. ARM64 packages use `aarch64`. Enable CRB and EPEL before either installation method:
-
-```sh
-sudo dnf install -y dnf-plugins-core epel-release
-sudo dnf config-manager --set-enabled crb
-```
-
-## Quick install
-
-Install the complete package sets:
-
-```sh
-(
-  set -eu
-  tmp=$(mktemp -d /tmp/snodec.XXXXXX)
-  trap 'rm -rf "$tmp"' EXIT HUP INT TERM
-  base=https://raw.githubusercontent.com/SNodeC/Packages/main
-  curl -fsSL "$base/install/install.sh" -o "$tmp/install.sh"
-  sudo sh "$tmp/install.sh"
-)
-```
-
-The installer detects the distribution, release and package architecture, checks that an index exists, installs the signing key, configures the repository and installs the complete package set. Configure applications before starting them. For manual configuration, use [Manual repository setup](#manual-repository-setup).
-
-**Check**
-
-```sh
-rpm -q snodec mqttsuite
-```
-
-Both requested packages show their installed version, release and architecture; no “not installed” message appears. Next: [SNode.C configuration](../catalogs/snodec.md#after-installation) or [MQTTSuite configuration and deployment](../catalogs/mqttsuite.md#after-installation).
-
+<a id="quick-install"></a>
 <a id="choose-packages"></a>
-
-## Custom install
-
-Prepare the repository without installing packages, then install only what you need:
-
-```sh
-(
-  set -eu
-  tmp=$(mktemp -d /tmp/snodec.XXXXXX)
-  trap 'rm -rf "$tmp"' EXIT HUP INT TERM
-  base=https://raw.githubusercontent.com/SNodeC/Packages/main
-  curl -fsSL "$base/install/install.sh" -o "$tmp/install.sh"
-  sudo sh "$tmp/install.sh" --prepare
-)
-```
-
-For only the broker and command-line client:
-
+<a id="custom-install"></a>
 <a id="install-selected-components"></a>
 
-```sh
-sudo dnf install mqttsuite-broker mqttsuite-cli
-```
+## Choose a project
 
-Dependencies are installed automatically.
+- [SNode.C on Rocky Linux](snodec/rocky-linux.md#banner)
+- [MQTTSuite on Rocky Linux](mqttsuite/rocky-linux.md#banner)
+- [SNode.C IDP on Rocky Linux](snodec-idp/rocky-linux.md#banner)
 
-**Check**
+<a id="requirements"></a>
+<a id="manual-repository-setup"></a>
 
-```sh
-rpm -q mqttsuite-broker mqttsuite-cli
-```
+## Repository setup and requirements
 
-Both requested packages show their installed version, release and architecture; no “not installed” message appears. Next: [SNode.C configuration](../catalogs/snodec.md#after-installation) or [MQTTSuite configuration and deployment](../catalogs/mqttsuite.md#after-installation).
+[Rocky Linux requirements and signed repository setup](../repositories/rocky-linux.md#banner) configure the shared package source without installing applications.
 
-See the [SNode.C catalog](../catalogs/snodec.md#banner) and [MQTTSuite catalog](../catalogs/mqttsuite.md#banner) for package roles and after-install configuration.
-
-## Manual repository setup
-
-These commands configure the signed repository without installing SNode.C or MQTTSuite.
-
-APT and RPM repositories use the same signing key. Its download filename is `snodec-apt.asc`; the commands below install it under the RPM-specific name `RPM-GPG-KEY-snodec`.
-
-```sh
-(
-  set -eu
-  . /etc/os-release
-  [ "$ID" = rocky ] || { echo "Requires rocky"; exit 1; }
-  suite=${VERSION_ID%%.*}
-  case "$suite" in
-    9|10) ;;
-    *) echo "Unsupported release"; exit 1 ;;
-  esac
-  arch=$(rpm --eval '%{_arch}')
-  case "$arch" in
-    x86_64|aarch64) ;;
-    *) echo "Unsupported architecture"; exit 1 ;;
-  esac
-  tmp=$(mktemp -d /tmp/snodec.XXXXXX)
-  trap 'rm -rf "$tmp"' EXIT HUP INT TERM
-  base=https://raw.githubusercontent.com/SNodeC/Packages/main
-  curl -fsSL "$base/rocky/$suite/$arch/repodata/repomd.xml" -o "$tmp/index"
-  curl -fsSL "$base/keys/snodec-apt.asc" -o "$tmp/key"
-  sudo install -d -m 755 /etc/pki/rpm-gpg /etc/yum.repos.d
-  sudo install -m 644 "$tmp/key" /etc/pki/rpm-gpg/RPM-GPG-KEY-snodec
-  sudo rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-snodec
-  sudo tee /etc/yum.repos.d/snodec.repo >/dev/null <<REPO
-[snodec]
-name=SNode.C and MQTTSuite
-baseurl=$base/rocky/\$releasever/\$basearch/
-enabled=1
-gpgcheck=1
-repo_gpgcheck=1
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-snodec
-REPO
-  sudo dnf makecache
-)
-```
-
-The escaped `$releasever` and `$basearch` remain literal in the file; DNF expands them for the installed system. Both RPM packages and repository metadata are signature-checked.
-
-Verify the [installed signing key](../../keys/README.md#installed-keys) before installing packages.
-
-Install the complete sets after manual setup:
-
-```sh
-sudo dnf install snodec mqttsuite
-```
-
-**Check**
-
-```sh
-rpm -q snodec mqttsuite
-```
-
-Both requested packages show their installed version, release and architecture; no “not installed” message appears. Next: [SNode.C configuration](../catalogs/snodec.md#after-installation) or [MQTTSuite configuration and deployment](../catalogs/mqttsuite.md#after-installation).
-
-The repository is ready; [install only the selected components](#install-selected-components) you need.
+<a id="updates"></a>
 
 ## Updates
 
-```sh
-sudo dnf upgrade 'snodec*' 'mqttsuite*'
-```
+Use the update instructions in your selected project's guide above. After an operating-system release change, configure its matching supported repository again.
 
-The quoted patterns upgrade installed matching packages and their dependencies; they do not select the complete metapackages for installation. DNF substitutes the new `$releasever` after a distribution upgrade. Confirm that the new release is supported and refresh metadata with `sudo dnf makecache --refresh`. Installer-created repository URLs are fixed to the detected release; rerun the installer for a supported new release in that case.
+<a id="source-records"></a>
+<a id="troubleshooting"></a>
 
-## Source records
+## Availability and help
 
-In [source records](../../rocky/), `<release>/<architecture>/build.json` belongs to the feed. **Packages** opens its `Packages/` subdirectory, not the record itself.
-
-`build.json` records source tags and commits, package versions, checksums and publication context. On the [project status pages](../../status/README.md#banner), **Build log** opens the recorded build job or release run. See [column semantics](../publication.md#latest-release-available-and-in-build) for missing historical records.
-
-Native package definitions: [SNode.C CPack](https://github.com/SNodeC/snode.c/blob/HEAD/cmake/Packing.cmake) and [MQTTSuite CPack](https://github.com/SNodeC/mqttsuite/blob/HEAD/cmake/Packing.cmake).
-
-## Troubleshooting
-
-See [common problems and fixes](../troubleshooting.md#banner) for download, signature, dependency and application errors.
-
-| Symptom | What to check |
-| --- | --- |
-| Dependencies are missing | Enable CRB and EPEL as shown in Requirements. |
-| Illegal instruction on x86 | Check the x86-64-v3 requirement for Rocky Linux 10. |
+[Package status](../../status/README.md#banner) · [Source records and repository details](../repositories/rocky-linux.md#banner) · [Troubleshooting](../troubleshooting.md#banner)

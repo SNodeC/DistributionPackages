@@ -20,3 +20,7 @@ Choose the guide for your installed [distribution](../../README.md#install), the
 <a id="mqttsuite"></a>
 
 [MQTTSuite package roles](../catalogs/mqttsuite.md#banner).
+
+<a id="snodec-idp"></a>
+
+[SNode.C IDP package roles](../catalogs/snodec-idp.md#banner).

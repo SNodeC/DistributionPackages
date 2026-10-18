@@ -54,16 +54,17 @@ jobs:
           # Execute only code from this repository's history, never an uploaded script.
           commit=$(jq -er '.recipe_commit | select(test("^[0-9a-f]{40}$"))' bundle/context.json)
           git -C feed merge-base --is-ancestor "$commit" HEAD
-          # Separate authored presentation data from capture-pinned executable tooling.
+          # Publish current guides and downloadable installers; keep CI tooling capture-pinned.
           mkdir -p "$RUNNER_TEMP/package-site"
-          git -C feed archive "origin/$DOCS_BRANCH" site |
-            tar -x -C "$RUNNER_TEMP/package-site" --strip-components=1
-          echo "PACKAGE_SITE=$RUNNER_TEMP/package-site" >> "$GITHUB_ENV"
+          git -C feed archive "origin/$DOCS_BRANCH" site install |
+            tar -x -C "$RUNNER_TEMP/package-site"
+          echo "PACKAGE_SITE=$RUNNER_TEMP/package-site/site" >> "$GITHUB_ENV"
           git -C feed checkout --detach "$commit"
           echo "signer-platform=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
-          cp "$RUNNER_TEMP/package-site/README.md" feed/README.md
-          rm -rf feed/docs
-          cp -a "$RUNNER_TEMP/package-site/docs" feed/docs
+          cp "$RUNNER_TEMP/package-site/site/README.md" feed/README.md
+          rm -rf feed/docs feed/install
+          cp -a "$RUNNER_TEMP/package-site/site/docs" feed/docs
+          cp -a "$RUNNER_TEMP/package-site/install" feed/install
           echo 'paths<<EOF' >> "$GITHUB_OUTPUT"
           python3 -m ci.publish.publication scope "$TARGET" >> "$GITHUB_OUTPUT"
           echo EOF >> "$GITHUB_OUTPUT"

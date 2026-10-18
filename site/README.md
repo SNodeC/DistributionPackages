@@ -37,7 +37,13 @@ Signed packages for the SNode.C ecosystem. Choose a project and distribution, in
 
 ## Install
 
-Select the guide matching your installed distribution, release and package architecture. Each guide covers requirements, quick installation, manual repository setup and updates.
+Choose the project you want to install, then your distribution and components. Each guide provides a focused quick install, verification and updates.
+
+- [Install SNode.C](docs/installation/snodec/README.md#banner)
+- [Install MQTTSuite](docs/installation/mqttsuite/README.md#banner)
+- [Install SNode.C IDP](docs/installation/snodec-idp/README.md#banner)
+
+[Repository setup only](docs/repositories/README.md#banner) configures the signed package source without installing applications.
 
 <a id="platforms"></a>
 
