@@ -10,7 +10,7 @@ case "${DISTRIBUTION:-raspberrypios}" in
         libdir=lib
         apt-get update
         apt-get install -y build-essential cmake ninja-build pkg-config git ca-certificates adduser passwd util-linux libbluetooth-dev \
-            libmagic-dev libmariadb-dev libssl-dev libncurses-dev nlohmann-json3-dev libsqlite3-dev file python3
+            libmagic-dev libmariadb-dev libssl-dev openssl libncurses-dev nlohmann-json3-dev libsqlite3-dev file python3
         ;;
     rocky|fedora)
         format=RPM
@@ -20,7 +20,7 @@ case "${DISTRIBUTION:-raspberrypios}" in
             dnf config-manager --set-enabled crb
         fi
         dnf install -y gcc gcc-c++ cmake ninja-build make pkgconf-pkg-config git ca-certificates \
-            bluez-libs-devel file-devel mariadb-connector-c-devel openssl-devel ncurses-devel \
+            bluez-libs-devel file-devel mariadb-connector-c-devel openssl-devel openssl ncurses-devel \
             json-devel sqlite-devel file python3 rpm-build shadow-utils util-linux
         if [ "$DISTRIBUTION:$SUITE" = rocky:9 ]; then
             dnf install -y gcc-toolset-14-gcc-c++
