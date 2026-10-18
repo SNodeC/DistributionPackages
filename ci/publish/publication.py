@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 import sys
 
-from ci.repository import ROOT, matrix, linux_matrix, run, select, project_file, digest, PROJECTS, REPOSITORIES, project_revision, package_version
+from ci.repository import ROOT, matrix, linux_matrix, run, select, project_file, digest, PROJECTS, REPOSITORIES, supports, package_owner, project_revision, package_version
 
 
 def targets():
@@ -128,7 +128,7 @@ print(json.dumps({path: render_header('Packages', path) for path in json.load(sy
             ('Install', 'install', '../README.md#install'), ('Catalog', 'catalog', f'../docs/catalogs/{config["package"]}.md#banner'),
             ('Troubleshoot', 'troubleshoot', '../docs/troubleshooting.md#banner')] if label != 'Catalog' or (root / href.removeprefix('../').split('#')[0]).is_file())
         sections = {}
-        for row in rows:
+        for row in (row for row in rows if supports(project, row)):
             info, feed = published(root, row)
             available = info.get('versions', {}).get(config['package'], info.get('versions', {}).get(project))
             key = f"{row['id']}/{project}"
@@ -232,7 +232,7 @@ def reserve(root, project, run_id):
     selected = REPOSITORIES if project == 'snode.c' else (project,)
     if run_id not in allocations:
         for repo in selected:
-            state['counters'][repo] += 1
+            state['counters'][repo] = state['counters'].get(repo, 0) + 1
         allocations[run_id] = {repo: str(state['counters'][repo]) for repo in selected}
     if set(allocations[run_id]) != set(selected):
         raise RuntimeError('A retry cannot change its release project')
@@ -250,7 +250,7 @@ def record_run(bundle, state, context):
                 or generation['targets'] != rows or generation['profiles_hash'] != digest(bundle / 'profiles.json')):
             raise RuntimeError('A retry cannot change its captured sources or matrix')
     else:
-        generation = dict(revision=revisions['mqttsuite'], revisions=revisions, context=context, sources=read(bundle / 'sources.json'),
+        generation = dict(revision=revisions[context['release_project']], revisions=revisions, context=context, sources=read(bundle / 'sources.json'),
                           targets=rows, profiles_hash=digest(bundle / 'profiles.json'), run_id=run_id, run_url=context['run_url'])
         state['runs'][run_id] = generation
     return generation
@@ -264,28 +264,36 @@ def publish(root, bundle, incoming, row, generation, project):
         raise RuntimeError('Project is not selected for this release')
     current, _ = published(root, row)
     baseline = original['baseline']
-    if project == 'mqttsuite' and original['context']['release_project'] == 'snode.c':
+    if PROJECTS[project]['depends_on'] and original['context']['release_project'] == 'snode.c':
         # The application must follow this target's successful library publication.
         # Allow an idempotent retry of this application's own completed publication.
-        if (current.get('context', {}).get('run_id') != generation['run_id']
-                or project_revision(current, 'snode.c') != int(generation['revisions']['snode.c'])
+        if (project_revision(current, 'snode.c') != int(generation['revisions']['snode.c'])
                 or current.get('sources', {}).get('snode.c') != original['sources']['snode.c']):
             raise RuntimeError('Corresponding SNode.C release has not been published or was superseded')
         baseline = current
-    other = 'mqttsuite' if project == 'snode.c' else 'snode.c'
-    dependency_files = lambda info: {k: v for k, v in info.get('files', {}).items() if project_file(k, other)}
-    if (current.get('sources', {}).get(other) != baseline.get('sources', {}).get(other)
-            or dependency_files(current) != dependency_files(baseline)):
-        raise RuntimeError('Superseded build: published counterpart changed')
-    profile = select(bundle, row['id'], project, baseline)
+    others = [repo for repo in REPOSITORIES if repo != project]
+    # Verify dependencies against the actual build manifest, and preserve unrelated
+    # products from the current feed inside this serialized publication transaction.
     manifests = list(incoming.rglob('build.json'))
     if len(manifests) != 1:
         raise RuntimeError('A publisher must receive exactly one target artifact')
     metadata = read(manifests[0])
-    if dependency_files(metadata) != dependency_files(baseline):
-        raise RuntimeError('Artifact changed the published counterpart packages')
-    if (metadata['revision'] != generation['revisions'][project] or metadata['sources'] != profile['sources']
-            or metadata['context'] != profile['context']):
+    for dependency in PROJECTS[project]['depends_on']:
+        files = lambda info: {k: v for k, v in info.get('files', {}).items() if project_file(k, dependency)}
+        if (metadata['sources'].get(dependency) != current.get('sources', {}).get(dependency)
+                or files(metadata) != files(current)):
+            raise RuntimeError('Superseded build: published dependency changed')
+    # The selected source and capture identity cannot be replaced by uploaded metadata.
+    profile = select(bundle, row['id'], project, baseline)
+    expected_context = dict(profile['context'])
+    for key in ('source_tags', 'versions'):
+        expected_context[key] = {project: profile['context'][key][project]}
+    actual_context = dict(metadata['context'])
+    for key in ('source_tags', 'versions'):
+        actual_context[key] = {project: metadata['context'][key].get(project)}
+    if (metadata['revision'] != generation['revisions'][project]
+            or metadata['sources'].get(project) != profile['sources'].get(project)
+            or actual_context != expected_context):
         raise RuntimeError('Artifact does not belong to this project build generation')
     if row['family'] == 'openwrt':
         expected = incoming / 'openwrt' / row['suite'] / row['arch'] / 'build.json'
@@ -295,6 +303,44 @@ def publish(root, bundle, incoming, row, generation, project):
         expected = incoming / 'linux' / row['distribution'] / row['suite'] / row['arch'] / 'build.json'
     if manifests[0] != expected:
         raise RuntimeError('Artifact belongs to a different target')
+    if row['family'] != 'openwrt':
+        # Validate every incoming byte before replacing retained sibling packages.
+        directory = manifests[0].parent
+        for name, checksum in metadata['files'].items():
+            path = Path(name)
+            if path.is_absolute() or '..' in path.parts or (directory / path).is_symlink() or digest(directory / path) != checksum:
+                raise RuntimeError('Artifact checksum mismatch')
+        for other in others:
+            for name in list(metadata['files']):
+                if project_file(name, other):
+                    (directory / name).unlink()
+                    del metadata['files'][name]
+            for name, checksum in current.get('files', {}).items():
+                if project_file(name, other):
+                    relative = (Path(row['distribution']) / 'pool' / row['suite'] / name
+                                if name.endswith('.deb') else Path(feed_paths(row)[0]) / name)
+                    source = root / relative
+                    if digest(source) != checksum:
+                        raise RuntimeError('Published sibling checksum mismatch')
+                    (directory / name).parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(source, directory / name)
+                    metadata['files'][name] = checksum
+        metadata['packages'] = sorted([name for name in metadata['packages'] if package_owner(name) == project]
+                                      + [name for name in current.get('packages', []) if package_owner(name) in others])
+        metadata['versions'] = {key: value for key, value in metadata['versions'].items()
+                                if key in (project, PROJECTS[project]['package'])}
+        metadata['versions'].update({key: value for key, value in current.get('versions', {}).items()
+                                    if key not in (project, PROJECTS[project]['package'])})
+        profile = select(bundle, row['id'], project, current)
+        metadata.update(context=profile['context'], sources=profile['sources'])
+        write(manifests[0], metadata)
+    else:
+        if metadata['sources'] != profile['sources'] or metadata['context'] != profile['context']:
+            raise RuntimeError('Artifact source context mismatch')
+        for other in others:
+            files = lambda info: {k: v for k, v in info.get('files', {}).items() if project_file(k, other)}
+            if files(metadata) != files(current):
+                raise RuntimeError('Artifact changed the published counterpart packages')
     if row['family'] == 'openwrt':
         importlib.import_module('ci.repository').publish(incoming, root, bundle)
     elif row['family'] == 'raspberrypi':
@@ -325,7 +371,9 @@ def event(state, generation, row, project, status, attempt):
             and current.get('run_id') == generation['run_id'] and current.get('attempt') == attempt
             and current.get('status') in {'failed', 'cancelled', 'skipped', 'superseded'}):
         # No application job has run yet. Its own attempt 1 supersedes this dependency placeholder.
-        update(state, row, generation, 'mqttsuite', 'skipped', 0)
+        for dependent in generation['revisions']:
+            if project in PROJECTS[dependent]['depends_on'] and supports(dependent, row):
+                update(state, row, generation, dependent, 'skipped', 0)
 
 
 def merge_readme(root, previous, remote):
@@ -397,7 +445,7 @@ def main():
         target, project, status = args[2:5]
         if target == '-' and project == '-' and status == 'pending':
             for row in generation['targets']:
-                for project in generation['revisions']:
+                for project in (project for project in generation['revisions'] if supports(project, row)):
                     event(state, generation, row, project, status,
                           attempt if project == context['release_project'] else 0)
         else:

@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 import sys
 
-from ci.repository import REPOSITORIES, run
+from ci.repository import PROJECTS, REPOSITORIES, supports, run
 from ci.publish.publication import read, targets
 
 
@@ -18,7 +18,7 @@ def api(path, payload=None):
 
 
 def build(bundle, project, target, publication):
-    if project != 'mqttsuite' or target not in {row['id'] for row in targets()}:
+    if not PROJECTS.get(project, {}).get('depends_on') or target not in {row['id'] for row in targets() if supports(project, row)}:
         raise ValueError('Unknown build project/target')
     capture = read(bundle / 'context.json')['run_id']
     # Retry a handoff, not a completed build. GitHub remains the run authority.
@@ -36,7 +36,7 @@ def receive(payload):
     project = payload['project']
     if project not in REPOSITORIES:
         raise ValueError('Unknown artifact repository')
-    row = next(row for row in targets() if row['id'] == payload['target'])
+    row = next(row for row in targets() if row['id'] == payload['target'] and supports(project, row))
     capture, build_run, attempt = (str(payload[key]) for key in ('capture', 'run', 'attempt'))
     if not all(value.isdecimal() and int(value) > 0 for value in (capture, build_run, attempt)):
         raise ValueError('Invalid run identity')
@@ -54,7 +54,7 @@ def receive(payload):
         if (capture != build_run or origin['display_title'] != f'Packages · {capture} · -'
                 or origin['head_branch'] != api(f'repos/SNodeC/{project}')['default_branch']):
             raise ValueError('Manual capture must be its own default-branch package run')
-    elif project != 'mqttsuite' or origin['display_title'] != f'Packages · {capture} · {row["id"]}':
+    elif not PROJECTS.get(project, {}).get('depends_on') or origin['display_title'] != f'Packages · {capture} · {row["id"]}':
         raise ValueError('Only a published SNode.C target dispatches a dependent build')
     job_url = origin['html_url']
     if 'job' in payload:
@@ -101,15 +101,21 @@ if __name__ == '__main__':
         context = read(bundle / 'context.json')
         if (context['run_id'] != os.environ['CAPTURE_RUN']
                 or (target == '-' and project != context['release_project'])
-                or (target != '-' and (project != 'mqttsuite' or context['release_project'] != 'snode.c'))):
+                or (target != '-' and (not PROJECTS.get(project, {}).get('depends_on') or context['release_project'] != 'snode.c'))):
             raise ValueError('Build request does not match capture')
         if target != '-' and not re.fullmatch(r'[0-9a-f]{40}', os.environ.get('PUBLISHED_REF', '')):
             raise ValueError('Dependent build requires an exact Packages commit')
-        rows = [row for row in read(bundle / 'targets.json') if target in {'-', row['id']}]
+        rows = [row for row in read(bundle / 'targets.json') if target in {'-', row['id']} and supports(project, row)]
         if not rows:
             raise ValueError('Unknown target')
         print('matrix=' + json.dumps({'include': rows}))
         print('revisions=' + json.dumps(read(bundle / 'revisions.json')))
+    elif command == 'dependents':
+        bundle, target, publication = Path(args[0]), args[1], args[2]
+        row = next(row for row in targets() if row['id'] == target)
+        for project, config in PROJECTS.items():
+            if 'snode.c' in config['depends_on'] and supports(project, row):
+                build(bundle, project, target, publication)
     elif command == 'built':
         bundle, target, project = args
         capture = read(Path(bundle) / 'context.json')['run_id']

@@ -7,7 +7,7 @@ import shutil
 import sys
 import tempfile
 
-from ci.repository import ROOT, digest, run, unchanged, linux_matrix, signer, publication_needed
+from ci.repository import PROJECTS, ROOT, digest, run, unchanged, linux_matrix, signer, publication_needed
 
 
 def suites(distribution='raspberrypios'):
@@ -34,13 +34,13 @@ def stage(suite, packages, bundle, output, distribution='raspberrypios'):
         if (name, architecture) in names:
             raise RuntimeError(f'Duplicate Debian package: {name}')
         names.add((name, architecture))
-        if name in {'snodec', 'mqttsuite'}:
+        if name in {config['package'] for config in PROJECTS.values()}:
             versions[name] = run('dpkg-deb', '-f', str(package), 'Version')
         by_arch.setdefault(architecture, set()).add(name)
         if architecture not in architectures(distribution, suite):
             raise RuntimeError(f'Unexpected architecture: {architecture}')
     project = json.loads((bundle / 'context.json').read_text())['build_project']
-    required = packages / ('snodec.packages' if project == 'snode.c' else 'mqttsuite.packages')
+    required = packages / (PROJECTS[project]['package'] + '.packages')
     if not required.is_file():
         raise RuntimeError('Missing built project package inventory')
     expected = {name for inventory in packages.glob('*.packages') for name in inventory.read_text().splitlines()}

@@ -20,7 +20,7 @@ Set the following **repository** variables and secrets in [SNodeC/DistributionPa
 
 GitHub does not reveal existing secret values through its API. Obtain them from their original secure storage. Do not commit private keys or place them in logs.
 
-The GitHub App needs **Contents: read and write** and **Actions: read-only**. Its installation must cover **snode.c, mqttsuite, DistributionPackages and Packages**. Approve any permission update on the installation after saving the App settings. Artifact transfers use Actions read; dispatches and package/status commits use Contents write. Tokens are scoped per step.
+The GitHub App needs **Contents: read and write** and **Actions: read-only**. Its installation must cover **snode.c, mqttsuite, snode.c-idp, DistributionPackages and Packages**. Approve any permission update on the installation after saving the App settings. Artifact transfers use Actions read; dispatches and package/status commits use Contents write. Tokens are scoped per step.
 
 Packages needs no Actions secrets, workflows or build system. Its main branch is written by the publisher, including force-with-lease snapshot replacement. Restrict write access to the publisher and repository administrators.
 
@@ -28,7 +28,7 @@ Packages needs no Actions secrets, workflows or build system. Its main branch is
 
 Configure the App installation and central signing credentials before creating or moving a version tag. Preparation and unsigned builds run directly in the source repository.
 
-Both upstream projects use the same `Build distribution packages` workflow, with their own project identity. In **each source repository**, set:
+The upstream projects use the same `Build distribution packages` workflow, with their own project identity. In **each source repository**, set:
 
 | Type | Name | Value |
 | --- | --- | --- |
@@ -45,7 +45,7 @@ Only version-tag creation or movement starts builds. No ordinary push or README 
 
 1. Verify all current indexes and their referenced files exist in Packages/main.
 2. Verify signing keys match the original feed and configure all credentials above.
-3. Verify the two counters in `Packages/status.json` match the last allocated revisions; use zero for a fresh package repository.
+3. Verify the project counters in `Packages/status.json` match the last allocated revisions; use zero for a fresh package repository.
 4. Review the source scripts and workflow validation results.
 5. With explicit approval, exercise a version-tag event.
 6. Confirm each target publishes SNode.C before its MQTTSuite build starts, and an application-only event does not rebuild SNode.C.
@@ -54,3 +54,11 @@ Only version-tag creation or movement starts builds. No ordinary push or README 
 There is no timer or additional Packages workflow. Creation of the new repositories and pushing source files do not trigger package builds. A CI run cannot be claimed validated until it has actually executed with the signing and GitHub App credentials.
 
 Existing device feeds remain on the original URLs until explicitly updated. No redirect, deletion, or change to the original repositories is part of this setup.
+
+## IDP integration
+
+The IDP uses `PACKAGES_APP_CLIENT_ID` and `OPENWRT_APP_PRIVATE_KEY`, matching the existing product workflows. Extend the CI App installation to `snode.c-idp`; the publisher requests that repository in its artifact-read token. Signing secrets stay in DistributionPackages.
+
+Merge the IDP packaging/workflow and this pipeline integration before deliberately creating its initial matching `vMAJOR.MINOR.PATCH` tag. The capture step requires a release tag for every dependent product. Do not trigger a new SNode.C capture between enabling the third project and preparing the initial IDP tag. Ordinary branch pushes do not build packages.
+
+An IDP release captures only supported native targets and consumes their published SNode.C packages. SNode.C publication dispatches IDP rebuilds for native targets, alongside the existing MQTTSuite chain. OpenWrt retains only its existing products. There are no root-server credentials or automatic machine upgrades in CI.

@@ -5,7 +5,7 @@ from pathlib import Path
 import shutil
 import tempfile
 
-from ci.repository import ROOT, digest, run, signer, unchanged, publication_needed, project_file
+from ci.repository import PROJECTS, ROOT, digest, run, signer, unchanged, publication_needed, project_file
 
 
 def stage(row, packages, bundle, output):
@@ -14,7 +14,7 @@ def stage(row, packages, bundle, output):
     pool = directory / 'Packages'
     pool.mkdir(parents=True)
     project = json.loads((bundle / 'context.json').read_text())['build_project']
-    required = packages / ('snodec.packages' if project == 'snode.c' else 'mqttsuite.packages')
+    required = packages / (PROJECTS[project]['package'] + '.packages')
     if not required.is_file():
         raise RuntimeError('Missing built project package inventory')
     expected = {name for inventory in packages.glob('*.packages') for name in inventory.read_text().splitlines()}
@@ -25,7 +25,7 @@ def stage(row, packages, bundle, output):
         if arch != row['arch'] or name in names:
             raise RuntimeError(f'Unexpected RPM: {name}/{arch}')
         names.add(name)
-        if name in {'snodec', 'mqttsuite'}:
+        if name in {config['package'] for config in PROJECTS.values()}:
             versions[name] = run('rpm', '-qp', '--qf', '%{VERSION}-%{RELEASE}', str(package))
         shutil.copy2(package, pool / package.name)
     if names != expected:

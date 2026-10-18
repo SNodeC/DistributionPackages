@@ -22,8 +22,20 @@ ROOT = Path(__file__).resolve().parent.parent
 PROJECTS = {
     'snode.c': dict(title='SNode.C', package='snodec', depends_on=()),
     'mqttsuite': dict(title='MQTTSuite', package='mqttsuite', depends_on=('snode.c',)),
+    'snode.c-idp': dict(title='SNode.C IDP', package='snodec-idp', depends_on=('snode.c',), families=('linux', 'raspberrypi')),
 }
 REPOSITORIES = tuple(PROJECTS)
+
+
+def supports(project, row):
+    return row['family'] in PROJECTS[project].get('families', ('openwrt', 'linux', 'raspberrypi'))
+
+
+def package_owner(name):
+    matches = [repo for repo, config in PROJECTS.items()
+               if name == config['package'] or name.startswith((config['package'] + '-', config['package'] + '_'))]
+    result = max(matches, key=lambda repo: len(PROJECTS[repo]['package']), default=None)
+    return result
 
 
 def run(*args, **kwargs):
@@ -102,27 +114,34 @@ def prepare(published_root, bundle):
                    destination='SNodeC/Packages', packages_commit=run('git', '-C', str(published_root), 'rev-parse', 'HEAD'),
                    release_project=changed, run_id=os.environ.get('GITHUB_RUN_ID', 'local'),
                    run_url=f'https://github.com/{os.environ.get("GITHUB_REPOSITORY", "SNodeC/DistributionPackages")}/actions/runs/{os.environ.get("GITHUB_RUN_ID", "local")}')
-    mqtt_tag = None
+    release_tags = {changed: tag}
     if changed == 'snode.c':
-        # A library release rebuilds the current application release.
-        refs = run('git', 'ls-remote', '--tags', 'https://github.com/SNodeC/mqttsuite.git', 'refs/tags/v*')
-        candidates = [line.split()[1].removeprefix('refs/tags/') for line in refs.splitlines()
-                      if re.fullmatch(r'refs/tags/v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', line.split()[1])]
-        mqtt_tag = max(candidates, key=lambda value: tuple(map(int, value[1:].split('.'))))
+        for dependent in REPOSITORIES:
+            if 'snode.c' in PROJECTS[dependent]['depends_on']:
+                refs = run('git', 'ls-remote', '--tags', f'https://github.com/SNodeC/{dependent}.git', 'refs/tags/v*')
+                candidates = [line.split()[1].removeprefix('refs/tags/') for line in refs.splitlines()
+                              if re.fullmatch(r'refs/tags/v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', line.split()[1])]
+                if not candidates:
+                    raise RuntimeError(f'{dependent}: publish an initial version tag before enabling dependency builds')
+                release_tags[dependent] = max(candidates, key=lambda value: tuple(map(int, value[1:].split('.'))))
     profiles, captured, observed = {}, {}, {}
-    for row in targets():
+    rows = [row for row in targets() if supports(changed, row)]
+    for row in rows:
         baseline, directory = published(published_root, row)
         if (baseline and any(int(value) <= project_revision(baseline, repo) for repo, value in revisions.items())
                 and baseline.get('context', {}).get('run_id') != context['run_id']):
             raise RuntimeError('Package revision must exceed the published revision; check the reserved project revisions')
-        tags = ({'snode.c': tag, 'mqttsuite': mqtt_tag} if changed == 'snode.c' else
-                dict(baseline.get('context', {}).get('source_tags', {}), mqttsuite=tag))
-        if set(tags) != set(REPOSITORIES):
-            raise RuntimeError(f'{row["id"]}: no published SNode.C dependency; publish a SNode.C release first')
+        tags = {repo: value for repo, value in release_tags.items() if supports(repo, row)}
+        if changed != 'snode.c':
+            for dependency in PROJECTS[changed]['depends_on']:
+                dependency_tag = baseline.get('context', {}).get('source_tags', {}).get(dependency)
+                if not dependency_tag:
+                    raise RuntimeError(f'{row["id"]}: no published {dependency} dependency; publish it first')
+                tags[dependency] = dependency_tag
         profile = dict(context=context | dict(source_tags=tags, versions={}), sources={}, archives={},
                        baseline=baseline, directory=directory)
         for repo, source_tag in tags.items():
-            if changed == 'mqttsuite' and repo == 'snode.c':
+            if repo in PROJECTS[changed]['depends_on']:
                 profile['sources'][repo] = baseline['sources'][repo]
                 continue
             key = (repo, source_tag)
@@ -153,7 +172,7 @@ def prepare(published_root, bundle):
             observed.setdefault(repo, {}).update(refs)
         profiles[row['id']] = profile
     for name, data in [('profiles', profiles), ('sources', observed), ('context', context),
-                       ('targets', targets()), ('revisions', revisions)]:
+                       ('targets', rows), ('revisions', revisions)]:
         (bundle / f'{name}.json').write_text(json.dumps(data, indent=2) + '\n')
     run('tar', '-czf', str(bundle / 'feed.tar.gz'), '--exclude=.git', '--exclude=__pycache__', '-C', str(ROOT), '.')
     unchanged(bundle)
@@ -165,16 +184,17 @@ def select(bundle, target, project, baseline=None):
         raise ValueError('Unknown build project')
     if baseline is not None:
         profile['baseline'] = baseline
-    other = next(repo for repo in REPOSITORIES if repo != project)
     previous = profile['baseline']
     profile['context']['build_project'] = project
     # Record the actual retained counterpart, not the source planned for its next build.
     for values, old in [(profile['sources'], previous.get('sources', {})),
                         (profile['context']['source_tags'], previous.get('context', {}).get('source_tags', {})),
                         (profile['context']['versions'], previous.get('context', {}).get('versions', {}))]:
-        values.pop(other, None)
-        if other in old:
-            values[other] = old[other]
+        for other in REPOSITORIES:
+            if other != project:
+                values.pop(other, None)
+                if other in old:
+                    values[other] = old[other]
     for key in ['context', 'sources']:
         (bundle / f'{key}.json').write_text(json.dumps(profile[key], indent=2) + '\n')
     (bundle / 'baseline.json').write_text(json.dumps(previous))
@@ -185,8 +205,9 @@ def select(bundle, target, project, baseline=None):
 
 def project_file(name, project):
     filename = Path(name).name
-    prefixes = ('snodec_', 'snodec-', 'snode.c_', 'snode.c-') if project == 'snode.c' else ('mqttsuite_', 'mqttsuite-')
-    return filename.endswith(('.deb', '.rpm', '.ipk', '.apk', '.tar.zst')) and filename.startswith(prefixes)
+    extension = filename.endswith(('.deb', '.rpm', '.ipk', '.apk', '.tar.zst'))
+    normalized = filename.replace('snode.c-', 'snodec-', 1).replace('snode.c_', 'snodec_', 1)
+    return extension and package_owner(normalized) == project
 
 
 def reuse(bundle, target, destination):
@@ -194,13 +215,13 @@ def reuse(bundle, target, destination):
     row = next(r for r in json.loads((bundle / 'targets.json').read_text()) if r['id'] == target)
     info = json.loads((bundle / 'baseline.json').read_text())
     built = json.loads((bundle / 'context.json').read_text())['build_project']
-    project = next(repo for repo in REPOSITORIES if repo != built)
-    if project == 'snode.c' and row['family'] == 'openwrt' and len([n for n in info.get('files', {}) if n.startswith('snodec-openwrt-build-deps-') and n.endswith('.tar.zst')]) != 1:
+    others = [repo for repo in REPOSITORIES if repo != built]
+    if 'snode.c' in others and row['family'] == 'openwrt' and len([n for n in info.get('files', {}) if n.startswith('snodec-openwrt-build-deps-') and n.endswith('.tar.zst')]) != 1:
         raise RuntimeError(f'{target}: published SNode.C development files are missing; publish a SNode.C release first')
     destination.mkdir(parents=True, exist_ok=True)
     for name, checksum in info.get('files', {}).items():
         filename = Path(name).name
-        if not project_file(filename, project):
+        if not any(project_file(filename, project) for project in others):
             continue
         directory = f'{row["distribution"]}/pool/{row["suite"]}' if filename.endswith('.deb') else profile['directory']
         path = destination / filename
@@ -209,10 +230,11 @@ def reuse(bundle, target, destination):
         if digest(path) != checksum:
             raise RuntimeError(f'Published dependency checksum mismatch: {name}')
     if row['family'] != 'openwrt':
-        prefix = 'snodec' if project == 'snode.c' else project
-        names = [n for n in info.get('packages', []) if n == prefix or n.startswith(prefix + '-')]
-        if names:
-            (destination / f'{prefix}.packages').write_text('\n'.join(names) + '\n')
+        for project in others:
+            prefix = PROJECTS[project]['package']
+            names = [name for name in info.get('packages', []) if package_owner(name) == project]
+            if names:
+                (destination / f'{prefix}.packages').write_text('\n'.join(names) + '\n')
 
 
 def fetch(url, destination=None):

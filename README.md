@@ -13,7 +13,7 @@ Build recipes, authenticated handoffs, signing and publication for SNode.C distr
 
 ## Operations
 
-This repository authenticates, signs and publishes successful product-package builds, then requests MQTTSuite builds after SNode.C publication. Its manual publication workflow copies guides and renders recorded package status. See the organization [workflow graph](https://github.com/SNodeC/.github/blob/main/docs/workflow-graph.md#banner) for the complete chain and trigger contracts.
+This repository authenticates, signs and publishes successful product-package builds, then requests MQTTSuite and native IDP builds after SNode.C publication. Its manual publication workflow copies guides and renders recorded package status. See the organization [workflow graph](https://github.com/SNodeC/.github/blob/main/docs/workflow-graph.md#banner) for the complete chain and trigger contracts.
 
 - [Documentation](docs/README.md#banner)
 - [Publication and maintenance](docs/maintainers.md#banner)

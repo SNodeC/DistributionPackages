@@ -30,7 +30,7 @@ jobs:
           client-id: ${{ vars.PACKAGES_APP_CLIENT_ID }}
           private-key: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
           owner: SNodeC
-          repositories: Packages,snode.c,mqttsuite
+          repositories: Packages,snode.c,mqttsuite,snode.c-idp
           permission-contents: write
           permission-actions: read
       - name: Validate upstream build identity
@@ -117,7 +117,7 @@ jobs:
           GH_TOKEN: ${{ steps.publisher.outputs.token }}
           TARGET_ID: ${{ github.event.client_payload.target }}
           PUBLICATION: ${{ steps.write.outputs.snapshot }}
-        run: python3 -m ci.dispatch build bundle mqttsuite "$TARGET_ID" "$PUBLICATION"
+        run: python3 -m ci.dispatch dependents bundle "$TARGET_ID" "$PUBLICATION"
       - name: Report publication failure
         if: ${{ always() && steps.source.outcome == 'success' && steps.write.outcome != 'success' }}
         continue-on-error: true

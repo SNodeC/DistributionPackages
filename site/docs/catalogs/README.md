@@ -11,6 +11,7 @@ The package catalogs of SNode.C and MQTTSuite.
 ## Sections
 
 <!-- snodec:begin section-pages -->
+- [SNode.C IDP packages](snodec-idp.md#banner)
 - [MQTTSuite package catalog](mqttsuite.md#banner)
 - [SNode.C package catalog](snodec.md#banner)
 <!-- snodec:end section-pages -->
