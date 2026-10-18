@@ -272,7 +272,7 @@ class PackagePagesTest(unittest.TestCase):
 
     def test_current_doc_overlay_preserves_capture_pinned_executables(self):
         workflow = (repository.ROOT / '.github/workflows/sign-and-publish-packages.yml').read_text()
-        shell = workflow.split('          # Separate authored presentation', 1)[1].split('\n', 1)[1].split("          echo 'paths<<EOF'", 1)[0]
+        shell = workflow.split('          # Publish current guides', 1)[1].split('\n', 1)[1].split("          echo 'paths<<EOF'", 1)[0]
         shell = shell.replace('$DOCS_BRANCH', 'trunk')
         current = self.root / 'feed'
         current.mkdir()
@@ -284,11 +284,15 @@ class PackagePagesTest(unittest.TestCase):
         (current / 'docs').mkdir()
         (current / 'docs/old.md').write_text('old')
         (current / 'README.md').write_text('old')
+        (current / 'install').mkdir()
+        (current / 'install/install.sh').write_text('# obsolete ecosystem installer')
         (current / 'tool.py').write_text('CAPTURED')
         git('add', '.')
         git('commit', '-m', 'capture')
         commit = git('rev-parse', 'HEAD')
         shutil.copytree(repository.ROOT / 'site', current / 'site')
+        shutil.rmtree(current / 'install')
+        shutil.copytree(repository.ROOT / 'install', current / 'install')
         (current / 'tool.py').write_text('NEW')
         git('add', '.')
         git('commit', '-m', 'current')
@@ -302,6 +306,9 @@ class PackagePagesTest(unittest.TestCase):
         self.assertEqual((current / 'README.md').read_bytes(), (repository.ROOT / 'site/README.md').read_bytes())
         self.assertFalse((current / 'docs/old.md').exists())
         self.assertEqual((current / 'tool.py').read_text(), 'CAPTURED')
+        self.assertEqual({p.name: p.read_bytes() for p in (current / 'install').iterdir()},
+                         {p.name: p.read_bytes() for p in (repository.ROOT / 'install').iterdir()})
+        self.assertIn('PACKAGE_SITE=' + str(tmp / 'package-site/site'), (self.root / 'env').read_text())
 
 
 

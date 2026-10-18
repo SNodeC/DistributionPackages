@@ -406,6 +406,9 @@ def copy_site(root):
     if (root / 'docs').exists():
         shutil.rmtree(root / 'docs')
     shutil.copytree(site / 'docs', root / 'docs')
+    if (root / 'install').exists():
+        shutil.rmtree(root / 'install')
+    shutil.copytree(site.parent / 'install', root / 'install')
     (root / 'keys').mkdir(exist_ok=True)
     shutil.copy2(site / 'keys/README.md', root / 'keys/README.md')
 
@@ -478,9 +481,6 @@ def main():
                 return 0
             publish(root, bundle, Path(args[4]).resolve(), row, generation, project)
             copy_site(root)
-            if (root / 'install').exists():
-                shutil.rmtree(root / 'install')
-            shutil.copytree(ROOT / 'install', root / 'install')
         except Exception as error:
             print(f'Publication rejected: {error}', file=sys.stderr)
             run('git', '-C', str(root), 'reset', '--hard', 'HEAD')

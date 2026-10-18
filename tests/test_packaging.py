@@ -230,13 +230,13 @@ class PackagingTest(unittest.TestCase):
             for series, manager, index in [('24.10', 'opkg', 'Packages.gz'), ('25.12', 'apk', 'packages.adb')]:
                 for suffix in ['', '.0', '.8', '-SNAPSHOT', '.0-rc1']:
                     fixture.write_text(f"DISTRIB_RELEASE='{series}{suffix}'\nDISTRIB_ARCH='aarch64_cortex-a53'\n")
-                    for args, prepare in [([], 'false'), (['--prepare'], 'true')]:
+                    for args, prepare in [(['--project', 'mqttsuite'], 'false'), (['--prepare'], 'true')]:
                         result = subprocess.run(['sh', str(script), *args], text=True, capture_output=True)
                         self.assertEqual(result.returncode, 0, result.stderr)
                         self.assertEqual(result.stdout.strip(), f'{manager}|https://raw.githubusercontent.com/SNodeC/Packages/main/openwrt/{series}/aarch64_cortex-a53/{index}|{prepare}')
             fixture.write_text("DISTRIB_RELEASE='SNAPSHOT'\nDISTRIB_ARCH='aarch64_cortex-a53'\n")
-            self.assertNotEqual(subprocess.run(['sh', str(script)], capture_output=True).returncode, 0)
-            self.assertEqual(subprocess.run(['sh', str(script), '--suite', '25.12'], capture_output=True).returncode, 0)
+            self.assertNotEqual(subprocess.run(['sh', str(script), '--prepare'], capture_output=True).returncode, 0)
+            self.assertEqual(subprocess.run(['sh', str(script), '--prepare', '--suite', '25.12'], capture_output=True).returncode, 0)
 
     def test_revision_floor_rejects_downgrade_before_source_download(self):
         row = publication.targets()[0]
@@ -618,6 +618,22 @@ class StatusEventsTest(unittest.TestCase):
         self.assertEqual((self.seed/'install/install.sh').read_bytes(),(repository.ROOT/'install/install.sh').read_bytes())
         self.assertFalse((self.seed / 'net').exists())
 
+    def test_authored_snapshot_copies_matching_installers(self):
+        import shutil
+        content = self.root / 'current-content'
+        shutil.copytree(repository.ROOT / 'site', content / 'site')
+        shutil.copytree(repository.ROOT / 'install', content / 'install')
+        (content / 'install/install.sh').write_text('# current authored installer\n')
+        (self.seed / 'install').mkdir()
+        (self.seed / 'install/obsolete.sh').write_text('# obsolete\n')
+        state = self.snapshot()
+        with patch.dict(os.environ, PACKAGE_SITE=str(content / 'site')):
+            publication.copy_site(self.seed)
+        self.assertEqual((self.seed / 'install/install.sh').read_bytes(),
+                         (content / 'install/install.sh').read_bytes())
+        self.assertFalse((self.seed / 'install/obsolete.sh').exists())
+        self.assertEqual(self.snapshot(), state)
+
     def test_manual_render_handoff_replaces_docs_without_changing_state_or_keys(self):
         (self.seed / 'keys').mkdir()
         (self.seed / 'keys/snodec-opkg.pub').write_bytes(b'fixture public key')
@@ -633,6 +649,8 @@ class StatusEventsTest(unittest.TestCase):
         self.assertEqual(self.snapshot(), state)
         self.assertEqual(self.git('show', 'main:feed', cwd=self.remote), 'original feed')
         self.assertEqual((self.seed / 'keys/snodec-opkg.pub').read_bytes(), b'fixture public key')
+        self.assertEqual({p.name: p.read_bytes() for p in (self.seed / 'install').iterdir()},
+                         {p.name: p.read_bytes() for p in (repository.ROOT / 'install').iterdir()})
         self.assertEqual((self.seed / 'keys/README.md').read_bytes(),
                          (repository.ROOT / 'site/keys/README.md').read_bytes())
         self.assertFalse((self.seed / 'docs/status.md').exists())

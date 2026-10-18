@@ -6,16 +6,18 @@
 
 # Installation
 
-Installation guides per distribution and how to select DEB and RPM packages.
+Choose a project and your installed distribution. Each guide has its own quick install, component selection, verification and updates.
 
-## Sections
+| Project | Distribution guides |
+| --- | --- |
+| [SNode.C](snodec/README.md#banner) | [Debian](snodec/debian.md#banner) · [Ubuntu](snodec/ubuntu.md#banner) · [Raspberry Pi OS](snodec/raspberry-pi-os.md#banner) · [Fedora](snodec/fedora.md#banner) · [Rocky Linux](snodec/rocky-linux.md#banner) · [OpenWrt](snodec/openwrt.md#banner) |
+| [MQTTSuite](mqttsuite/README.md#banner) | [Debian](mqttsuite/debian.md#banner) · [Ubuntu](mqttsuite/ubuntu.md#banner) · [Raspberry Pi OS](mqttsuite/raspberry-pi-os.md#banner) · [Fedora](mqttsuite/fedora.md#banner) · [Rocky Linux](mqttsuite/rocky-linux.md#banner) · [OpenWrt](mqttsuite/openwrt.md#banner) |
+| [SNode.C IDP](snodec-idp/README.md#banner) | [Debian](snodec-idp/debian.md#banner) · [Ubuntu](snodec-idp/ubuntu.md#banner) · [Raspberry Pi OS](snodec-idp/raspberry-pi-os.md#banner) · [Fedora](snodec-idp/fedora.md#banner) · [Rocky Linux](snodec-idp/rocky-linux.md#banner) |
 
-<!-- snodec:begin section-pages -->
-- [Debian](debian.md#banner)
-- [Fedora](fedora.md#banner)
-- [OpenWrt](openwrt.md#banner)
-- [DEB and RPM package selection](package-selection.md#banner)
-- [Raspberry Pi OS](raspberry-pi-os.md#banner)
-- [Rocky Linux](rocky-linux.md#banner)
-- [Ubuntu](ubuntu.md#banner)
-<!-- snodec:end section-pages -->
+## Repository setup
+
+[Signed package-source setup](../repositories/README.md#banner) prepares repositories without installing applications. Project installers perform that preparation automatically.
+
+## Package selection
+
+[Package catalogs and component roles](package-selection.md#banner). Shared dependencies are installed automatically.

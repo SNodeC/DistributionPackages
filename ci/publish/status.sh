@@ -14,7 +14,7 @@ fi
 if [ ! -d "$root/.git" ]; then
     git clone --filter=blob:none --no-checkout https://github.com/SNodeC/Packages.git "$root"
 fi
-git -C "$root" sparse-checkout set --no-cone /README.md /status.json /docs/ /keys/ /status/ '**/build.json'
+git -C "$root" sparse-checkout set --no-cone /README.md /status.json /docs/ /install/ /keys/ /status/ '**/build.json'
 git -C "$root" config user.name 'github-actions[bot]'
 git -C "$root" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 for attempt in {1..30}; do
