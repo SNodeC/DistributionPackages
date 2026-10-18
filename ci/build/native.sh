@@ -34,8 +34,10 @@ for project in "$BUILD_PROJECT"; do
     tar -xzf bundle/"$project"-*.tar.gz --strip-components=1 -C "sources/$project"
 done
 package() {
-    local build=$1 version
+    local build=$1 version expected
     version=$(sed -n 's/^set(CPACK_PACKAGE_VERSION "\([^" ]*\)")/\1/p' "$build/CPackConfig.cmake")
+    expected=$(python3 -c 'import json, os; print(json.load(open("bundle/context.json"))["versions"][os.environ["BUILD_PROJECT"]])')
+    [ "$version" = "$expected" ] || { echo "Package version $version differs from captured release $expected" >&2; exit 1; }
     local distribution=${DISTRIBUTION:-raspberrypios}
     version=$(python3 /work/feed/ci/repository.py package-version "$distribution" "$SUITE" "$version" "$PACKAGE_RELEASE")
     local options=(-D "CPACK_PACKAGE_VERSION=$version")

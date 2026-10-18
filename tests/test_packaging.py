@@ -192,6 +192,7 @@ class PackagingTest(unittest.TestCase):
             build = root / 'build'
             (build / '_packages').mkdir(parents=True)
             (root / 'packages').mkdir()
+            (root / 'bundle').mkdir()
             (build / 'CPackConfig.cmake').write_text('set(CPACK_PACKAGE_VERSION "2.0.0")\n')
             for distribution, suite, format, expected in [('debian', 'sid', 'DEB', 'CPACK_PACKAGE_VERSION=2.0.0-9~sid'),
                     ('raspberrypios', 'trixie', 'DEB', 'CPACK_PACKAGE_VERSION=2.0.0-9~trixie'),
@@ -201,8 +202,21 @@ class PackagingTest(unittest.TestCase):
                 (build / '_packages/fixture.packages').touch()
                 env = os.environ | {'DISTRIBUTION': distribution, 'SUITE': suite, 'PACKAGE_RELEASE': '9', 'format': format}
                 shell = 'cpack() { printf "%s\\n" "$@" > "$OUTPUT"; }\n' + package + 'package "$BUILD"'
-                subprocess.run(['bash', '-e', '-c', shell], cwd=root, env=env | {'OUTPUT': str(root / 'args'), 'BUILD': str(build)}, check=True)
-                self.assertEqual((root / 'args').read_text().splitlines(), ['-G', format, '-D', expected])
+                for project in repository.PROJECTS:
+                    for captured in ['2.0.0', '2.0.1']:
+                        with self.subTest(distribution=distribution, project=project, captured=captured):
+                            (root / 'bundle/context.json').write_text(json.dumps({'versions': {project: captured}}))
+                            (root / 'args').unlink(missing_ok=True)
+                            result = subprocess.run(['bash', '-e', '-c', shell], cwd=root,
+                                env=env | {'OUTPUT': str(root / 'args'), 'BUILD': str(build), 'BUILD_PROJECT': project},
+                                capture_output=True, text=True)
+                            if captured == '2.0.0':
+                                self.assertEqual(result.returncode, 0, result.stderr)
+                                self.assertEqual((root / 'args').read_text().splitlines(), ['-G', format, '-D', expected])
+                            else:
+                                self.assertNotEqual(result.returncode, 0)
+                                self.assertIn('differs from captured release 2.0.1', result.stderr)
+                                self.assertFalse((root / 'args').exists(), 'CPack must not run for a mismatched release')
 
     def test_installer_openwrt_series_and_urls(self):
         source = (repository.ROOT / 'install/install.sh').read_text().split('fetch() {', 1)[0]
