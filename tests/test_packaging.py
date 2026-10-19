@@ -360,7 +360,8 @@ class StatusEventsTest(unittest.TestCase):
         self.context=dict(run_id='100',run_url='https://example.invalid/100',destination='SNodeC/Packages',release_project='snode.c')
         for name,value in dict(context=self.context,targets=self.rows,revisions={'snode.c':'1','mqttsuite':'1'},sources={'snode.c': {'refs/tags/v2.0.0': 'fixture'}, 'mqttsuite': {'refs/tags/v1.0.2': 'fixture'}},profiles={}).items():
             publication.write(self.bundle/f'{name}.json',value)
-        self.env=os.environ | {'GITHUB_RUN_ATTEMPT':'1','PYTHONPATH':str(repository.ROOT)}
+        self.env=os.environ | {'GITHUB_RUN_ATTEMPT':'1','PYTHONPATH':str(repository.ROOT), 'GITHUB_REPOSITORY':'SNodeC/DistributionPackages',
+                                  'GITHUB_WORKFLOW_REF':'SNodeC/DistributionPackages/.github/workflows/orchestrate-packages.yml@refs/heads/main'}
         self.status_script=repository.ROOT/'ci/publish/status.sh'
         self.push_script=repository.ROOT/'ci/publish/push.sh'
 
@@ -449,10 +450,10 @@ class StatusEventsTest(unittest.TestCase):
         self.event(self.seed,'running',self.rows[8],project='mqttsuite',attempt=2)
         for result in ['cancelled','failed']:
             baseline=(self.seed/'status.json').read_bytes()
-            subprocess.run(['python3','-m','ci.publish.publication','finalize',str(self.seed),str(self.bundle),result],env=self.env,check=True)
+            subprocess.run(['python3','-m','ci.publish.publication','finalize',str(self.seed),str(self.bundle),result,json.dumps(self.rows)],env=self.env | {'BUILD_PROJECT':'mqttsuite'},check=True)
             values=publication.read(self.seed/'status.json')['targets']
             for index,status in enumerate(['pending','running','publishing','published','failed','cancelled','skipped','superseded']):
-                self.assertEqual(values[self.rows[index]['id']+'/mqttsuite']['status'],result if index<3 else status)
+                self.assertEqual(values[self.rows[index]['id']+'/mqttsuite']['status'],result if index<2 else status)
             self.assertEqual(values[self.rows[8]['id']+'/mqttsuite']['status'],'running')
             (self.seed/'status.json').write_bytes(baseline)
 

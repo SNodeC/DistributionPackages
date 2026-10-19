@@ -183,12 +183,18 @@ jobs:
         run: python3 -m ci.dispatch status status-bundle "$TARGET_ID" "$BUILD_PROJECT" "$BUILD_STATUS"
   finalize:
     needs: [prepare, build]
-    if: ${{ always() && needs.prepare.result == 'success' && needs.build.result != 'success' }}
+    if: ${{ always() && needs.build.result != 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
-      FINAL_STATUS: ${{ needs.build.result == 'cancelled' && 'cancelled' || 'failed' }}
+      FINAL_STATUS: ${{ (needs.build.result == 'cancelled' || needs.prepare.result == 'cancelled') && 'cancelled' || 'failed' }}
     steps:
+      - uses: actions/checkout@v6
+        with:
+          repository: SNodeC/DistributionPackages
+          ref: main
+          path: feed
+          persist-credentials: false
       - uses: actions/create-github-app-token@v3
         id: capture
         with:
@@ -198,6 +204,10 @@ jobs:
           repositories: DistributionPackages
           permission-actions: read
           permission-contents: write
+      - name: Authorize coordinator capture
+        env:
+          GH_TOKEN: ${{ steps.capture.outputs.token }}
+        run: python3 -m ci.dispatch authorize
       - uses: actions/download-artifact@v8
         with:
           repository: ${{ env.CAPTURE_REPOSITORY }}
@@ -209,6 +219,5 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.capture.outputs.token }}
         run: |
-          mkdir feed
-          tar -xzf bundle/feed.tar.gz -C feed
+          python3 -m ci.dispatch plan bundle "$BUILD_PROJECT" "$TARGET_ID"
           python3 -m ci.dispatch status bundle "$TARGET_ID" "$BUILD_PROJECT" "$FINAL_STATUS"

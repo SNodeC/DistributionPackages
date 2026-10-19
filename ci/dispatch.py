@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 
 from ci.repository import PROJECTS, REPOSITORIES, supports, run, project_revision
-from ci.publish.publication import read, targets, published
+from ci.publish.publication import read, published
 
 COORDINATOR = 'SNodeC/DistributionPackages'
 TAG = r'v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)'
@@ -23,7 +23,7 @@ def api(path, payload=None):
 
 def identity(value):
     result = str(value)
-    if not result.isdecimal() or int(result) <= 0:
+    if not re.fullmatch(r'[1-9][0-9]*', result):
         raise ValueError('Invalid run identity')
     return result
 
@@ -55,6 +55,15 @@ def capture_run(capture):
     return origin
 
 
+def retry_capture():
+    for attempt in range(1, int(os.environ['GITHUB_RUN_ATTEMPT'])):
+        pages = json.loads(run('gh', 'api', '--paginate', '--slurp',
+            f'repos/{COORDINATOR}/actions/runs/{identity(os.environ["GITHUB_RUN_ID"])}/attempts/{attempt}/jobs?per_page=100'))
+        if any(step['name'] == 'Save immutable release capture' and step.get('conclusion') == 'success'
+               for page in pages for job in page['jobs'] for step in job.get('steps', [])):
+            raise ValueError('Previously saved capture is unavailable; refusing to recapture this generation')
+
+
 def build(bundle, project, target, publication):
     context = read(bundle / 'context.json')
     rows = read(bundle / 'targets.json')
@@ -73,17 +82,16 @@ def build(bundle, project, target, publication):
             capture=capture, target=target, publication=publication)))
 
 
-def receive(payload):
+def receive(payload, bundle, action):
     project = payload['project']
     if project not in REPOSITORIES:
         raise ValueError('Unknown artifact repository')
     status = payload.get('status', 'publishing')
-    if status not in {'running', 'publishing', 'failed', 'cancelled'}:
+    if (status not in {'running', 'publishing', 'failed', 'cancelled'}
+            or action not in {'sign-and-publish-packages', 'package-build-status'}
+            or (status == 'publishing') != (action == 'sign-and-publish-packages')):
         raise ValueError('Invalid build status')
     target = payload['target']
-    row = next((row for row in targets() if row['id'] == target and supports(project, row)), None)
-    if row is None and not (target == '-' and status in {'failed', 'cancelled'}):
-        raise ValueError('Unknown build target')
     capture, build_run, attempt = (identity(payload[key]) for key in ('capture', 'run', 'attempt'))
     capture_run(capture)
     origin = api(f'repos/SNodeC/{project}/actions/runs/{build_run}')
@@ -91,7 +99,13 @@ def receive(payload):
             or origin['head_repository']['full_name'] != f'SNodeC/{project}' or origin['run_attempt'] < int(attempt)
             or origin['display_title'] not in {f'Packages · {capture} · -', f'Packages · {capture} · {target}'}):
         raise ValueError('Result does not match the upstream build workflow and capture')
-    job_url = origin['html_url']
+    context = read(bundle / 'context.json')
+    rows = [row for row in read(bundle / 'targets.json') if supports(project, row) and target in {'-', row['id']}]
+    if (context['run_id'] != capture or project not in read(bundle / 'revisions.json') or not rows
+            or (target == '-' and (project != context['release_project'] or status not in {'failed', 'cancelled'}))):
+        raise ValueError('Result does not belong to the captured project and target')
+    row = rows[0] if target != '-' else None
+    job_url, final_targets = origin['html_url'], None
     if 'job' in payload:
         job = api(f'repos/SNodeC/{project}/actions/jobs/{identity(payload["job"])}')
         name = f"{row['distribution']} · {row['suite']} · {row['arch']}" if row else ''
@@ -99,8 +113,22 @@ def receive(payload):
                 or job['name'] not in {name, 'build / ' + name}):
             raise ValueError('Job does not belong to the validated target and attempt')
         job_url = job['html_url']
-    return dict(project=project, target=json.dumps(row), capture=capture, run=build_run,
-                attempt=attempt, artifact=f'packages-{project}-{target}-{attempt}', status=status,
+    else:
+        if status not in {'failed', 'cancelled'}:
+            raise ValueError('Only finalization may omit its build job')
+        pages = json.loads(run('gh', 'api', '--paginate', '--slurp',
+            f'repos/SNodeC/{project}/actions/runs/{build_run}/jobs?filter=all&per_page=100'))
+        jobs = sorted((job for page in pages for job in page['jobs'] if job['run_attempt'] <= int(attempt)),
+                      key=lambda job: job['run_attempt'])
+        latest = {job['name']: job for job in jobs}
+        handed_off = {job['name'] for job in latest.values()
+                      if job.get('conclusion') == 'success' or any(step['name'] == 'Request signed publication'
+                         and step.get('conclusion') == 'success' for step in job.get('steps', []))}
+        final_targets = [row for row in rows if not handed_off.intersection(
+            {f"{row['distribution']} · {row['suite']} · {row['arch']}",
+             f"build / {row['distribution']} · {row['suite']} · {row['arch']}"})]
+    return dict(project=project, target=json.dumps(row), final_targets=json.dumps(final_targets), capture=capture,
+                run=build_run, attempt=attempt, artifact=f'packages-{project}-{target}-{attempt}', status=status,
                 run_url=job_url, capture_repository=COORDINATOR)
 
 
@@ -119,7 +147,7 @@ def baseline(bundle, target, ref):
     if not re.fullmatch(SHA, ref):
         raise ValueError('Dependency publication must be an exact commit')
     if PROJECTS[os.environ['BUILD_PROJECT']]['depends_on']:
-        row = next(row for row in targets() if row['id'] == target)
+        row = next(row for row in read(bundle / 'targets.json') if row['id'] == target)
         profile = read(bundle / 'profiles.json')[target]
         info = json.loads(fetch(f'https://raw.githubusercontent.com/SNodeC/Packages/{ref}/{profile["directory"]}/build.json'))
         info = info.get('targets', {}).get(row['arch'], info)
@@ -173,8 +201,11 @@ def main():
             project=os.environ['GITHUB_REPOSITORY'].split('/')[1], tag=os.environ['GITHUB_REF_NAME'],
             sha=os.environ['GITHUB_SHA'], run=os.environ['GITHUB_RUN_ID'])))
     elif command in {'intake', 'receive'}:
-        payload = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())['client_payload']
-        values = {'intake': intake, 'receive': receive}[command](payload)
+        event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+        values = (intake(event['client_payload']) if command == 'intake'
+                  else receive(event['client_payload'], Path(args[0]), event['action']))
+    elif command == 'retry-capture':
+        retry_capture()
     elif command == 'authorize':
         capture_run(os.environ['CAPTURE_RUN'])
     elif command == 'plan':

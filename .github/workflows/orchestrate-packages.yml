@@ -21,12 +21,16 @@ jobs:
         with:
           path: feed
           persist-credentials: false
+      - name: Scope coordinator token to registered repositories
+        id: repositories
+        run: echo "names=$(jq -r 'keys + ["DistributionPackages", "Packages"] | join(",")' feed/ci/projects.json)" >> "$GITHUB_OUTPUT"
       - uses: actions/create-github-app-token@v3
         id: coordinator
         with:
           client-id: ${{ vars.PACKAGES_APP_CLIENT_ID }}
           private-key: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
           owner: SNodeC
+          repositories: ${{ steps.repositories.outputs.names }}
           permission-actions: read
           permission-contents: write
       - name: Validate source notification
@@ -45,14 +49,17 @@ jobs:
         if: steps.release.outputs.duplicate != 'true' && steps.previous.outcome != 'success'
         env:
           PACKAGES_TOKEN: ${{ steps.coordinator.outputs.token }}
+          GH_TOKEN: ${{ steps.coordinator.outputs.token }}
           RELEASE_PROJECT: ${{ steps.release.outputs.project }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           RELEASE_SHA: ${{ steps.release.outputs.sha }}
         run: |
+          python3 -m ci.dispatch retry-capture
           rm -rf bundle
           bash feed/ci/publish/status.sh published reserve
           python3 -m ci.repository prepare published bundle
-      - uses: actions/upload-artifact@v7
+      - name: Save immutable release capture
+        uses: actions/upload-artifact@v7
         if: steps.release.outputs.duplicate != 'true' && steps.previous.outcome != 'success'
         with:
           name: source-pair

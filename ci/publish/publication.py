@@ -422,6 +422,9 @@ def main():
             render(root, read(root / 'status.json', {}))
         return
     if command == 'reserve':
+        if (os.environ.get('GITHUB_REPOSITORY') != 'SNodeC/DistributionPackages'
+                or os.environ.get('GITHUB_WORKFLOW_REF') != 'SNodeC/DistributionPackages/.github/workflows/orchestrate-packages.yml@refs/heads/main'):
+            raise ValueError('Only the coordinator workflow may reserve package revisions')
         reserve(Path(args[0]), os.environ['RELEASE_PROJECT'], os.environ['GITHUB_RUN_ID'])
         return
     if command == 'matrix':
@@ -455,14 +458,12 @@ def main():
         status = args[2]
         if status not in {'cancelled', 'failed'}:
             raise ValueError('Invalid final status')
-        for key, item in list(state['targets'].items()):
-            if (item['run_id'] == generation['run_id'] and item['attempt'] in {0, attempt}
-                    and item['status'] not in TERMINAL
-                    and (not os.environ.get('BUILD_PROJECT') or (key.endswith('/' + os.environ['BUILD_PROJECT'])
-                         and item['status'] != 'publishing'
-                         and os.environ.get('TARGET_ID', '-') in {'-', item['target']['id']}))):
-                project = key.rsplit('/', 1)[1]
-                event(state, generation, item['target'], project, status, attempt)
+        for row in json.loads(args[3]):
+            project = os.environ['BUILD_PROJECT']
+            item = state['targets'].get(f"{row['id']}/{project}", {})
+            if (item.get('run_id') == generation['run_id'] and item['attempt'] in {0, attempt}
+                    and item['status'] not in TERMINAL and item['status'] != 'publishing'):
+                event(state, generation, row, project, status, attempt)
     elif command == 'feed':
         row, project = json.loads(args[2]), args[3]
         original_context = (bundle / 'context.json').read_bytes()

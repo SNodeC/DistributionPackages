@@ -56,8 +56,8 @@ Existing device feeds remain on the original URLs until explicitly updated. No r
 
 ## IDP integration
 
-The IDP uses `PACKAGES_APP_CLIENT_ID` and `OPENWRT_APP_PRIVATE_KEY`, matching the existing product workflows. Extend the CI App installation to `snode.c-idp`; the publisher requests that repository in its artifact-read token. Signing secrets stay in DistributionPackages.
+The IDP uses `PACKAGES_APP_CLIENT_ID` and `OPENWRT_APP_PRIVATE_KEY`, matching the existing product workflows. Extend the CI App installation to `snode.c-idp`; the publisher derives its repository token scope from the JSON project registry. Signing secrets stay in DistributionPackages.
 
-Merge the IDP packaging/workflow and this pipeline integration before deliberately creating its initial matching `vMAJOR.MINOR.PATCH` tag. The capture step requires a release tag for every dependent product. Do not trigger a new SNode.C capture between enabling the third project and preparing the initial IDP tag. Ordinary branch pushes do not build packages.
+Merge the IDP packaging/workflow and this pipeline integration before deliberately creating its initial matching `vMAJOR.MINOR.PATCH` tag. The capture step requires a release tag for every dependent product. Do not trigger a new SNode.C capture between enabling the third project and preparing the initial IDP tag. Ordinary branch pushes do not build packages. A release tag must point to a commit containing the thin workflow entry point, including on maintenance branches; backport the wrapper before tagging. Old source workflows are rejected before allocating revisions.
 
 An IDP release captures only supported native targets and consumes their published SNode.C packages. SNode.C publication dispatches IDP rebuilds for native targets, alongside the existing MQTTSuite chain. OpenWrt retains only its existing products. There are no root-server credentials or automatic machine upgrades in CI.
