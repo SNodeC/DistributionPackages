@@ -1,0 +1,47 @@
+name: Coordinate package builds
+on:
+  workflow_dispatch:
+    inputs:
+      retry:
+        description: 'Retry a repaired task: capture/project/target'
+        type: string
+  workflow_run:
+    workflows: [Orchestrate package release, Sign and publish distribution packages]
+    types: [completed]
+  schedule:
+    - cron: '17 * * * *'
+permissions:
+  contents: read
+concurrency:
+  group: package-control
+  cancel-in-progress: false
+jobs:
+  control:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: feed
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - id: repositories
+        run: echo "names=$(jq -r 'keys + ["DistributionPackages", "Packages"] | join(",")' feed/ci/projects.json)" >> "$GITHUB_OUTPUT"
+      - uses: actions/create-github-app-token@v3
+        id: coordinator
+        with:
+          client-id: ${{ vars.PACKAGES_APP_CLIENT_ID }}
+          private-key: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
+          owner: SNodeC
+          repositories: ${{ steps.repositories.outputs.names }}
+          permission-actions: write
+          permission-contents: write
+      - name: Observe, admit and publish captured tasks
+        env:
+          PYTHONPATH: ${{ github.workspace }}/feed
+          GH_TOKEN: ${{ steps.coordinator.outputs.token }}
+          PACKAGES_TOKEN: ${{ steps.coordinator.outputs.token }}
+          COORDINATOR_ACTOR: ${{ steps.coordinator.outputs.app-slug }}[bot]
+          PACKAGE_RETRY: ${{ inputs.retry }}
+        run: python3 -m ci.dispatch control published

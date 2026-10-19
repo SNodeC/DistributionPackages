@@ -1,13 +1,25 @@
 name: Orchestrate package release
-run-name: Release · ${{ github.event.client_payload.project }} · ${{ github.event.client_payload.tag }} · ${{ github.event.client_payload.run }}
+run-name: Release · ${{ inputs.project }} · ${{ inputs.tag }} · ${{ inputs.run }}
 on:
-  repository_dispatch:
-    types: [release-packages]
+  workflow_dispatch:
+    inputs:
+      project:
+        type: string
+        required: true
+      tag:
+        type: string
+        required: true
+      sha:
+        type: string
+        required: true
+      run:
+        type: string
+        required: true
 permissions:
   contents: read
   actions: read
 concurrency:
-  group: package-release-${{ github.event.client_payload.project }}-${{ github.event.client_payload.run }}
+  group: package-release-${{ inputs.project }}-${{ inputs.run }}
   cancel-in-progress: false
   queue: max
 env:
@@ -31,7 +43,7 @@ jobs:
           private-key: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
           owner: SNodeC
           repositories: ${{ steps.repositories.outputs.names }}
-          permission-actions: read
+          permission-actions: write
           permission-contents: write
       - name: Validate source notification
         id: release
@@ -74,4 +86,5 @@ jobs:
           tar -xzf bundle/feed.tar.gz -C feed
           python3 -m ci.repository check bundle
           bash feed/ci/publish/status.sh published status bundle '-' '-' pending
-          python3 -m ci.dispatch start bundle
+          state=$(gh api repos/SNodeC/DistributionPackages/actions/workflows/control-packages.yml --jq .state)
+          test "$state" = active || { echo 'Coordinator disabled; enable it before resuming releases' >&2; exit 1; }

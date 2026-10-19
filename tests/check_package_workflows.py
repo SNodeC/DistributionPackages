@@ -7,15 +7,17 @@ import yaml
 def check(path):
     workflow = yaml.load(path.read_text(), Loader=yaml.BaseLoader)
     assert workflow['on']['push']['tags'] == ['v[0-9]*.[0-9]*.[0-9]*']
-    assert workflow['on']['repository_dispatch']['types'] == ['build-packages']
+    assert workflow['on']['workflow_dispatch']['inputs']['request']['required'] == 'true'
+    assert 'fromJSON(inputs.request).intent' in workflow['run-name']
     assert set(workflow['jobs']) == {'notify', 'build'}
     for job, shared in [('notify', 'notify-release'), ('build', 'build-packages')]:
         entry = workflow['jobs'][job]
         assert entry['uses'] == f'SNodeC/DistributionPackages/.github/workflows/{shared}.yml@main'
         assert set(entry) == {'if', 'uses', 'secrets'}
-        assert entry['secrets'] == {'OPENWRT_APP_PRIVATE_KEY': '${{ secrets.OPENWRT_APP_PRIVATE_KEY }}'}
+        secret = 'PACKAGE_NOTIFY_APP_PRIVATE_KEY' if job == 'notify' else 'PACKAGE_CAPTURE_APP_PRIVATE_KEY'
+        assert entry['secrets'] == {secret: '${{ secrets.' + secret + ' }}'}
     assert workflow['jobs']['notify']['if'] == "github.event_name == 'push' && github.event.deleted == false"
-    assert workflow['jobs']['build']['if'] == "github.event_name == 'repository_dispatch'"
+    assert workflow['jobs']['build']['if'] == "github.event_name == 'workflow_dispatch'"
     print(f'{path}: thin tag notification and coordinator build entry points passed')
 
 

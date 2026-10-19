@@ -48,32 +48,22 @@ class OrchestrationTest(unittest.TestCase):
                 with self.subTest(change=change), self.assertRaises(ValueError):
                     repository.load_projects(path)
 
-    def test_diamond_waits_for_all_exact_dependencies_and_publishes_per_target(self):
+    def test_diamond_waits_for_all_exact_dependency_identities(self):
         graph = self.graph()
-        row = next(row for row in publication.targets() if row['id'] == 'debian-trixie-amd64')
         sources = {name: {f'refs/tags/v1.0.0': name} for name in graph}
-        revisions = dict.fromkeys(graph, '2')
         profile = dict(sources=sources, baseline={})
-        with tempfile.TemporaryDirectory() as tmp, patch.object(repository, 'PROJECTS', graph), \
-             patch.object(dispatch, 'PROJECTS', graph):
-            bundle = Path(tmp)
-            for name, value in [('targets', [row]), ('profiles', {row['id']: profile}), ('revisions', revisions)]:
-                publication.write(bundle / (name + '.json'), value)
-            for versions, expected in [({'base': '1.0.0-2'}, {'left', 'right'}),
-                                       ({'base': '1.0.0-2', 'left': '1.0.0-2'}, {'right'}),
-                                       ({'base': '1.0.0-2', 'left': '1.0.0-2', 'right': '1.0.0-2'}, {'top'})]:
+        revisions = dict.fromkeys(graph, '2')
+        with patch.object(repository, 'PROJECTS', graph):
+            for versions, project, expected in [({'base':'1.0.0-2'}, 'left', True),
+                    ({'base':'1.0.0-2','left':'1.0.0-2'}, 'top', False),
+                    ({'base':'1.0.0-2','left':'1.0.0-2','right':'1.0.0-2'}, 'top', True)]:
                 info = dict(versions=versions, sources=sources)
-                publication.write(bundle / 'debian/dists/trixie/build.json', {'targets': {'amd64': info}})
-                with self.subTest(versions=versions), patch('sys.argv',
-                        ['dispatch', 'dependents', str(bundle), row['id'], 'a' * 40, tmp]), \
-                     patch.object(dispatch, 'build') as build:
-                    dispatch.main()
-                    self.assertEqual({call.args[1] for call in build.call_args_list}, expected)
-            info['sources'] = sources | {'right': 'superseded'}
-            self.assertFalse(dispatch.ready(profile, revisions, 'top', info))
+                self.assertEqual(dispatch.ready(profile,revisions,project,info,graph),expected)
+            info['sources'] = sources | {'right':'other'}
+            self.assertFalse(dispatch.ready(profile,revisions,'top',info,graph))
             info['sources'] = sources
             info['versions']['right'] = '1.0.0-3'
-            self.assertFalse(dispatch.ready(profile, revisions, 'top', info))
+            self.assertFalse(dispatch.ready(profile,revisions,'top',info,graph))
 
     def test_coordinator_attempt_does_not_consume_source_build_attempt(self):
         row = publication.targets()[0]
@@ -87,10 +77,10 @@ class OrchestrationTest(unittest.TestCase):
                  patch.object(publication, 'render'), patch('sys.argv',
                     ['publication', 'status', str(root), str(bundle), '-', '-', 'pending']):
                 publication.main()
-            state = publication.read(root / 'status.json')
-            self.assertEqual(state['targets'][row['id'] + '/snode.c']['attempt'], 0)
+            state = publication.projection(publication.read(root / 'status.json'))
+            self.assertEqual(publication.projection(state)['targets'][row['id'] + '/snode.c']['attempt'], 0)
             publication.event(state, state['runs']['123'], row, 'snode.c', 'running', 1)
-            self.assertEqual(state['targets'][row['id'] + '/snode.c']['status'], 'running')
+            self.assertEqual(publication.projection(state)['targets'][row['id'] + '/snode.c']['status'], 'running')
 
     def test_failed_branch_skips_transitive_dependents_without_blocking_sibling(self):
         graph = self.graph()
@@ -103,12 +93,12 @@ class OrchestrationTest(unittest.TestCase):
             for project in graph:
                 publication.event(state, generation, row, project, 'pending', 0)
             publication.event(state, generation, row, 'left', 'failed', 1)
-            self.assertEqual(state['targets'][row['id'] + '/top']['status'], 'skipped')
-            self.assertEqual(state['targets'][row['id'] + '/right']['status'], 'pending')
+            self.assertEqual(publication.projection(state)['targets'][row['id'] + '/top']['status'], 'skipped')
+            self.assertEqual(publication.projection(state)['targets'][row['id'] + '/right']['status'], 'pending')
             publication.event(state, generation, row, 'left', 'running', 2)
             publication.event(state, generation, row, 'left', 'published', 2)
             publication.event(state, generation, row, 'top', 'running', 1)
-            self.assertEqual(state['targets'][row['id'] + '/top']['status'], 'running')
+            self.assertEqual(publication.projection(state)['targets'][row['id'] + '/top']['status'], 'running')
             with tempfile.TemporaryDirectory() as tmp:
                 self.assertEqual(set(publication.reserve(Path(tmp), 'left', '123')), {'left', 'top'})
 
@@ -165,11 +155,14 @@ class OrchestrationTest(unittest.TestCase):
                     self.assertEqual(step['with']['repositories'], 'DistributionPackages')
                 self.assertNotIn('ci/publish/status.sh', step.get('run', ''))
         publisher = yaml.load((root / '.github/workflows/sign-and-publish-packages.yml').read_text(), Loader=yaml.BaseLoader)
-        self.assertEqual(publisher['on']['repository_dispatch']['types'], ['sign-and-publish-packages', 'package-build-status'])
-        publish = publisher['jobs']['write']['steps']
-        handoff = next(step for step in publish if step.get('name') == 'Dispatch dependent project after successful publication')
-        self.assertIn("steps.write.outcome == 'success'", handoff['if'])
-        self.assertIn('published', handoff['run'])
+        self.assertIn('workflow_dispatch', publisher['on'])
+        self.assertNotIn('finalize', shared['jobs'])
+        self.assertEqual(set(shared['jobs']), {'build'})
+        for job in shared['jobs'].values():
+            for step in job['steps']:
+                if step.get('uses', '').startswith('actions/create-github-app-token@'):
+                    self.assertEqual(step['with']['permission-actions'], 'read')
+                    self.assertNotIn('write', step['with'].values())
 
 
 if __name__ == '__main__':
