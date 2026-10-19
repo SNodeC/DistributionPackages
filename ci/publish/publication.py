@@ -144,12 +144,10 @@ print(json.dumps({path: render_header('Packages', path) for path in json.load(sy
             status = item.get('status')
             attempt = expected and revision is not None and str(item.get('revision')) == str(revision) and status in ORDER
             in_build = f'{dot(status.replace(" ", "-"))} `{expected}`' if attempt and status != 'published' else '—'
-            if in_build != '—':
-                log = item.get('job_url') or item.get('run_url')
-            else:
-                log = record.get('job_url') if matching_publication else None
-                if not log and available and same_revision and status == 'published':
-                    log = item.get('job_url') or item.get('run_url')
+            log = item.get('job_url') if in_build != '—' else (record.get('job_url') if matching_publication else None)
+            if not log and in_build == '—' and available and same_revision and status == 'published':
+                log = item.get('job_url')
+            log = log if log and re.fullmatch(r'https://github\.com/SNodeC/' + re.escape(project) + r'/actions/runs/[1-9][0-9]*/job/[1-9][0-9]*', log) else None
             packages = f"{row['distribution']}/pool/{row['suite']}" if row['distribution'] in {'debian', 'ubuntu', 'raspberrypios'} else f'{feed}/Packages' if row['distribution'] in {'rocky', 'fedora'} else feed
             links = ([f'[Build log]({log})'] if log else []) + [f'[Packages](../{packages}/)']
             sections.setdefault(row['distribution'], {}).setdefault(row['suite'], []).append(
@@ -214,7 +212,7 @@ def update(state, row, generation, project, status, attempt, job_url=None):
     state['targets'][key] = dict(target=row, revision=revision, attempt=attempt,
                                 run_id=generation['run_id'], run_url=generation['run_url'], status=status,
                                 job_url=job_url or (previous.get('job_url') if previous.get('run_id') == generation['run_id']
-                                                   and previous.get('attempt') == attempt else None) or generation['run_url'])
+                                                   and previous.get('attempt') == attempt else None))
     if status == 'published':
         current_event['published_at'] = now
         timeline['published'] = dict(revision=revision, at=now, run_id=generation['run_id'],

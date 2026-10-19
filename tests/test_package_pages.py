@@ -55,6 +55,8 @@ class PackagePagesTest(unittest.TestCase):
         publication.write(path, info)
 
     def event(self, project, status, row=None, attempt=1, log='job-url'):
+        if log == 'job-url':
+            log = f'https://github.com/SNodeC/{project}/actions/runs/1/job/1'
         with patch.dict(os.environ, EVENT_TIME='2026-10-10T11:00:00Z', EVENT_STAGE='publication' if status == 'published' else 'build'):
             publication.update(self.state, row or self.row, self.generation, project, status, attempt, log)
 
@@ -135,15 +137,15 @@ class PackagePagesTest(unittest.TestCase):
 
     def test_build_log_selects_attempt_or_available_publication(self):
         self.feed(revision=5)
-        self.state['timeline'] = {self.key + '/snode.c': {'published': {'revision': '5', 'at': '2026-10-09T12:00:00Z', 'job_url': 'old-job'}}}
-        self.event('snode.c', 'running', log='new-job')
+        self.state['timeline'] = {self.key + '/snode.c': {'published': {'revision': '5', 'at': '2026-10-09T12:00:00Z', 'job_url': 'https://github.com/SNodeC/snode.c/actions/runs/1/job/1'}}}
+        self.event('snode.c', 'running', log='https://github.com/SNodeC/snode.c/actions/runs/2/job/2')
         publication.render(self.root, self.state)
-        self.assertIn('[Build log](new-job)', self.table_row())
+        self.assertIn('[Build log](https://github.com/SNodeC/snode.c/actions/runs/2/job/2)', self.table_row())
         self.assertIn('2026-10-09 12:00', self.table_row())
         # An attempt for a previous revision is not In build for the latest release.
         self.state['targets'][self.key + '/snode.c']['revision'] = '4'
         publication.render(self.root, self.state)
-        self.assertIn('[Build log](old-job)', self.table_row())
+        self.assertIn('[Build log](https://github.com/SNodeC/snode.c/actions/runs/1/job/1)', self.table_row())
         self.assertNotIn('alt="running"', self.table_row())
         del self.state['timeline'][self.key + '/snode.c']['published']['job_url']
         publication.render(self.root, self.state)
@@ -151,21 +153,21 @@ class PackagePagesTest(unittest.TestCase):
 
     def test_publication_job_and_time_survive_later_attempt(self):
         self.feed()
-        self.event('snode.c', 'published', log='published-job')
-        self.assertEqual(self.state['timeline'][self.key + '/snode.c']['published']['job_url'], 'published-job')
+        self.event('snode.c', 'published', log='https://github.com/SNodeC/snode.c/actions/runs/3/job/3')
+        self.assertEqual(self.state['timeline'][self.key + '/snode.c']['published']['job_url'], 'https://github.com/SNodeC/snode.c/actions/runs/3/job/3')
         self.generation = self.generation | dict(run_id='next', revisions={'snode.c': '10'})
         self.state['runs']['next'] = self.generation
-        self.event('snode.c', 'running', log='next-job')
+        self.event('snode.c', 'running', log='https://github.com/SNodeC/snode.c/actions/runs/4/job/4')
         publication.render(self.root, self.state)
         self.assertIn('2026-10-10 11:00', self.table_row())
-        self.assertIn('[Build log](next-job)', self.table_row())
+        self.assertIn('[Build log](https://github.com/SNodeC/snode.c/actions/runs/4/job/4)', self.table_row())
 
     def test_publication_without_job_id_never_borrows_previous_generation_job(self):
-        self.event('snode.c', 'published', log='old-job')
+        self.event('snode.c', 'published', log='https://github.com/SNodeC/snode.c/actions/runs/1/job/1')
         self.generation = self.generation | dict(run_id='next', run_url='new-run', revisions={'snode.c': '10'})
         self.state['runs']['next'] = self.generation
         self.event('snode.c', 'published', log=None)
-        self.assertEqual(self.state['timeline'][self.key + '/snode.c']['published']['job_url'], 'new-run')
+        self.assertIsNone(self.state['timeline'][self.key + '/snode.c']['published']['job_url'])
 
     def test_unknown_latest_source_never_invents_attempt_version(self):
         self.generation['sources'] = {}
@@ -357,6 +359,35 @@ class PackagePagesTest(unittest.TestCase):
             self.assertIsNotNone(ET.parse(badges / f'{label}.svg').getroot().find(ns + 'path'))
         for label in ('current', 'outdated', 'skipped', 'running', 'publishing', 'failed', 'pending', 'superseded', 'not-built', 'cancelled'):
             self.assertEqual(self.text().count(f'alt="{label.replace("-", " ")}"'), 1)
+
+    def test_misleading_stored_links_are_hidden_without_mutating_state(self):
+        self.feed()
+        original = copy.deepcopy(self.state)
+        for status in ['pending', 'running', 'publishing', 'failed', 'cancelled', 'published']:
+            for link in [None, self.generation['run_url'],
+                         'https://github.com/SNodeC/DistributionPackages/actions/runs/123',
+                         'https://github.com/SNodeC/DistributionPackages/actions/runs/123/job/456',
+                         'https://github.com/SNodeC/snode.c/actions/runs/123',
+                         'https://github.com/SNodeC/mqttsuite/actions/runs/123/job/456']:
+                with self.subTest(status=status, link=link):
+                    self.state = copy.deepcopy(original)
+                    self.event('snode.c', status, log=link)
+                    # Simulate both historical fields: old writers stored the
+                    # coordinator URL under job_url as well as run_url.
+                    before = copy.deepcopy(self.state)
+                    publication.render(self.root, self.state)
+                    self.assertNotIn('[Build log]', self.table_row())
+                    self.assertEqual(self.state, before)
+
+    def test_real_job_link_survives_lifecycle_without_run_fallback(self):
+        self.feed()
+        self.event('snode.c', 'pending', log=None)
+        self.assertIsNone(self.state['targets'][self.key + '/snode.c']['job_url'])
+        job = 'https://github.com/SNodeC/snode.c/actions/runs/123/job/456'
+        for status, link in [('running', job), ('publishing', None), ('published', None)]:
+            self.event('snode.c', status, log=link)
+            publication.render(self.root, self.state)
+            self.assertIn('[Build log](' + job + ')', self.table_row())
 
 
 if __name__ == '__main__':
