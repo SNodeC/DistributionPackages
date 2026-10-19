@@ -219,9 +219,14 @@ def tick(root, bundles):
     observations = []
     for intent, permit in list(permits.items()):
         matches = sorted((r for (repo, _), r in origins.items() if repo == permit['repository'] and r['display_title'] == 'Packages · ' + intent), key=lambda r: r['id'])
-        if not permit.get('owner') and matches:
-            validate_run(permit, matches[0], intent)
-            permit['owner'] = dict(run=matches[0]['id'], attempt=matches[0]['run_attempt'])
+        for candidate in matches:
+            if not permit.get('owner'):
+                try:
+                    validate_run(permit, candidate, intent)
+                except ValueError as error:
+                    print(f'::warning::Ignoring unmatched dispatch identity: {error}')
+                else:
+                    permit['owner'] = dict(run=candidate['id'], attempt=candidate['run_attempt'])
         if permit.get('owner'):
             owner = permit['owner']
             origin = origins[permit['repository'], owner['run']]

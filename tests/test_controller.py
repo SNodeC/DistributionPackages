@@ -343,3 +343,49 @@ class ControllerTest(unittest.TestCase):
         self.assertEqual(self.node()['attempt'], 2)
         self.assertNotIn('job_url', self.node())
         self.assertNotIn('job', self.node())
+
+    def test_forged_duplicate_identity_cannot_halt_admission(self):
+        self.tick()
+        intent, permit = next(iter(self.read()['permits'].items()))
+        permit.pop('owner')
+        self.save()
+        repo, first = next(iter(self.runs))
+        self.runs[repo, 400] = self.runs[repo, first] | dict(id=400, actor={'login': 'untrusted-user'})
+        self.tick()
+        self.assertEqual(self.read()['permits'][intent]['owner']['run'], first)
+        self.assertEqual(self.node()['status'], 'pending')
+
+    def test_authorize_cli_accepts_only_exact_persisted_permit_owner(self):
+        import sys
+        self.tick()
+        permit = next(iter(self.read()['permits'].values()))
+        request = json.loads(self.posts[0][1]['inputs']['request'])
+        publication.write(self.bundle / 'checksums.json', {})
+        fixture = self.base / 'transport'
+        fixture.mkdir()
+        origin = dict(event='workflow_dispatch', path='.github/workflows/orchestrate-packages.yml',
+                      head_repository=dict(full_name=dispatch.COORDINATOR))
+        gh = fixture / 'gh'
+        gh.write_text('#!' + sys.executable + '\nprint(' + repr('HTTP/2.0 200 OK\n\n' + json.dumps(origin)) + ')\n')
+        gh.chmod(0o755)
+        state = self.root / 'status.json'
+        (fixture / 'sitecustomize.py').write_text(
+            'import io, pathlib, urllib.request, time\n'
+            'urllib.request.urlopen = lambda *a, **k: io.BytesIO(pathlib.Path(' + repr(str(state)) + ').read_bytes())\n'
+            'def stop_retry(seconds):\n    raise RuntimeError("No matching permit")\n'
+            'time.sleep = stop_retry\n')
+        output = self.base / 'outputs'
+        env = os.environ | dict(PATH=str(fixture) + os.pathsep + os.environ['PATH'],
+            PYTHONPATH=str(fixture) + os.pathsep + str(repository.ROOT), PACKAGE_REQUEST=json.dumps(request),
+            GITHUB_REPOSITORY='SNodeC/snode.c', GITHUB_RUN_ID=str(permit['owner']['run']),
+            GITHUB_RUN_ATTEMPT='1', RUNNER_ARCH='X64', GITHUB_OUTPUT=str(output))
+        accepted = subprocess.run([sys.executable, '-m', 'ci.dispatch', 'authorize', str(self.bundle)],
+                                  cwd=repository.ROOT, env=env, capture_output=True, text=True)
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        self.assertIn('revision=2', output.read_text())
+        output.unlink()
+        rejected = subprocess.run([sys.executable, '-m', 'ci.dispatch', 'authorize', str(self.bundle)],
+                                  cwd=repository.ROOT, env=env | dict(GITHUB_RUN_ATTEMPT='2'), capture_output=True, text=True)
+        self.assertNotEqual(rejected.returncode, 0)
+        self.assertIn('No matching permit', rejected.stderr)
+        self.assertFalse(output.exists())
