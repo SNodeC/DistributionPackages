@@ -173,7 +173,7 @@ def plan(bundle, project, target):
 
 def dependents(bundle, target, publication, root):
     row = next(row for row in read(bundle / 'targets.json') if row['id'] == target)
-    info, _ = published(root, row)
+    info, _ = published(Path(root), row)
     revisions = read(bundle / 'revisions.json')
     profile = read(bundle / 'profiles.json')[target]
     for project in revisions:

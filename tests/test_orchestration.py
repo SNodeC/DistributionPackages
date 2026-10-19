@@ -63,9 +63,11 @@ class OrchestrationTest(unittest.TestCase):
                                        ({'base': '1.0.0-2', 'left': '1.0.0-2'}, {'right'}),
                                        ({'base': '1.0.0-2', 'left': '1.0.0-2', 'right': '1.0.0-2'}, {'top'})]:
                 info = dict(versions=versions, sources=sources)
-                with self.subTest(versions=versions), patch.object(dispatch, 'published', return_value=(info, 'feed')), \
+                publication.write(bundle / 'debian/dists/trixie/build.json', {'targets': {'amd64': info}})
+                with self.subTest(versions=versions), patch('sys.argv',
+                        ['dispatch', 'dependents', str(bundle), row['id'], 'a' * 40, tmp]), \
                      patch.object(dispatch, 'build') as build:
-                    dispatch.dependents(bundle, row['id'], 'a' * 40, Path(tmp))
+                    dispatch.main()
                     self.assertEqual({call.args[1] for call in build.call_args_list}, expected)
             info['sources'] = sources | {'right': 'superseded'}
             self.assertFalse(dispatch.ready(profile, revisions, 'top', info))
