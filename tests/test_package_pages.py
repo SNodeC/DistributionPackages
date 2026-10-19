@@ -54,7 +54,7 @@ class PackagePagesTest(unittest.TestCase):
             info = existing
         publication.write(path, info)
 
-    def event(self, project, status, row=None, attempt=1, log='job-url'):
+    def event(self, project, status, row=None, attempt=1, log='https://github.com/SNodeC/snode.c/actions/runs/100/job/101'):
         with patch.dict(os.environ, EVENT_TIME='2026-10-10T11:00:00Z', EVENT_STAGE='publication' if status == 'published' else 'build'):
             publication.update(self.state, row or self.row, self.generation, project, status, attempt, log)
 
@@ -135,37 +135,41 @@ class PackagePagesTest(unittest.TestCase):
 
     def test_build_log_selects_attempt_or_available_publication(self):
         self.feed(revision=5)
-        self.state['timeline'] = {self.key + '/snode.c': {'published': {'revision': '5', 'at': '2026-10-09T12:00:00Z', 'job_url': 'old-job'}}}
-        self.event('snode.c', 'running', log='new-job')
-        publication.render(self.root, self.state)
-        self.assertIn('[Build log](new-job)', self.table_row())
-        self.assertIn('2026-10-09 12:00', self.table_row())
-        # An attempt for a previous revision is not In build for the latest release.
-        self.state['targets'][self.key + '/snode.c']['revision'] = '4'
-        publication.render(self.root, self.state)
-        self.assertIn('[Build log](old-job)', self.table_row())
-        self.assertNotIn('alt="running"', self.table_row())
-        del self.state['timeline'][self.key + '/snode.c']['published']['job_url']
-        publication.render(self.root, self.state)
-        self.assertNotIn('[Build log]', self.table_row())
+        old_job = 'https://github.com/SNodeC/snode.c/actions/runs/50/job/51'
+        new_job = 'https://github.com/SNodeC/snode.c/actions/runs/90/job/91'
+        self.event('snode.c', 'running', log=new_job)
+        node = self.generation['nodes'][self.key + '/snode.c']
+        node['published'] = dict(revision='5',at='2026-10-09T12:00:00Z',job_url=old_job)
+        publication.render(self.root,self.state)
+        self.assertIn('[Build log]('+new_job+')',self.table_row())
+        self.assertIn('2026-10-09 12:00',self.table_row())
+        old = copy.deepcopy(self.generation)
+        old.update(run_id='old', revisions={'snode.c':'4'})
+        self.state['runs'] = {'old':old,'capture':self.generation | dict(nodes={})}
+        publication.render(self.root,self.state)
+        self.assertIn('[Build log]('+old_job+')',self.table_row())
+        self.assertNotIn('alt="running"',self.table_row())
+        del old['nodes'][self.key+'/snode.c']['published']['job_url']
+        publication.render(self.root,self.state)
+        self.assertNotIn('[Build log]',self.table_row())
 
     def test_publication_job_and_time_survive_later_attempt(self):
         self.feed()
-        self.event('snode.c', 'published', log='published-job')
-        self.assertEqual(self.state['timeline'][self.key + '/snode.c']['published']['job_url'], 'published-job')
-        self.generation = self.generation | dict(run_id='next', revisions={'snode.c': '10'})
+        self.event('snode.c', 'published', log='https://github.com/SNodeC/snode.c/actions/runs/100/job/101')
+        self.assertEqual(publication.projection(self.state)['timeline'][self.key + '/snode.c']['published']['job_url'], 'https://github.com/SNodeC/snode.c/actions/runs/100/job/101')
+        self.generation = self.generation | dict(run_id='next', nodes={}, revisions={'snode.c': '10'})
         self.state['runs']['next'] = self.generation
-        self.event('snode.c', 'running', log='next-job')
+        self.event('snode.c', 'running', log='https://github.com/SNodeC/snode.c/actions/runs/200/job/201')
         publication.render(self.root, self.state)
         self.assertIn('2026-10-10 11:00', self.table_row())
-        self.assertIn('[Build log](next-job)', self.table_row())
+        self.assertIn('[Build log](https://github.com/SNodeC/snode.c/actions/runs/200/job/201)', self.table_row())
 
     def test_publication_without_job_id_never_borrows_previous_generation_job(self):
         self.event('snode.c', 'published', log='old-job')
-        self.generation = self.generation | dict(run_id='next', run_url='new-run', revisions={'snode.c': '10'})
+        self.generation = self.generation | dict(run_id='next', nodes={}, run_url='new-run', revisions={'snode.c': '10'})
         self.state['runs']['next'] = self.generation
         self.event('snode.c', 'published', log=None)
-        self.assertEqual(self.state['timeline'][self.key + '/snode.c']['published']['job_url'], 'new-run')
+        self.assertIsNone(publication.projection(self.state)['timeline'][self.key + '/snode.c']['published']['job_url'])
 
     def test_unknown_latest_source_never_invents_attempt_version(self):
         self.generation['sources'] = {}
@@ -244,7 +248,7 @@ class PackagePagesTest(unittest.TestCase):
         self.event('snode.c', 'publishing', attempt=2)
         with patch.dict(os.environ, EVENT_TIME='2026-10-10T12:00:00Z', EVENT_STAGE='publication'):
             publication.update(self.state, self.row, self.generation, 'snode.c', 'failed', 2)
-        event = self.state['timeline'][self.key + '/snode.c']['event']
+        event = publication.projection(self.state)['timeline'][self.key + '/snode.c']['event']
         self.assertEqual(event['stage'], 'publication')
         self.assertEqual(event['started_at'], '2026-10-10T11:00:00Z')
 

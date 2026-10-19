@@ -8,56 +8,51 @@
 
 ## Configure DistributionPackages
 
-Set the following **repository** variables and secrets in [SNodeC/DistributionPackages Actions settings](https://github.com/SNodeC/DistributionPackages/settings/secrets/actions). Organization-level settings restricted to this repository are also suitable. No GitHub Environment is used by these workflows.
+Use [DistributionPackages Actions settings](https://github.com/SNodeC/DistributionPackages/settings/secrets/actions). Organization settings restricted to the intended repositories are also suitable. No GitHub Environment is used.
 
-| Type | Name | Value or purpose |
+| Type | Name | Purpose |
 | --- | --- | --- |
-| Variable | `PACKAGES_APP_CLIENT_ID` | Client ID of the publishing GitHub App (from its settings page) |
-| Secret | `PACKAGES_APP_PRIVATE_KEY` | The App's private key |
+| Variable | `PACKAGES_APP_CLIENT_ID` | Coordinator/publisher App client ID |
+| Secret | `PACKAGES_APP_PRIVATE_KEY` | Coordinator/publisher private key; DistributionPackages only |
 | Secret | `APT_SIGNING_KEY` | Existing ASCII-armored private key for APT and RPM |
-| Secret | `OPENWRT_USIGN_KEY` | Existing OpenWrt opkg signing private key |
-| Secret | `OPENWRT_APK_KEY` | Existing OpenWrt APK signing private key |
+| Secret | `OPENWRT_USIGN_KEY` | Existing opkg signing private key |
+| Secret | `OPENWRT_APK_KEY` | Existing APK signing private key |
 
-GitHub does not reveal existing secret values through its API. Obtain them from their original secure storage. Do not commit private keys or place them in logs.
+The coordinator App needs **Actions: read and write**, **Contents: read and write**, and implicit metadata access. Its installation covers DistributionPackages, Packages and the registry's source repositories. Tokens are scoped to the repositories and operations needed by each job. Actions write dispatches source and publication workflows; Contents write persists feed transactions. Restrict private-key access to DistributionPackages.
 
-The GitHub App needs **Contents: read and write** and **Actions: read-only**. Its installation must cover **snode.c, mqttsuite, snode.c-idp, DistributionPackages and Packages**. Approve any permission update on the installation after saving the App settings. Artifact transfers use Actions read; dispatches and package/status commits use Contents write. Tokens are scoped per step.
+Packages needs no workflows or Actions secrets. Restrict its write access to the publisher and administrators. Existing checksums, signing keys, public URLs and serialized force-with-lease snapshot writes are retained.
 
-Packages needs no Actions secrets, workflows or build system. Its main branch is written by the publisher, including force-with-lease snapshot replacement. Restrict write access to the publisher and repository administrators.
+## Configure source repositories
 
-## Connect upstream releases
+Each source wrapper uses two separate limited Apps. Configure these variables and secrets in each source repository:
 
-Configure the App installation and central signing credentials before creating or moving a version tag. Capture and scheduling run in DistributionPackages; unsigned builds run in the source repository through the central reusable workflow.
-
-The upstream projects use thin `build-distribution-packages.yml` entry points with identity taken from the calling repository. In **each source repository**, set:
-
-| Type | Name | Value |
+| Type | Name | Purpose |
 | --- | --- | --- |
-| Variable | `PACKAGES_APP_CLIENT_ID` | The same App client ID as DistributionPackages |
-| Secret | `OPENWRT_APP_PRIVATE_KEY` | Existing App private key; retained credential name |
+| Variable | `PACKAGE_NOTIFY_APP_CLIENT_ID` | Notification App client ID |
+| Secret | `PACKAGE_NOTIFY_APP_PRIVATE_KEY` | Notification App private key |
+| Variable | `PACKAGE_CAPTURE_APP_CLIENT_ID` | Capture-reader App client ID |
+| Secret | `PACKAGE_CAPTURE_APP_PRIVATE_KEY` | Capture-reader App private key |
 
-The legacy App credential name does not select a distribution. No package-signing private key is required in any source repository. Keep all three package-signing secrets in DistributionPackages only.
+The notification App installation needs **Actions: write** on DistributionPackages and implicit metadata read. The reader App needs **Actions: read** and **Contents: read** on DistributionPackages. Neither App has Packages write permission. Source execution uses its repository token to upload its own artifacts and the reader token to download the central immutable capture. No package-signing key belongs in a source repository.
 
-A version-tag push sends `release-packages` with its tag, commit and originating workflow run. DistributionPackages validates that notification, captures immutable inputs and allocates revisions. It dispatches `build-packages` to the released project. Source jobs report status and unsigned artifacts back to the coordinator. Each successful signed publication unlocks the ready dependents for that target, using its exact Packages commit. See [CI orchestration](ci-orchestration.md#banner) for the complete contract.
-Only version-tag creation or movement starts builds. No ordinary push or README change starts package CI. README automation, if present upstream, remains independent. The migration never creates or moves upstream tags automatically.
+App creation, installation changes, key provisioning and removal are operator actions. GitHub never reveals stored private-key values; use secure original storage or the App's private-key generation page. Never paste keys into workflow inputs, source files, issue bodies or logs.
 
-## Validate and activate
+The old `OPENWRT_APP_PRIVATE_KEY` represented a broadly privileged App, despite its name. It is no longer referenced by these wrappers. Audit other consumers before removing it; never delete a shared credential solely because these three workflows migrated.
 
-1. Verify all current indexes and their referenced files exist in Packages/main.
-2. Verify signing keys match the original feed and configure all credentials above.
-3. Verify the project counters in `Packages/status.json` match the last allocated revisions; use zero for a fresh package repository.
-4. Drain all existing captures, builds and publication requests before migrating. Merge the central reusable workflows and coordinator first, then the thin entry points in all three source repositories; do not release during this interval.
-5. With explicit approval, exercise a version-tag event.
-6. Confirm each target publishes SNode.C before its MQTTSuite and supported IDP builds start, and an application-only event does not rebuild SNode.C.
-7. Update devices using the new installer or documented manual repository URLs.
+## Ordered activation checklist
 
-There is no timer or additional Packages workflow. Creation of the new repositories and pushing source files do not trigger package builds. A CI run cannot be claimed validated until it has actually executed with the signing and GitHub App credentials.
+1. Freeze release-tag notifications and drain all existing captures, builds and publication requests. Do not move tags during migration.
+2. Verify the feed indexes, files, signing keys and revision counters. Preserve existing public URLs and installed clients.
+3. Provision the two limited Apps, configure their variables and secrets in every source repository, and verify their installation scopes. Keep central signing secrets unchanged. Approve the coordinator App's Actions-write permission if required.
+4. Merge the coordinator PR, then all source-wrapper PRs while releases remain frozen. Contract-1 captures cannot execute through the new controller. Backport the wrapper before tagging older maintenance branches.
+5. Audit and remove obsolete broad source keys only after every consumer has switched. Keep the central coordinator key private to DistributionPackages.
+6. Validate in a separately approved sandbox: exact dispatch run IDs, queued job discovery, read-only capture downloads, gate fencing, failed and cancelled publication retry, controller continuation and all supported target coverage. Use a test feed and signing keys, not production Packages.
+7. Resume releases only after that validation. Monitor the capture, **Coordinate package builds**, individual source jobs and publication receipts. A green capture alone does not prove the release published.
 
-Existing device feeds remain on the original URLs until explicitly updated. No redirect, deletion, or change to the original repositories is part of this setup.
+The controller has an hourly recovery schedule and a manual resume input. GitHub can delay schedules; public repositories can have schedules disabled after inactivity. Check that the controller workflow is enabled and use **Run workflow** after outages. Its `retry` input accepts `capture/project/target` for a repaired terminal task; see [CI orchestration](ci-orchestration.md#banner).
 
-## IDP integration
+## Project integration
 
-The IDP uses `PACKAGES_APP_CLIENT_ID` and `OPENWRT_APP_PRIVATE_KEY`, matching the existing product workflows. Extend the CI App installation to `snode.c-idp`; the publisher derives its repository token scope from the JSON project registry. Signing secrets stay in DistributionPackages.
+Add a registry entry, a project recipe, the standard thin workflow and App access. Native-only projects such as IDP select only supported target families. Untagged dependents are explicitly skipped at capture rather than blocking their prerequisites. Ordinary branch pushes do not start package builds, and no workflow moves tags, installs software or deploys to a server automatically.
 
-Merge the IDP packaging/workflow and this pipeline integration before deliberately creating its initial matching `vMAJOR.MINOR.PATCH` tag. The capture step requires a release tag for every dependent product. Do not trigger a new SNode.C capture between enabling the third project and preparing the initial IDP tag. Ordinary branch pushes do not build packages. A release tag must point to a commit containing the thin workflow entry point, including on maintenance branches; backport the wrapper before tagging. Old source workflows are rejected before allocating revisions.
-
-An IDP release captures only supported native targets and consumes their published SNode.C packages. SNode.C publication dispatches IDP rebuilds for native targets, alongside the existing MQTTSuite chain. OpenWrt retains only its existing products. There are no root-server credentials or automatic machine upgrades in CI.
+Handcrafted deployment choices, root-server credentials and device upgrades are outside package CI. This migration changes neither existing package URLs nor deployed machines.

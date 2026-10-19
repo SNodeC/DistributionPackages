@@ -21,14 +21,6 @@ class IdpTest(unittest.TestCase):
     def test_idp_support_is_native_only(self):
         for row in publication.targets():
             self.assertEqual(repository.supports('snode.c-idp', row), row['family'] != 'openwrt')
-        row = next(row for row in publication.targets() if row['family'] == 'openwrt')
-        with tempfile.TemporaryDirectory() as tmp:
-            bundle = Path(tmp)
-            publication.write(bundle / 'context.json', dict(run_id='123', release_project='snode.c'))
-            publication.write(bundle / 'revisions.json', {'snode.c-idp': '1'})
-            publication.write(bundle / 'targets.json', [row])
-            with patch.dict('os.environ', {'CAPTURE_RUN': '123', 'PUBLISHED_REF': 'a' * 40}), self.assertRaises(ValueError):
-                dispatch.plan(bundle, 'snode.c-idp', row['id'])
 
     def test_old_counter_state_adds_idp_without_resetting_products(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -38,24 +30,6 @@ class IdpTest(unittest.TestCase):
                              {'snode.c': '18', 'mqttsuite': '22', 'snode.c-idp': '1'})
             self.assertEqual(publication.reserve(root, 'snode.c-idp', '101'), {'snode.c-idp': '2'})
 
-    def test_idp_handoff_is_bound_to_upstream_job(self):
-        row = next(row for row in publication.targets() if row['family'] == 'linux')
-        origin = dict(event='repository_dispatch', path='.github/workflows/build-distribution-packages.yml',
-                      head_repository={'full_name': 'SNodeC/snode.c-idp'}, run_attempt=1,
-                      display_title=f'Packages · 100 · {row["id"]}', html_url='https://example.test/run')
-        payload = dict(project='snode.c-idp', target=row['id'], capture='100', run='101', attempt='1', job='789')
-        job = dict(run_id=101, run_attempt=1, html_url='https://example.test/job',
-                   name=f"build / {row['distribution']} · {row['suite']} · {row['arch']}")
-        with tempfile.TemporaryDirectory() as temporary:
-            bundle = Path(temporary)
-            publication.write(bundle / 'context.json', dict(run_id='100', release_project='snode.c-idp'))
-            publication.write(bundle / 'targets.json', [row])
-            publication.write(bundle / 'revisions.json', {'snode.c-idp': '1'})
-            with patch.object(dispatch, 'capture_run'), patch.object(dispatch, 'api', side_effect=[origin, job]):
-                self.assertEqual(dispatch.receive(payload, bundle, 'sign-and-publish-packages')['capture_repository'], dispatch.COORDINATOR)
-            with patch.object(dispatch, 'capture_run'), patch.object(dispatch, 'api', return_value=origin | {'head_repository': {'full_name': 'someone/fork'}}):
-                with self.assertRaises(ValueError):
-                    dispatch.receive(payload, bundle, 'sign-and-publish-packages')
 
     def test_native_publication_preserves_newer_unrelated_sibling(self):
         row = next(row for row in publication.targets() if row['id'] == 'debian-trixie-amd64')

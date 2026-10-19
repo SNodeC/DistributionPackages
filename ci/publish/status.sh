@@ -5,7 +5,7 @@ root=$1
 command=$2
 shift 2
 export EVENT_TIME="${EVENT_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
-[[ "$command" = reserve || "$command" = render ]] || trap 'result=$?; if [ "$result" != 0 ]; then echo "::warning::Package status update failed (exit $result); continuing"; fi; exit 0' EXIT
+[[ "$command" = reserve || "$command" = control || "$command" = render ]] || trap 'result=$?; if [ "$result" != 0 ]; then echo "::warning::Package status update failed (exit $result); continuing"; fi; exit 0' EXIT
 if [ -n "${PACKAGES_TOKEN:-}" ]; then
     export GIT_CONFIG_COUNT=1
     export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader

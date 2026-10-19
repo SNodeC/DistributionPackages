@@ -60,12 +60,13 @@ def affected(project):
     return tuple(name for name in PROJECTS if name in selected)
 
 
-def dependencies(project):
-    selected = set(PROJECTS[project]['depends_on'])
-    for name in reversed(PROJECTS):
+def dependencies(project, projects=None):
+    projects = PROJECTS if projects is None else projects
+    selected = set(projects[project]['depends_on'])
+    for name in reversed(projects):
         if name in selected:
-            selected.update(PROJECTS[name]['depends_on'])
-    return tuple(name for name in PROJECTS if name in selected)
+            selected.update(projects[name]['depends_on'])
+    return tuple(name for name in projects if name in selected)
 
 
 def supports(project, row):
@@ -146,7 +147,7 @@ def prepare(published_root, bundle):
     revisions = json.loads((published_root / 'status.json').read_text())['allocations'][os.environ['GITHUB_RUN_ID']]
     if set(revisions) != set(affected(changed)):
         raise RuntimeError('Reserved revisions do not match the release project')
-    context = dict(captured_at=datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'), recipe_ref=os.environ.get('RECIPE_REF', 'main'),
+    context = dict(contract=2, projects=PROJECTS, captured_at=datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'), recipe_ref=os.environ.get('RECIPE_REF', 'main'),
                    recipe_commit=run('git', '-C', str(ROOT), 'rev-parse', 'HEAD'),
                    destination='SNodeC/Packages', packages_commit=run('git', '-C', str(published_root), 'rev-parse', 'HEAD'),
                    release_project=changed, run_id=os.environ.get('GITHUB_RUN_ID', 'local'),
@@ -157,17 +158,18 @@ def prepare(published_root, bundle):
             refs = run('git', 'ls-remote', '--tags', f'https://github.com/SNodeC/{dependent}.git', 'refs/tags/v*')
             candidates = [line.split()[1].removeprefix('refs/tags/') for line in refs.splitlines()
                           if re.fullmatch(r'refs/tags/v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', line.split()[1])]
-            if not candidates:
-                raise RuntimeError(f'{dependent}: publish an initial version tag before enabling dependency builds')
-            release_tags[dependent] = max(candidates, key=lambda value: tuple(map(int, value[1:].split('.'))))
-    profiles, captured, observed = {}, {}, {}
+            release_tags[dependent] = max(candidates, key=lambda value: tuple(map(int, value[1:].split('.'))), default=None)
+    for project in release_tags:
+        if any(release_tags.get(dependency, True) is None for dependency in dependencies(project)):
+            release_tags[project] = None
+    profiles, captured, observed = {}, {}, {project: None for project, value in release_tags.items() if value is None}
     rows = [row for row in targets() if supports(changed, row)]
     for row in rows:
         baseline, directory = published(published_root, row)
         if (baseline and any(int(value) <= project_revision(baseline, repo) for repo, value in revisions.items())
                 and baseline.get('context', {}).get('run_id') != context['run_id']):
             raise RuntimeError('Package revision must exceed the published revision; check the reserved project revisions')
-        tags = {repo: value for repo, value in release_tags.items() if supports(repo, row)}
+        tags = {repo: value for repo, value in release_tags.items() if value is not None and supports(repo, row)}
         required = {dependency for project in tags for dependency in dependencies(project)} - tags.keys()
         for dependency in required:
             dependency_tag = baseline.get('context', {}).get('source_tags', {}).get(dependency)
@@ -259,8 +261,6 @@ def reuse(bundle, target, destination):
     info = json.loads((bundle / 'baseline.json').read_text())
     built = json.loads((bundle / 'context.json').read_text())['build_project']
     others = [repo for repo in REPOSITORIES if repo != built]
-    if 'snode.c' in others and row['family'] == 'openwrt' and len([n for n in info.get('files', {}) if n.startswith('snodec-openwrt-build-deps-') and n.endswith('.tar.zst')]) != 1:
-        raise RuntimeError(f'{target}: published SNode.C development files are missing; publish a SNode.C release first')
     destination.mkdir(parents=True, exist_ok=True)
     for name, checksum in info.get('files', {}).items():
         filename = Path(name).name
@@ -356,9 +356,7 @@ def stage(sdk, bundle, output):
     destination = output / 'openwrt' / info['series'] / info['arch']
     destination.mkdir(parents=True)
     indexes = ['Packages', 'Packages.gz'] if extension == '.ipk' else ['packages.adb']
-    development = list(sdk.glob('snodec-openwrt-build-deps-*.tar.zst'))
-    if len(development) != 1:
-        raise RuntimeError('Expected one SNode.C development archive')
+    development = list(sdk.glob('*-openwrt-build-deps-*.tar.zst'))
     for path in packages + [feed / name for name in indexes] + development:
         shutil.copy2(path, destination / path.name)
     files = {p.name: digest(p)
@@ -369,46 +367,56 @@ def stage(sdk, bundle, output):
     info['versions'] = {repo: package_version(dict(distribution="openwrt"), version, info["revision"])
                         for repo, version in info['context']['versions'].items()}
     baseline = json.loads((bundle / 'baseline.json').read_text())
-    other = 'mqttsuite' if info['context']['build_project'] == 'snode.c' else 'snode.c'
-    if other in baseline.get('versions', {}):
-        info['versions'][other] = baseline['versions'][other]
+    info['versions'].update({project: version for project, version in baseline.get('versions', {}).items()
+                             if project != info['context']['build_project']})
     (destination / 'build.json').write_text(json.dumps(info, indent=2) + '\n')
 
 
-def sdk_dependency(sdk, bundle, dependencies):
-    """Export/reuse the SDK's installed development files, never build trees or stamps."""
+def sdk_dependency(sdk, bundle, archives):
+    """Import registered prerequisite development exports, rejecting conflicting files."""
     info = json.loads((sdk / 'ci-sdk.json').read_text())
     baseline = json.loads((bundle / 'baseline.json').read_text())
-    if json.loads((bundle / 'context.json').read_text())['build_project'] == 'mqttsuite':
-        if any(baseline[key] != info[key] for key in ('release', 'target', 'arch', 'sha256')):
-            raise RuntimeError('Published SNode.C requires a different OpenWrt SDK; publish a SNode.C release first')
-        name, = (n for n in baseline['files'] if n.startswith('snodec-openwrt-build-deps-') and n.endswith('.tar.zst'))
-        archive = dependencies / name
-        if digest(archive) != baseline['files'][name]:
-            raise RuntimeError('SNode.C development archive checksum mismatch')
+    project = json.loads((bundle / 'context.json').read_text())['build_project']
+    for dependency in dependencies(project):
+        prefix = PROJECTS[dependency]['package'] + '-openwrt-build-deps-'
+        names = [name for name in baseline.get('files', {}) if name.startswith(prefix) and name.endswith('.tar.zst')]
+        if len(names) != 1 or any(baseline[key] != info[key] for key in ('release', 'target', 'arch', 'sha256')):
+            raise RuntimeError('Missing or incompatible published development export: ' + dependency)
+        archive = archives / names[0]
+        if digest(archive) != baseline['files'][names[0]]:
+            raise RuntimeError('Development export checksum mismatch')
         with tempfile.TemporaryDirectory(dir=sdk) as tmp:
             root = Path(tmp)
             run('tar', '--zstd', '-xf', str(archive), '-C', tmp)
             origin = json.loads((root / 'sdk-development.json').read_text())
             if origin['sdk'] != info:
-                raise RuntimeError('SNode.C development archive SDK mismatch')
-            # CMake and pkg-config exports can contain SDK-absolute dependency paths.
-            # Relocate installed metadata only; sources and binary files stay untouched.
-            for path in (root / 'staging_dir').rglob('*'):
-                if path.is_file() and not path.is_symlink() and path.suffix in {'.cmake', '.pc', '.la'}:
-                    path.write_text(path.read_text().replace(origin['path'] + '/', str(sdk) + '/'))
-            run('cp', '-a', str(root / 'staging_dir'), str(root / 'recipes'), str(sdk))
-        shutil.copy2(archive, sdk / name)
-    else:
-        target, = sdk.glob('staging_dir/target-*')
-        context = json.loads((bundle / 'context.json').read_text())
-        archive = sdk / f'snodec-openwrt-build-deps-{context["versions"]["snode.c"]}-r{os.environ["PACKAGE_RELEASE"]}.tar.zst'
-        with tempfile.TemporaryDirectory(dir=sdk) as tmp:
-            (Path(tmp) / 'sdk-development.json').write_text(json.dumps(dict(sdk=info, path=str(sdk))))
-            run('tar', '--zstd', '-cf', str(archive), '-C', tmp, 'sdk-development.json',
-                '-C', str(sdk), 'recipes/snode.c', str(target.relative_to(sdk) / 'usr/include'),
-                str(target.relative_to(sdk) / 'usr/lib'),
-                *(str(p.relative_to(sdk)) for p in sorted((target / 'pkginfo').glob('*.provides'))))
+                raise RuntimeError('Development export SDK mismatch')
+            for path in sorted(root.rglob('*')):
+                if path.is_file() or path.is_symlink():
+                    relative = path.relative_to(root)
+                    if relative.as_posix() != 'sdk-development.json':
+                        if path.suffix in {'.cmake', '.pc', '.la'} and not path.is_symlink():
+                            path.write_text(path.read_text().replace(origin['path'] + '/', str(sdk) + '/'))
+                        destination = sdk / relative
+                        if destination.exists() and not destination.is_dir() and (path.is_symlink() != destination.is_symlink() or
+                                (os.readlink(path) != os.readlink(destination) if path.is_symlink() else digest(path) != digest(destination))):
+                            raise RuntimeError('Conflicting development exports: ' + str(relative))
+                        destination.parent.mkdir(parents=True, exist_ok=True)
+                        if not destination.exists():
+                            shutil.copy2(path, destination, follow_symlinks=False)
+        shutil.copy2(archive, sdk / names[0])
+
+
+def sdk_export(sdk, bundle, *files):
+    """The project recipe declares its installed development files, never build trees."""
+    context = json.loads((bundle / 'context.json').read_text())
+    project = context['build_project']
+    archive = sdk / f'{PROJECTS[project]["package"]}-openwrt-build-deps-{context["versions"][project]}-r{os.environ["PACKAGE_RELEASE"]}.tar.zst'
+    if any(Path(name).is_absolute() or '..' in Path(name).parts for name in files):
+        raise ValueError('Development export paths must stay inside the SDK')
+    with tempfile.TemporaryDirectory(dir=sdk) as tmp:
+        (Path(tmp) / 'sdk-development.json').write_text(json.dumps(dict(sdk=json.loads((sdk / 'ci-sdk.json').read_text()), path=str(sdk))))
+        run('tar', '--zstd', '-cf', str(archive), '-C', tmp, 'sdk-development.json', '-C', str(sdk), *files)
 
 
 def package_version(row, version, revision):
@@ -492,6 +500,8 @@ if __name__ == '__main__':
         select(Path(args[0]).resolve(), args[1], args[2], baseline)
     elif command == 'reuse':
         reuse(Path(args[0]).resolve(), args[1], Path(args[2]).resolve())
+    elif command == 'sdk-export':
+        sdk_export(Path(args[0]).resolve(), Path(args[1]).resolve(), *args[2:])
     else:
         {'prepare': prepare, 'check': unchanged, 'stage': stage, 'publish': publish,
          'sdk-dependency': sdk_dependency}[command](
