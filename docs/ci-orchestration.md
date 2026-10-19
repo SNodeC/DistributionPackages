@@ -12,7 +12,7 @@
 
 A release selects the changed project and its transitive dependents. SNode.C selects SNode.C, MQTTSuite and IDP; an application release selects that application. IDP has native Linux and Raspberry Pi OS targets only. Exact published dependencies outside the selected subgraph are retained. Build recipes still define how each product is compiled; the registry does not invent a recipe for a new product.
 
-DistributionPackages owns capture, allocation, scheduling, status updates, signing and publication. Packages stores published files and the existing revision/status records. Source repositories own their unsigned build jobs. Source workflows no longer write Packages. The coordinator's capture job finishes after scheduling; its green result alone does not mean the entire release has published. Check the per-project target status in Packages and the downstream build/publication runs.
+DistributionPackages owns capture, allocation, scheduling, status updates, signing and publication. Packages stores published files and the existing revision/status records. Source repositories own their unsigned build jobs. Source workflows no longer write Packages. The coordinator's capture job finishes after scheduling; its green result alone does not mean the entire release has published. Check the per-project target status in Packages and the downstream build/publication runs. A target’s “Build log” links only to a known job in that source repository. Until a source job URL is reported, the link is omitted; the capture or trigger run is never substituted.
 
 ## Release and publication sequence
 
