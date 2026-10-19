@@ -1,0 +1,31 @@
+name: Notify package coordinator
+on:
+  workflow_call:
+    secrets:
+      OPENWRT_APP_PRIVATE_KEY:
+        required: true
+permissions:
+  contents: read
+jobs:
+  notify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          repository: SNodeC/DistributionPackages
+          ref: main
+          path: feed
+          persist-credentials: false
+      - uses: actions/create-github-app-token@v3
+        id: coordinator
+        with:
+          client-id: ${{ vars.PACKAGES_APP_CLIENT_ID }}
+          private-key: ${{ secrets.OPENWRT_APP_PRIVATE_KEY }}
+          owner: SNodeC
+          repositories: DistributionPackages
+          permission-contents: write
+      - name: Notify exact tag commit
+        env:
+          PYTHONPATH: ${{ github.workspace }}/feed
+          GH_TOKEN: ${{ steps.coordinator.outputs.token }}
+        run: python3 -m ci.dispatch notify

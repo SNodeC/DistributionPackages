@@ -1,0 +1,77 @@
+name: Orchestrate package release
+run-name: Release · ${{ github.event.client_payload.project }} · ${{ github.event.client_payload.tag }} · ${{ github.event.client_payload.run }}
+on:
+  repository_dispatch:
+    types: [release-packages]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: package-release-${{ github.event.client_payload.project }}-${{ github.event.client_payload.run }}
+  cancel-in-progress: false
+  queue: max
+env:
+  PYTHONPATH: ${{ github.workspace }}/feed
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: feed
+          persist-credentials: false
+      - name: Scope coordinator token to registered repositories
+        id: repositories
+        run: echo "names=$(jq -r 'keys + ["DistributionPackages", "Packages"] | join(",")' feed/ci/projects.json)" >> "$GITHUB_OUTPUT"
+      - uses: actions/create-github-app-token@v3
+        id: coordinator
+        with:
+          client-id: ${{ vars.PACKAGES_APP_CLIENT_ID }}
+          private-key: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
+          owner: SNodeC
+          repositories: ${{ steps.repositories.outputs.names }}
+          permission-actions: read
+          permission-contents: write
+      - name: Validate source notification
+        id: release
+        env:
+          GH_TOKEN: ${{ steps.coordinator.outputs.token }}
+        run: python3 -m ci.dispatch intake
+      - uses: actions/download-artifact@v8
+        id: previous
+        if: steps.release.outputs.duplicate != 'true' && github.run_attempt > 1
+        continue-on-error: true
+        with:
+          name: source-pair
+          path: bundle
+      - name: Reserve revisions and capture immutable inputs
+        if: steps.release.outputs.duplicate != 'true' && steps.previous.outcome != 'success'
+        env:
+          PACKAGES_TOKEN: ${{ steps.coordinator.outputs.token }}
+          GH_TOKEN: ${{ steps.coordinator.outputs.token }}
+          RELEASE_PROJECT: ${{ steps.release.outputs.project }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+        run: |
+          python3 -m ci.dispatch retry-capture
+          rm -rf bundle
+          bash feed/ci/publish/status.sh published reserve
+          python3 -m ci.repository prepare published bundle
+      - name: Save immutable release capture
+        uses: actions/upload-artifact@v7
+        if: steps.release.outputs.duplicate != 'true' && steps.previous.outcome != 'success'
+        with:
+          name: source-pair
+          path: bundle/
+          if-no-files-found: error
+      - name: Initialize graph status and schedule release builds
+        if: steps.release.outputs.duplicate != 'true'
+        env:
+          GH_TOKEN: ${{ steps.coordinator.outputs.token }}
+          PACKAGES_TOKEN: ${{ steps.coordinator.outputs.token }}
+        run: |
+          tar -xzf bundle/feed.tar.gz -C feed
+          python3 -m ci.repository check bundle
+          bash feed/ci/publish/status.sh published status bundle '-' '-' pending
+          python3 -m ci.dispatch start bundle

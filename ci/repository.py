@@ -1,8 +1,9 @@
-"""Capture a release-tag generation; commit IDs are evidence, not pinned refs."""
+"""Capture an immutable release generation from exact source commits."""
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 import http.client
+from graphlib import TopologicalSorter
 from math import ceil
 import tempfile
 import hashlib
@@ -19,16 +20,56 @@ import urllib.error
 import urllib.request
 
 ROOT = Path(__file__).resolve().parent.parent
-PROJECTS = {
-    'snode.c': dict(title='SNode.C', package='snodec', depends_on=()),
-    'mqttsuite': dict(title='MQTTSuite', package='mqttsuite', depends_on=('snode.c',)),
-    'snode.c-idp': dict(title='SNode.C IDP', package='snodec-idp', depends_on=('snode.c',), families=('linux', 'raspberrypi')),
-}
+
+def load_projects(path):
+    projects = json.loads(path.read_text())
+    if not isinstance(projects, dict) or not projects:
+        raise ValueError('Project registry must be a nonempty object')
+    packages = set()
+    for name, config in projects.items():
+        if (not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.-]*', name)
+                or not isinstance(config, dict) or set(config) != {'title', 'package', 'depends_on', 'families'}
+                or not isinstance(config['title'], str) or not config['title']
+                or not isinstance(config['package'], str) or not re.fullmatch(r'[a-z0-9][a-z0-9-]*', config['package'])
+                or config['package'] in packages):
+            raise ValueError('Invalid project metadata: ' + name)
+        packages.add(config['package'])
+        for key, allowed in [('depends_on', projects), ('families', ('openwrt', 'linux', 'raspberrypi'))]:
+            values = config[key]
+            if not isinstance(values, list) or any(not isinstance(value, str) or value not in allowed for value in values) or len(values) != len(set(values)):
+                raise ValueError('Invalid ' + key + ': ' + name)
+        if not config['families']:
+            raise ValueError('A project needs supported families: ' + name)
+    order = tuple(TopologicalSorter({name: config['depends_on'] for name, config in projects.items()}).static_order())
+    for name in order:
+        for dependency in projects[name]['depends_on']:
+            if not set(projects[name]['families']) <= set(projects[dependency]['families']):
+                raise ValueError('Dependency does not support every project family: ' + name)
+    return {name: projects[name] for name in order}
+
+
+PROJECTS = load_projects(ROOT / 'ci/projects.json')
 REPOSITORIES = tuple(PROJECTS)
 
 
+def affected(project):
+    selected = {project}
+    for name, config in PROJECTS.items():
+        if selected.intersection(config['depends_on']):
+            selected.add(name)
+    return tuple(name for name in PROJECTS if name in selected)
+
+
+def dependencies(project):
+    selected = set(PROJECTS[project]['depends_on'])
+    for name in reversed(PROJECTS):
+        if name in selected:
+            selected.update(PROJECTS[name]['depends_on'])
+    return tuple(name for name in PROJECTS if name in selected)
+
+
 def supports(project, row):
-    return row['family'] in PROJECTS[project].get('families', ('openwrt', 'linux', 'raspberrypi'))
+    return row['family'] in PROJECTS[project]['families']
 
 
 def package_owner(name):
@@ -87,14 +128,10 @@ def sources(tags):
 
 
 def unchanged(bundle):
-    project = json.loads((bundle / 'context.json').read_text()).get('build_project')
-    for repo, expected in json.loads((bundle / 'sources.json').read_text()).items():
-        if project and repo != project:
-            continue  # Published dependencies are checked by package inventory, not mutable source tags.
-        observed = dict(line.split()[::-1] for line in run(
-            'git', 'ls-remote', f'https://github.com/SNodeC/{repo}.git', *expected).splitlines())
-        if observed != expected:
-            raise RuntimeError('Source tags changed: refusing superseded build')
+    # Captured bytes, not mutable upstream tags, define an in-flight release.
+    for name, checksum in json.loads((bundle / 'checksums.json').read_text()).items():
+        if Path(name).is_absolute() or '..' in Path(name).parts or digest(bundle / name) != checksum:
+            raise RuntimeError('Captured source archive changed: ' + name)
 
 
 def prepare(published_root, bundle):
@@ -107,7 +144,7 @@ def prepare(published_root, bundle):
     if changed not in REPOSITORIES:
         raise ValueError('Unknown release project')
     revisions = json.loads((published_root / 'status.json').read_text())['allocations'][os.environ['GITHUB_RUN_ID']]
-    if set(revisions) != (set(REPOSITORIES) if changed == 'snode.c' else {changed}):
+    if set(revisions) != set(affected(changed)):
         raise RuntimeError('Reserved revisions do not match the release project')
     context = dict(captured_at=datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'), recipe_ref=os.environ.get('RECIPE_REF', 'main'),
                    recipe_commit=run('git', '-C', str(ROOT), 'rev-parse', 'HEAD'),
@@ -115,15 +152,14 @@ def prepare(published_root, bundle):
                    release_project=changed, run_id=os.environ.get('GITHUB_RUN_ID', 'local'),
                    run_url=f'https://github.com/{os.environ.get("GITHUB_REPOSITORY", "SNodeC/DistributionPackages")}/actions/runs/{os.environ.get("GITHUB_RUN_ID", "local")}')
     release_tags = {changed: tag}
-    if changed == 'snode.c':
-        for dependent in REPOSITORIES:
-            if 'snode.c' in PROJECTS[dependent]['depends_on']:
-                refs = run('git', 'ls-remote', '--tags', f'https://github.com/SNodeC/{dependent}.git', 'refs/tags/v*')
-                candidates = [line.split()[1].removeprefix('refs/tags/') for line in refs.splitlines()
-                              if re.fullmatch(r'refs/tags/v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', line.split()[1])]
-                if not candidates:
-                    raise RuntimeError(f'{dependent}: publish an initial version tag before enabling dependency builds')
-                release_tags[dependent] = max(candidates, key=lambda value: tuple(map(int, value[1:].split('.'))))
+    for dependent in affected(changed):
+        if dependent != changed:
+            refs = run('git', 'ls-remote', '--tags', f'https://github.com/SNodeC/{dependent}.git', 'refs/tags/v*')
+            candidates = [line.split()[1].removeprefix('refs/tags/') for line in refs.splitlines()
+                          if re.fullmatch(r'refs/tags/v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', line.split()[1])]
+            if not candidates:
+                raise RuntimeError(f'{dependent}: publish an initial version tag before enabling dependency builds')
+            release_tags[dependent] = max(candidates, key=lambda value: tuple(map(int, value[1:].split('.'))))
     profiles, captured, observed = {}, {}, {}
     rows = [row for row in targets() if supports(changed, row)]
     for row in rows:
@@ -132,28 +168,33 @@ def prepare(published_root, bundle):
                 and baseline.get('context', {}).get('run_id') != context['run_id']):
             raise RuntimeError('Package revision must exceed the published revision; check the reserved project revisions')
         tags = {repo: value for repo, value in release_tags.items() if supports(repo, row)}
-        if changed != 'snode.c':
-            for dependency in PROJECTS[changed]['depends_on']:
-                dependency_tag = baseline.get('context', {}).get('source_tags', {}).get(dependency)
-                if not dependency_tag:
-                    raise RuntimeError(f'{row["id"]}: no published {dependency} dependency; publish it first')
-                tags[dependency] = dependency_tag
+        required = {dependency for project in tags for dependency in dependencies(project)} - tags.keys()
+        for dependency in required:
+            dependency_tag = baseline.get('context', {}).get('source_tags', {}).get(dependency)
+            if not dependency_tag:
+                raise RuntimeError(f'{row["id"]}: no published {dependency} dependency; publish it first')
+            tags[dependency] = dependency_tag
         profile = dict(context=context | dict(source_tags=tags, versions={}), sources={}, archives={},
                        baseline=baseline, directory=directory)
         for repo, source_tag in tags.items():
-            if repo in PROJECTS[changed]['depends_on']:
+            if repo not in revisions:
                 profile['sources'][repo] = baseline['sources'][repo]
                 continue
             key = (repo, source_tag)
             if key not in captured:
-                refs = sources({repo: source_tag})[repo]
+                refs = ({f'refs/tags/{source_tag}': os.environ['RELEASE_SHA']} if repo == changed else sources({repo: source_tag})[repo])
                 commit = refs.get(f'refs/tags/{source_tag}^{{}}', refs[f'refs/tags/{source_tag}'])
                 with tempfile.TemporaryDirectory() as tmp:
                     source = Path(tmp) / repo
-                    run('git', 'clone', '--depth', '1', '--branch', source_tag, '--recurse-submodules',
-                        f'https://github.com/SNodeC/{repo}.git', str(source))
+                    if not re.fullmatch(r'[0-9a-f]{40}', commit):
+                        raise ValueError('Capture requires an exact source commit')
+                    run('git', 'init', str(source))
+                    run('git', '-C', str(source), 'remote', 'add', 'origin', f'https://github.com/SNodeC/{repo}.git')
+                    run('git', '-C', str(source), 'fetch', '--depth', '1', 'origin', commit)
+                    run('git', '-C', str(source), 'checkout', '--detach', 'FETCH_HEAD')
+                    run('git', '-C', str(source), 'submodule', 'update', '--init', '--recursive', '--depth', '1')
                     if run('git', '-C', str(source), 'rev-parse', 'HEAD') != commit:
-                        raise RuntimeError('Source tag changed during capture')
+                        raise RuntimeError('Source checkout does not match captured commit')
                     version_file = source / 'VERSION'
                     # Older published releases used a literal project VERSION.
                     version = version_file.read_text().strip() if version_file.exists() else re.search(
@@ -175,6 +216,8 @@ def prepare(published_root, bundle):
                        ('targets', rows), ('revisions', revisions)]:
         (bundle / f'{name}.json').write_text(json.dumps(data, indent=2) + '\n')
     run('tar', '-czf', str(bundle / 'feed.tar.gz'), '--exclude=.git', '--exclude=__pycache__', '-C', str(ROOT), '.')
+    (bundle / 'checksums.json').write_text(json.dumps({str(path.relative_to(bundle)): digest(path)
+        for path in [*archives.iterdir(), bundle / 'feed.tar.gz']}, indent=2) + '\n')
     unchanged(bundle)
 
 
