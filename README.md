@@ -9,27 +9,33 @@
 
 # DistributionPackages
 
-Build recipes, authenticated handoffs, signing and publication for SNode.C distribution packages. This is the maintainer control repository; [Packages](https://github.com/SNodeC/Packages#banner) is the public installation and availability hub.
+Repository-owned builds, authenticated handoffs, central signing and publication for SNode.C distribution packages. This is the maintainer control repository; [Packages](https://github.com/SNodeC/Packages#banner) is the public installation and availability hub.
 
 ## Operations
 
-This repository captures notified release commits, allocates package revisions and schedules the dependency graph in [`ci/projects.json`](ci/projects.json). Source repositories build unsigned packages through shared workflows; this coordinator authenticates, signs and publishes each target before scheduling its dependents. The manual documentation workflow remains separate. See [CI orchestration](docs/ci-orchestration.md#banner) for the trigger contracts, retries and migration order.
+This repository captures notified release commits, allocates package revisions and registers participating repositories in [`ci/projects.json`](ci/projects.json) and schedules their pinned source-owned dependency graphs. Source repositories build unsigned packages through shared workflows; this coordinator authenticates, signs and publishes each target before scheduling its dependents. The manual documentation workflow remains separate. See [CI orchestration](docs/ci-orchestration.md#banner) for the trigger contracts, retries and migration order.
 
 - [Documentation](docs/README.md#banner)
 - [CI orchestration](docs/ci-orchestration.md#banner)
+- [Repository registration and onboarding](docs/setup.md#add-a-repository)
+- [Add a repository and plan activation](docs/setup.md#add-a-repository)
 - [Publication and maintenance](docs/maintainers.md#banner)
 - [CI setup](docs/setup.md#banner)
 - [Authored Packages documentation](site/README.md#banner) (source template; navigation is resolved in the published Packages snapshot)
-- [Target definitions](ci/targets/)
+- [Repository registration](ci/projects.json) and [onboarding](docs/setup.md#add-a-repository)
 
 ## Interfaces
 
-Product workflows call the reusable notification and build workflows here. The JSON registry is the project and dependency authority; signing accepts only registered projects and verified coordinator captures and source run identities. Public documentation lives under `site/`; generated status is rendered from Packages records by `ci/publish/publication.py`. Catalogue changes do not grant signing rights.
+Product workflows call the reusable notification and build workflows here. The master JSON lists repositories and policy overrides; each source `ci/packages.json` owns its matrix, dependencies and build hooks; signing accepts only registered projects and verified coordinator captures and source run identities. Public documentation lives under `site/`; generated status is rendered from Packages records by `ci/publish/publication.py`. Catalogue changes do not grant signing rights.
 
 ## Local verification
 
 ```sh
-python3 -m unittest discover -s tests -v
+mkdir -p /tmp/codex/build/snodec/package-ci
+PYTHONPATH=tests:. TMPDIR=/tmp/codex/build/snodec/package-ci \
+SNODEC_TEST_TOOLING=/path/to/local-navigation-tooling \
+python3 tests/run_package_checks.py --actionlint /path/to/actionlint \
+  /path/to/snode.c /path/to/mqttsuite /path/to/snode.c-idp
 ```
 
 Tests use temporary repositories and fixtures; they do not dispatch CI or publish packages.

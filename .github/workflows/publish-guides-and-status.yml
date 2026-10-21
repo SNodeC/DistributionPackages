@@ -20,6 +20,10 @@ jobs:
           path: feed
           persist-credentials: false
           ref: ${{ github.event.repository.default_branch }}
+      - name: Verify operator authority
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -m ci.dispatch operator
       - uses: actions/create-github-app-token@v3
         id: publisher
         with:

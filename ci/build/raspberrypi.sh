@@ -8,7 +8,9 @@ enter=(sudo unshare --mount --pid --fork --kill-child --mount-proc="$root/proc" 
 mkdir -p "$root" pi-image output logs
 readarray -t image < <(python3 - "$suite" <<'PY'
 import json, sys
-row = json.load(open('feed/ci/targets/raspberrypi.json'))[sys.argv[1]]
+from ci.repository import PROJECTS
+import os
+row = PROJECTS[os.environ['BUILD_PROJECT']]['matrix']['raspberrypi'][sys.argv[1]]
 print(row['url'])
 print(row['sha256'])
 PY

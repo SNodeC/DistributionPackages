@@ -2,35 +2,26 @@ name: Reusable package build
 on:
   workflow_call:
     secrets:
-      OPENWRT_APP_PRIVATE_KEY:
+      PACKAGE_CAPTURE_APP_PRIVATE_KEY:
+        required: true
+      PACKAGE_NOTIFY_APP_PRIVATE_KEY:
         required: true
 permissions:
   contents: read
   actions: read
 env:
   PYTHONPATH: ${{ github.workspace }}/feed
-  CAPTURE_RUN: ${{ github.event.client_payload.capture }}
-  CAPTURE_REPOSITORY: SNodeC/DistributionPackages
+  PACKAGE_REQUEST: ${{ github.event.inputs.request }}
+  CAPTURE_RUN: ${{ fromJSON(github.event.inputs.request).capture }}
   BUILD_PROJECT: ${{ github.event.repository.name }}
-  TARGET_ID: ${{ github.event.client_payload.target }}
-  PUBLISHED_REF: ${{ github.event.client_payload.publication }}
-  BUILD_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+  TARGET_ID: ${{ fromJSON(github.event.inputs.request).target }}
+  PUBLISHED_REF: ${{ fromJSON(github.event.inputs.request).publication }}
 jobs:
-  prepare:
-    runs-on: ubuntu-24.04
-    outputs:
-      matrix: ${{ steps.matrix.outputs.matrix }}
-      revisions: ${{ steps.matrix.outputs.revisions }}
+  build:
+    name: ${{ fromJSON(github.event.inputs.request).target }}
+    runs-on: ${{ fromJSON(github.event.inputs.request).runner == 'ubuntu-24.04-arm' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    timeout-minutes: 360
     steps:
-      - uses: actions/create-github-app-token@v3
-        id: capture
-        with:
-          client-id: ${{ vars.PACKAGES_APP_CLIENT_ID }}
-          private-key: ${{ secrets.OPENWRT_APP_PRIVATE_KEY }}
-          owner: SNodeC
-          repositories: DistributionPackages
-          permission-actions: read
-          permission-contents: read
       - uses: actions/checkout@v6
         with:
           repository: SNodeC/DistributionPackages
@@ -38,89 +29,45 @@ jobs:
           path: feed
           fetch-depth: 0
           persist-credentials: false
-      - name: Authorize coordinator capture
-        env:
-          GH_TOKEN: ${{ steps.capture.outputs.token }}
-        run: python3 -m ci.dispatch authorize
-      - uses: actions/download-artifact@v8
-        with:
-          repository: ${{ env.CAPTURE_REPOSITORY }}
-          run-id: ${{ env.CAPTURE_RUN }}
-          github-token: ${{ steps.capture.outputs.token }}
-          name: source-pair
-          path: bundle
-      - name: Select trusted tools and captured targets
-        id: matrix
-        run: |
-          commit=$(jq -er '.recipe_commit | select(test("^[0-9a-f]{40}$"))' bundle/context.json)
-          git -C feed merge-base --is-ancestor "$commit" HEAD
-          git -C feed checkout --detach "$commit"
-          python3 -m ci.repository check bundle
-          python3 -m ci.dispatch plan bundle "$BUILD_PROJECT" "$TARGET_ID"
-  build:
-    name: ${{ matrix.distribution }} · ${{ matrix.suite }} · ${{ matrix.arch }}
-    needs: prepare
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 360
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
-    concurrency:
-      group: package-build-${{ github.event.client_payload.capture }}-${{ matrix.build_slot }}
-      cancel-in-progress: false
-      queue: max
-    env:
-      TARGET_ID: ${{ matrix.id }}
-      PACKAGE_RELEASE: ${{ fromJSON(needs.prepare.outputs.revisions)[github.event.repository.name] }}
-    steps:
       - uses: actions/create-github-app-token@v3
         id: capture
         with:
-          client-id: ${{ vars.PACKAGES_APP_CLIENT_ID }}
-          private-key: ${{ secrets.OPENWRT_APP_PRIVATE_KEY }}
+          client-id: ${{ vars.PACKAGE_CAPTURE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.PACKAGE_CAPTURE_APP_PRIVATE_KEY }}
           owner: SNodeC
           repositories: DistributionPackages
           permission-actions: read
           permission-contents: read
       - uses: actions/download-artifact@v8
         with:
-          repository: ${{ env.CAPTURE_REPOSITORY }}
+          repository: SNodeC/DistributionPackages
           run-id: ${{ env.CAPTURE_RUN }}
           github-token: ${{ steps.capture.outputs.token }}
           name: source-pair
           path: bundle
-      - name: Unpack captured packaging tools
-        run: |
-          mkdir feed status-bundle
-          tar -xzf bundle/feed.tar.gz -C feed
-          cp bundle/*.json status-bundle/
-      - uses: actions/create-github-app-token@v3
-        id: coordinator
-        with:
-          client-id: ${{ vars.PACKAGES_APP_CLIENT_ID }}
-          private-key: ${{ secrets.OPENWRT_APP_PRIVATE_KEY }}
-          owner: SNodeC
-          repositories: DistributionPackages
-          permission-contents: write
-      - name: Report build started
-        continue-on-error: true
+      - name: Validate captured build
+        id: capture-input
         env:
-          GH_TOKEN: ${{ steps.coordinator.outputs.token }}
-          BUILD_JOB_ID: ${{ job.check_run_id }}
-        run: python3 -m ci.dispatch status status-bundle "$TARGET_ID" "$BUILD_PROJECT" running
+          GH_TOKEN: ${{ steps.capture.outputs.token }}
+        run: |
+          commit=$(jq -er '.recipe_commit | select(test("^[0-9a-f]{40}$"))' bundle/context.json)
+          git -C feed merge-base --is-ancestor "$commit" HEAD
+          git -C feed checkout --detach "$commit"
+          python3 -m ci.dispatch authorize bundle
+          echo "PACKAGE_RELEASE=$(jq -er --arg project "$BUILD_PROJECT" '.[$project]' bundle/revisions.json)" >> "$GITHUB_ENV"
       - name: Select captured dependencies
         run: |
           python3 -m ci.dispatch baseline bundle "$TARGET_ID" "$PUBLISHED_REF"
           python3 -m ci.repository select bundle "$TARGET_ID" "$BUILD_PROJECT" published-snodec
           python3 -m ci.repository reuse bundle "$TARGET_ID" dependencies
       - uses: docker/setup-qemu-action@v4
-        if: matrix.family == 'linux' && contains(fromJSON('["armhf", "riscv64"]'), matrix.arch)
+        if: fromJSON(steps.capture-input.outputs.row).family == 'linux' && contains(fromJSON('["armhf", "riscv64"]'), fromJSON(steps.capture-input.outputs.row).arch)
         with:
           platforms: arm,riscv64
       - name: Build and test OpenWrt packages
-        if: matrix.family == 'openwrt'
+        if: fromJSON(steps.capture-input.outputs.row).family == 'openwrt'
         env:
-          MATRIX_ROW: ${{ toJSON(matrix.build) }}
+          MATRIX_ROW: ${{ toJSON(fromJSON(steps.capture-input.outputs.row).build) }}
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential clang flex bison g++ gawk gcc-multilib gettext git libncurses-dev libssl-dev python3-setuptools rsync swig unzip zlib1g-dev file wget zstd cmake qemu-user
@@ -128,30 +75,32 @@ jobs:
           bash feed/ci/build/openwrt.sh feed bundle sdk
           python3 -m ci.repository stage sdk bundle output
       - name: Build and test Raspberry Pi OS packages
-        if: matrix.family == 'raspberrypi'
+        if: fromJSON(steps.capture-input.outputs.row).family == 'raspberrypi'
         env:
-          SUITE: ${{ matrix.suite }}
+          SUITE: ${{ fromJSON(steps.capture-input.outputs.row).suite }}
         run: |
           sudo apt-get update
           sudo apt-get install -y xz-utils
           bash feed/ci/build/raspberrypi.sh "$SUITE"
       - name: Build and test Linux packages
-        if: matrix.family == 'linux'
+        if: fromJSON(steps.capture-input.outputs.row).family == 'linux'
         env:
-          MATRIX_ROW: ${{ toJSON(matrix.build) }}
+          MATRIX_ROW: ${{ toJSON(fromJSON(steps.capture-input.outputs.row).build) }}
         run: |
           sudo apt-get update
           sudo apt-get install -y rpm
           bash feed/ci/build/linux.sh "$MATRIX_ROW"
-      - uses: actions/upload-artifact@v7
+      - name: Upload package artifact
+        id: artifact
+        uses: actions/upload-artifact@v7
         with:
-          name: packages-${{ env.BUILD_PROJECT }}-${{ matrix.id }}-${{ github.run_attempt }}
+          name: packages-${{ env.BUILD_PROJECT }}-${{ env.TARGET_ID }}-${{ github.run_attempt }}
           path: output/
           if-no-files-found: error
       - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
-          name: logs-${{ env.BUILD_PROJECT }}-${{ matrix.id }}
+          name: logs-${{ env.BUILD_PROJECT }}-${{ env.TARGET_ID }}
           include-hidden-files: true
           overwrite: true
           path: |
@@ -160,64 +109,19 @@ jobs:
             sdk/.config
             sdk/ci-sdk.json
       - uses: actions/create-github-app-token@v3
-        id: publication
+        id: notify
+        if: ${{ always() && steps.capture-input.outcome == 'success' }}
         with:
-          client-id: ${{ vars.PACKAGES_APP_CLIENT_ID }}
-          private-key: ${{ secrets.OPENWRT_APP_PRIVATE_KEY }}
+          client-id: ${{ vars.PACKAGE_NOTIFY_APP_CLIENT_ID }}
+          private-key: ${{ secrets.PACKAGE_NOTIFY_APP_PRIVATE_KEY }}
           owner: SNodeC
           repositories: DistributionPackages
-          permission-contents: write
-      - name: Request signed publication
-        id: handoff
+          permission-actions: write
+      - name: Report completed build
+        if: ${{ always() && steps.notify.outcome == 'success' }}
         env:
+          GH_TOKEN: ${{ github.token }}
+          NOTIFY_TOKEN: ${{ steps.notify.outputs.token }}
           BUILD_JOB_ID: ${{ job.check_run_id }}
-          GH_TOKEN: ${{ steps.publication.outputs.token }}
-        run: python3 -m ci.dispatch built status-bundle "$TARGET_ID" "$BUILD_PROJECT"
-      - name: Report build failure
-        if: ${{ always() && steps.handoff.outcome != 'success' }}
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ steps.publication.outputs.token || steps.coordinator.outputs.token }}
-          BUILD_JOB_ID: ${{ job.check_run_id }}
-          BUILD_STATUS: ${{ job.status == 'cancelled' && 'cancelled' || 'failed' }}
-        run: python3 -m ci.dispatch status status-bundle "$TARGET_ID" "$BUILD_PROJECT" "$BUILD_STATUS"
-  finalize:
-    needs: [prepare, build]
-    if: ${{ always() && needs.build.result != 'success' }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    env:
-      FINAL_STATUS: ${{ (needs.build.result == 'cancelled' || needs.prepare.result == 'cancelled') && 'cancelled' || 'failed' }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          repository: SNodeC/DistributionPackages
-          ref: main
-          path: feed
-          persist-credentials: false
-      - uses: actions/create-github-app-token@v3
-        id: capture
-        with:
-          client-id: ${{ vars.PACKAGES_APP_CLIENT_ID }}
-          private-key: ${{ secrets.OPENWRT_APP_PRIVATE_KEY }}
-          owner: SNodeC
-          repositories: DistributionPackages
-          permission-actions: read
-          permission-contents: write
-      - name: Authorize coordinator capture
-        env:
-          GH_TOKEN: ${{ steps.capture.outputs.token }}
-        run: python3 -m ci.dispatch authorize
-      - uses: actions/download-artifact@v8
-        with:
-          repository: ${{ env.CAPTURE_REPOSITORY }}
-          run-id: ${{ env.CAPTURE_RUN }}
-          github-token: ${{ steps.capture.outputs.token }}
-          name: source-pair
-          path: bundle
-      - name: Finalize interrupted builds
-        env:
-          GH_TOKEN: ${{ steps.capture.outputs.token }}
-        run: |
-          python3 -m ci.dispatch plan bundle "$BUILD_PROJECT" "$TARGET_ID"
-          python3 -m ci.dispatch status bundle "$TARGET_ID" "$BUILD_PROJECT" "$FINAL_STATUS"
+          BUILD_RESULT: ${{ steps.artifact.outcome == 'success' && 'publishing' || (job.status == 'cancelled' && 'cancelled' || 'failed') }}
+        run: python3 -m ci.dispatch report bundle "$BUILD_RESULT"

@@ -1,20 +1,7 @@
 {
-  "snode.c": {
-    "title": "SNode.C",
-    "package": "snodec",
-    "depends_on": [],
-    "families": ["openwrt", "linux", "raspberrypi"]
-  },
-  "mqttsuite": {
-    "title": "MQTTSuite",
-    "package": "mqttsuite",
-    "depends_on": ["snode.c"],
-    "families": ["openwrt", "linux", "raspberrypi"]
-  },
-  "snode.c-idp": {
-    "title": "SNode.C IDP",
-    "package": "snodec-idp",
-    "depends_on": ["snode.c"],
-    "families": ["linux", "raspberrypi"]
-  }
+  "repositories": [
+    "snode.c",
+    "mqttsuite",
+    "snode.c-idp"
+  ]
 }

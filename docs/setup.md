@@ -6,58 +6,49 @@
 
 # CI setup and activation
 
-## Configure DistributionPackages
+## Separate credential authorities
 
-Set the following **repository** variables and secrets in [SNodeC/DistributionPackages Actions settings](https://github.com/SNodeC/DistributionPackages/settings/secrets/actions). Organization-level settings restricted to this repository are also suitable. No GitHub Environment is used by these workflows.
+These are operator instructions, not an activation performed by this change. Provisioning, scope widening, rotation and revocation each require separate authorization. An App private key has installation-wide authority regardless of narrower tokens minted by steps; never share the coordinator key with a source repository.
 
-| Type | Name | Value or purpose |
+| Location | Variable or secret | Authority |
 | --- | --- | --- |
-| Variable | `PACKAGES_APP_CLIENT_ID` | Client ID of the publishing GitHub App (from its settings page) |
-| Secret | `PACKAGES_APP_PRIVATE_KEY` | The App's private key |
-| Secret | `APT_SIGNING_KEY` | Existing ASCII-armored private key for APT and RPM |
-| Secret | `OPENWRT_USIGN_KEY` | Existing OpenWrt opkg signing private key |
-| Secret | `OPENWRT_APK_KEY` | Existing OpenWrt APK signing private key |
+| DP | `PACKAGES_APP_CLIENT_ID`, `PACKAGES_APP_PRIVATE_KEY` | Coordinator App: Actions read/write and Contents read/write; installed only on registered sources, DP and Packages |
+| DP | `PACKAGES_OBSERVER_TOKEN` | Separate read-only observer: organization details/plan and complete repo inventory, Actions read on **all** org repos, including private repos |
+| Each source | `PACKAGE_NOTIFY_APP_CLIENT_ID`, `PACKAGE_NOTIFY_APP_PRIVATE_KEY` | Separate notify App: Actions write on DP only; no Packages or product-repo installation |
+| Each source | `PACKAGE_CAPTURE_APP_CLIENT_ID`, `PACKAGE_CAPTURE_APP_PRIVATE_KEY` | Separate capture-reader App: Actions read and Contents read on DP only |
+| DP only | `APT_SIGNING_KEY`, `OPENWRT_USIGN_KEY`, `OPENWRT_APK_KEY` | Existing signing secrets; never pass to source builds |
 
-GitHub does not reveal existing secret values through its API. Obtain them from their original secure storage. Do not commit private keys or place them in logs.
+The coordinator needs Actions **write**, correcting the old setup's read-only claim: it dispatches source and publication workflows. Capture and publication readers request Actions read and Contents read. Control requests Actions write and Contents read on registered sources and DP; its separate Packages token provides Contents write for the ledger. Publication uses a separate Contents-write token scoped only to Packages. Notify credentials dispatch workflows in DP; GitHub cannot restrict that permission to one workflow. Publication explicitly checks the coordinator App actor, and operator retry requires the actual triggering actor to be a human DP collaborator with write access, including on reruns. A coordinator publication rerun may be initiated by that App or an authorized human. Notify Actions-write still permits cancelling runs and deleting artifacts; these denial-of-service capabilities remain. source `GITHUB_TOKEN` reads its own artifacts. Capture credentials only download DP captures. Sources never receive a credential that can write Packages or another product repository. Packages has no workflow or signing credentials.
 
-The GitHub App needs **Contents: read and write** and **Actions: read-only**. Its installation must cover **snode.c, mqttsuite, snode.c-idp, DistributionPackages and Packages**. Approve any permission update on the installation after saving the App settings. Artifact transfers use Actions read; dispatches and package/status commits use Contents write. Tokens are scoped per step.
+Organization inventory/plan visibility must be tested read-only with the proposed observer credential. A selected-repository App that cannot see private repositories is insufficient. The single observer credential must expose complete inventory/count metadata and Actions read across the organization. Use an organization-wide read-only App token only if read-only API validation proves those fields are available; otherwise use a suitably authorized read-only owner credential. Organization policy determines which is provisioned. The implementation does not combine two observer credentials. Do not infer that a public-only listing is complete. If the plan cannot be read, configure a documented explicit capacity; that does not waive complete job visibility. No observer credential has been created or widened by this refactor.
 
-Packages needs no Actions secrets, workflows or build system. Its main branch is written by the publisher, including force-with-lease snapshot replacement. Restrict write access to the publisher and repository administrators.
+## Add a repository
 
-## Connect upstream releases
+1. Add its name to DP `ci/projects.json`. This is the intended coordinator configuration edit; do not add a central matrix, graph, recipe or workflow branch.
+2. Add source `ci/packages.json` with unique `title`/`package`, registered `depends_on`, a complete `matrix` and safe relative `build` hook paths. Copy an existing source definition as a syntax example and change its source-owned rows and prerequisites. Native rows specify distribution, suite, image and architectures; Raspberry Pi rows specify official image URL and SHA256; OpenWrt rows specify full releases and architecture-to-target mapping. Supported signers cover APT, RPM, OpenWrt 24.10 opkg and 25.12 APK. Unsupported platforms need a separately reviewed capability change.
+3. Implement native/OpenWrt hooks in that repository. The native hook receives source, package, prerequisite and generic `package`/`install_packages` helpers. The OpenWrt hook stages its recipe and defines `compile`; generic tooling imports registered prerequisite SDK exports and indexes the feed. Product libraries, feature switches, tests and commands stay in these hooks.
+4. Copy a thin `build-distribution-packages.yml` wrapper. It has tag-push notification and coordinator `workflow_dispatch` build entry points, forwarding only notify/capture secrets. Reusable workflow refs remain DP main.
+5. Authorize access and provision the separated credentials above. Validate the pinned JSON graph/cycles, target capability and prerequisite row coverage. A missing prerequisite publication makes only that row unsatisfiable; a never-published dependent is skipped by ordinary cascades.
+6. Run local suites, wrapper validation and actionlint. Explicitly authorize any sandbox/live validation and the first config-containing release separately. Registration itself grants no signing rights and never creates a tag.
 
-Configure the App installation and central signing credentials before creating or moving a version tag. Capture and scheduling run in DistributionPackages; unsigned builds run in the source repository through the central reusable workflow.
+A new product using existing capabilities requires no coordinator production-code change, workflow edit or central target inventory. An existing dependent's matrix changes take effect from its selected pinned source definition. Ordinary cascades use the last-published source per row; publish a config-containing explicit release to introduce a new row/version.
 
-The upstream projects use thin `build-distribution-packages.yml` entry points with identity taken from the calling repository. In **each source repository**, set:
+## Proposed compatible cutover from deployed A
 
-| Type | Name | Value |
-| --- | --- | --- |
-| Variable | `PACKAGES_APP_CLIENT_ID` | The same App client ID as DistributionPackages |
-| Secret | `OPENWRT_APP_PRIVATE_KEY` | Existing App private key; retained credential name |
+No running CI is changed by local implementation. A and PR #30 are evidence, not automatic migration bases; PR #31's separate link task is preserved in its canonical checkout.
 
-The legacy App credential name does not select a distribution. No package-signing private key is required in any source repository. Keep all three package-signing secrets in DistributionPackages only.
+Before any activation, review the local changes and test evidence, provision and validate least-privilege credentials under separate approvals, and agree a coordinated source-wrapper/DP cutover. The selected exact source commit must contain its JSON. A default-branch definition is only a fallback for a repository with no selected source; unavailable or invalid unrelated fallback definitions do not prevent another release. Old feed records/counters are read without resetting revisions. Existing captures retain their old tooling and callbacks: do not activate a controller that overlaps incompatible old captures. Inspect and finish or explicitly disposition outstanding A work before enabling the new protocol; a freeze/drain/merge sequence has not been approved.
 
-A version-tag push sends `release-packages` with its tag, commit and originating workflow run. DistributionPackages validates that notification, captures immutable inputs and allocates revisions. It dispatches `build-packages` to the released project. Source jobs report status and unsigned artifacts back to the coordinator. Each successful signed publication unlocks the ready dependents for that target, using its exact Packages commit. See [CI orchestration](ci-orchestration.md#banner) for the complete contract.
-Only version-tag creation or movement starts builds. No ordinary push or README change starts package CI. README automation, if present upstream, remains independent. The migration never creates or moves upstream tags automatically.
+Historical published commits without `ci/packages.json` remain available in the rolling feed, but cannot supply pinned ownership facts. Every shared row in the recorded A feed has this bootstrap limitation: no product can publish on such a shared row through the new protocol until retained ownership is usable. This is safe fail-closed publication, not a successful bootstrap or merely a skipped cascade. Historical matrices, build hooks and dependency graphs must not be validated just to recover ownership; the required contract is the pinned `package` namespace.
 
-## Validate and activate
+The bootstrap decision is unapproved and does not block local implementation. Compatible options are:
 
-1. Verify all current indexes and their referenced files exist in Packages/main.
-2. Verify signing keys match the original feed and configure all credentials above.
-3. Verify the project counters in `Packages/status.json` match the last allocated revisions; use zero for a fresh package repository.
-4. Drain all existing captures, builds and publication requests before migrating. Merge the central reusable workflows and coordinator first, then the thin entry points in all three source repositories; do not release during this interval.
-5. With explicit approval, exercise a version-tag event.
-6. Confirm each target publishes SNode.C before its MQTTSuite and supported IDP builds start, and an application-only event does not rebuild SNode.C.
-7. Update devices using the new installer or documented manual repository URLs.
+- **A-first bootstrap:** stage JSON/hook-containing commits with the old wrappers and publish them through deployed A before switching protocols. New tags or moved tags can select those commits; a new VERSION number is not required solely to carry JSON. Each tag action needs separate authorization and creates a new capture/revision. An existing commit cannot acquire JSON retroactively. Publish prerequisites and explicit dependents, then verify ownership on every retained row.
+- **Reviewed one-time ownership migration:** design and review it separately; none is implemented or approved.
+- **Defer cutover:** leave A active while deciding.
 
-There is no timer or additional Packages workflow. Creation of the new repositories and pushing source files do not trigger package builds. A CI run cannot be claimed validated until it has actually executed with the signing and GitHub App credentials.
+Manually inspect each row's `build.json` sources, resolve every recorded commit, and verify that its JSON supplies a usable package namespace. No preflight command was added. Every later publication still needs retained sources' minimal ownership facts to remain readable; a change to this contract can block rows. Deregistering a product or losing repository access blocks rows retaining its files. No offboarding policy or full historical schema freeze is adopted.
 
-Existing device feeds remain on the original URLs until explicitly updated. No redirect, deletion, or change to the original repositories is part of this setup.
+After a separately approved bootstrap, coordinate DP reusable `@main` interfaces, source wrappers and renamed secrets, validate token installations, and disposition in-flight A captures. Old A captures are incompatible with the new protocol. No freeze/drain/merge sequence or live migration is approved.
 
-## IDP integration
-
-The IDP uses `PACKAGES_APP_CLIENT_ID` and `OPENWRT_APP_PRIVATE_KEY`, matching the existing product workflows. Extend the CI App installation to `snode.c-idp`; the publisher derives its repository token scope from the JSON project registry. Signing secrets stay in DistributionPackages.
-
-Merge the IDP packaging/workflow and this pipeline integration before deliberately creating its initial matching `vMAJOR.MINOR.PATCH` tag. The capture step requires a release tag for every dependent product. Do not trigger a new SNode.C capture between enabling the third project and preparing the initial IDP tag. Ordinary branch pushes do not build packages. A release tag must point to a commit containing the thin workflow entry point, including on maintenance branches; backport the wrapper before tagging. Old source workflows are rejected before allocating revisions.
-
-An IDP release captures only supported native targets and consumes their published SNode.C packages. SNode.C publication dispatches IDP rebuilds for native targets, alongside the existing MQTTSuite chain. OpenWrt retains only its existing products. There are no root-server credentials or automatic machine upgrades in CI.
+Commit, push, PR actions, tag actions, workflow dispatch, credential operations, sandbox validation and activation are distinct authorization stages. Recheck open runs, installations and current default branches at that point. No live publication, deployment or credential change is performed here.

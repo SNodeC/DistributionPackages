@@ -1,0 +1,7 @@
+# Package CI tooling
+
+DP owns capture, revision allocation, admission and central signing/publication. Source repositories own `ci/packages.json`, dependency declarations, matrices and product hooks. Do not reintroduce a central product/target authority or use public status pages/CDN data as execution permits. Admission and publication separately check the same dependency identity policy. Keep signing secrets confined here and preserve CAS publication, receipts, sibling packages and retention.
+
+Python/shell/JSON/workflows are the applicable tooling; C++/CMake formatting settings are not applicable to this repository. Source formatting baselines are self-contained in each CMake source repository. Validate Python/shell syntax, the complete package suites, actual source wrappers and actionlint with the narrowly documented schema exclusions in `docs/ci-orchestration.md`.
+
+This authorized task uses `/tmp/codex/checkouts/DistributionPackages/repository-owned-package-ci` on `refactor/repository-owned-package-ci` to preserve the occupied canonical checkout. Retain this worktree until its uncommitted work is integrated or otherwise preserved; never silently discard it. Temporary checks/logs use `/tmp/codex/build/snodec/package-ci`. Persistent repository-local `build/` and `checkouts/` are ignored. No commit, push, tag, PR mutation, live workflow, credential operation or publication is authorized by local verification.

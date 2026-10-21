@@ -1,5 +1,6 @@
 """Monotonic build events and serialized feed publication for Packages/main."""
 from datetime import datetime, timezone
+import copy
 import importlib.util
 import json
 import os
@@ -10,21 +11,12 @@ import subprocess
 import tempfile
 import sys
 
-from ci.repository import ROOT, matrix, linux_matrix, run, select, project_file, digest, PROJECTS, REPOSITORIES, supports, package_owner, project_revision, package_version, affected
+from ci.repository import ROOT, run, select, project_file, digest, PROJECTS, REPOSITORIES, supports, package_owner, project_revision, package_version, affected, dependencies, rows, activate, ROW_PROJECTS, dependency_identity, source_commit, missing_prerequisites, binding
+from ci.repository import ownership
 
 
 def targets():
-    rows = [dict(family='openwrt', distribution='openwrt', suite=r['series'], arch=r['arch'],
-                 runner='ubuntu-24.04', build=r) for r in matrix()]
-    rows += [dict(family='raspberrypi', distribution='raspberrypios', suite=suite, arch='arm64',
-                  runner='ubuntu-24.04-arm', build=dict(suite=suite))
-             for suite in json.loads((ROOT / 'ci/targets/raspberrypi.json').read_text())]
-    rows += [dict(family='linux', distribution=r['distribution'], suite=r['suite'], arch=r['arch'],
-                  runner=r['runner'], build=r) for r in linux_matrix()]
-    for index, row in enumerate(rows):
-        row['id'] = '-'.join(row[k] for k in ('distribution', 'suite', 'arch'))
-        row['build_slot'] = {'linux-armhf': 0, 'linux-riscv64': 1}.get(f"{row['family']}-{row['arch']}", 2 + index % 17)
-    return rows
+    return list({row['id']: row for config in PROJECTS.values() for row in rows(config)}.values())
 
 
 def read(path, default=None):
@@ -50,7 +42,7 @@ def published(root, row):
     return info, path.parent.relative_to(root).as_posix()
 
 
-TERMINAL = {'published', 'failed', 'cancelled', 'skipped', 'superseded'}
+TERMINAL = {'published', 'failed', 'cancelled', 'skipped', 'superseded', 'unsatisfiable'}
 ORDER = {'not built': 0, 'pending': 1, 'running': 2, 'publishing': 3, **dict.fromkeys(TERMINAL, 4)}
 
 
@@ -63,11 +55,19 @@ DISTRIBUTIONS = {
 
 def render(root, state):
     """Project recorded release and feed facts; never mutate feeds or event state."""
+    state = projection(state)
+    recorded = {p: c for g in sorted(state.get('runs', {}).values(), key=lambda g: int(g['run_id']) if g['run_id'].isdigit() else 0) for p, c in g.get('context', {}).get('projects', {}).items()}
+    if recorded:
+        PROJECTS.clear()
+        PROJECTS.update(recorded)
     projects = []
     for project, config in PROJECTS.items():
+        config = config | dict(title=re.sub(r'[\r\n|`*_\[\]<>#!\\]', ' ', config['title']))
         candidates = [generation for generation in state.get('runs', {}).values() if project in generation.get('revisions', {})]
         latest = max(candidates, key=lambda generation: (int(generation['revisions'][project]), generation.get('context', {}).get('captured_at', ''), generation.get('run_id', '')), default={})
         source = latest.get('sources', {}).get(project)
+        if latest.get('context', {}).get('contract') == 3:
+            source = next((values[project] for values in latest.get('sources', {}).values() if project in values), None)
         tag = next((ref.removeprefix('refs/tags/') for ref in source if not ref.endswith('^{}')), None) if isinstance(source, dict) else source
         version = tag.removeprefix('v') if tag and re.fullmatch(r'v?\d+\.\d+\.\d+', tag) else None
         revision = latest.get('revisions', {}).get(project)
@@ -109,6 +109,7 @@ print(json.dumps({path: render_header('Packages', path) for path in json.load(sy
         'not-built': '<circle cx="7" cy="7" r="5.25" fill="none" stroke="#848d97" stroke-width="1.5"/><circle cx="7" cy="7" r="1.4" fill="#848d97"/>',
         'cancelled': '<circle cx="7" cy="7" r="5.25" fill="none" stroke="#848d97" stroke-width="1.5"/><path d="M3.3 10.7L10.7 3.3" fill="none" stroke="#848d97" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
     }
+    indicators['unsatisfiable'] = indicators['skipped']
     badges = root / 'status/badges'
     badges.mkdir(parents=True, exist_ok=True)
     for label, body in indicators.items():
@@ -117,7 +118,7 @@ print(json.dumps({path: render_header('Packages', path) for path in json.load(sy
         obsolete.unlink(missing_ok=True)
     dot = lambda label: f'<img src="badges/{label}.svg" alt="{label.replace("-", " ")}" title="{label.replace("-", " ").capitalize()}" width="14" height="14" align="absmiddle">'
     stamp = lambda value: datetime.fromisoformat(value.replace('Z', '+00:00')).astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M') if value else '—'
-    rows = targets()
+    rows = list({r['id']: r for g in state.get('runs', {}).values() for r in g.get('targets', [])}.values()) or targets()
     releases = list(dict.fromkeys((row['distribution'], row['suite']) for row in rows))
     rows.sort(key=lambda row: (list(DISTRIBUTIONS).index(row['distribution']), releases.index((row['distribution'], row['suite'])), row['arch']))
     platforms = []
@@ -128,29 +129,36 @@ print(json.dumps({path: render_header('Packages', path) for path in json.load(sy
             ('Install', 'install', '../README.md#install'), ('Catalog', 'catalog', f'../docs/catalogs/{config["package"]}.md#banner'),
             ('Troubleshoot', 'troubleshoot', '../docs/troubleshooting.md#banner')] if label != 'Catalog' or (root / href.removeprefix('../').split('#')[0]).is_file())
         sections = {}
-        for row in (row for row in rows if supports(project, row)):
+        for row in (r for r in rows if any(project in g.get('sources', {}).get(r['id'], {}) for g in state.get('runs', {}).values() if g.get('context', {}).get('contract') == 3) or not any(g.get('context', {}).get('contract') == 3 for g in state.get('runs', {}).values()) and supports(project, r)):
             info, feed = published(root, row)
             available = info.get('versions', {}).get(config['package'], info.get('versions', {}).get(project))
             key = f"{row['id']}/{project}"
             item = state.get('targets', {}).get(key, {})
-            record = state.get('timeline', {}).get(key, {}).get('published', {})
-            same_revision = available and str(project_revision(info, project)) == str(revision)
-            expected = package_version(row, version, revision) if version and revision is not None else None
+            receipt = info.get('publications', {}).get(project, {})
+            record = (dict(revision=receipt['revision'], job_url=receipt['job_url'], at=receipt['published_at']) if receipt else
+                      state.get('timeline', {}).get(key, {}).get('published', {}))
+            selected = max((g for g in state.get('runs', {}).values() if project in g.get('revisions', {}) and row in g.get('targets', [row])), key=lambda g: int(g['revisions'][project]), default={})
+            selected_source = selected.get('sources', {}).get(row['id'], {}).get(project) if selected.get('context', {}).get('contract') == 3 else None
+            selected_tag = next((k.removeprefix('refs/tags/v') for k in selected_source if not k.endswith('^{}')), None) if selected_source else version
+            row_revision = selected.get('revisions', {}).get(project, revision)
+            same_revision = available and str(project_revision(info, project)) == str(row_revision)
+            expected = package_version(row, selected_tag, row_revision) if selected_tag and row_revision is not None else None
             current = ((dot('current' if same_revision and available == expected else 'outdated') + ' ') if expected else '') + f'`{available}`' if available else '—'
             matching_publication = available and str(record.get('revision')) == str(project_revision(info, project))
             published_at = record.get('at') if matching_publication else None
             if not published_at and info.get('context', {}).get('build_project') == project:
                 published_at = info.get('published_at')
             status = item.get('status')
-            attempt = expected and revision is not None and str(item.get('revision')) == str(revision) and status in ORDER
+            attempt = expected and row_revision is not None and str(item.get('revision')) == str(row_revision) and status in ORDER
             in_build = f'{dot(status.replace(" ", "-"))} `{expected}`' if attempt and status != 'published' else '—'
             if in_build != '—':
-                log = item.get('job_url') or item.get('run_url')
+                log = item.get('job_url')
             else:
                 log = record.get('job_url') if matching_publication else None
                 if not log and available and same_revision and status == 'published':
-                    log = item.get('job_url') or item.get('run_url')
+                    log = item.get('job_url')
             packages = f"{row['distribution']}/pool/{row['suite']}" if row['distribution'] in {'debian', 'ubuntu', 'raspberrypios'} else f'{feed}/Packages' if row['distribution'] in {'rocky', 'fedora'} else feed
+            log = log if log and re.fullmatch(r'https://github.com/SNodeC/[A-Za-z0-9._-]+/actions/runs/[0-9]+/job/[0-9]+', log) else None
             links = ([f'[Build log]({log})'] if log else []) + [f'[Packages](../{packages}/)']
             sections.setdefault(row['distribution'], {}).setdefault(row['suite'], []).append(
                 f"| `{row['arch']}` | {current} | {stamp(published_at)} | {in_build} | {' · '.join(links)} |")
@@ -183,43 +191,68 @@ print(json.dumps({path: render_header('Packages', path) for path in json.load(sy
         for name, table in [('projects', overview('status/')), ('platforms', '| Distribution guide | Releases | Architectures |\n| --- | --- | --- |\n' + '\n'.join(platforms))]:
             text = re.sub(f'(<!-- packages:begin {name} -->).*?(<!-- packages:end {name} -->)', lambda match: match[1] + '\n' + table + '\n' + match[2], text, flags=re.S)
         readme.write_text(text)
+    return None
+
+
+def migrate(state):
+    """Import the drained display schema once; all new execution facts live per generation."""
+    for key, item in state.pop('targets', {}).items():
+        generation = state.get('runs', {}).get(item.get('run_id'))
+        if generation is not None:
+            generation.setdefault('nodes', {}).setdefault(key, item)
+    for key, timeline in state.pop('timeline', {}).items():
+        for name, record in timeline.items():
+            generation = state.get('runs', {}).get(record.get('run_id'))
+            if generation is not None:
+                generation.setdefault('nodes', {}).setdefault(key, {})[name] = record
+    return None
+
+
+def projection(state):
+    result = copy.deepcopy(state)
+    migrate(result)
+    result.update(targets={}, timeline={})
+    for generation in result.get('runs', {}).values():
+        for key, node in generation.get('nodes', {}).items():
+            if 'status' in node:
+                item = dict(node, revision=generation['revisions'][key.rsplit('/', 1)[1]], run_id=generation['run_id'])
+                previous = result['targets'].get(key, {})
+                if (int(item['revision']), item.get('attempt', 0)) >= (int(previous.get('revision', 0)), previous.get('attempt', 0)):
+                    result['targets'][key] = item
+                    result['timeline'].setdefault(key, {})['event'] = item.get('event', {})
+            record = node.get('published', {})
+            previous = result['timeline'].setdefault(key, {}).get('published', {})
+            if record and int(record['revision']) >= int(previous.get('revision', 0)):
+                result['timeline'][key]['published'] = record
+    return result
 
 
 def update(state, row, generation, project, status, attempt, job_url=None):
+    if row not in generation.get('targets', [row]) or project not in generation['revisions']:
+        raise ValueError('Unknown build target or project')
     key = f"{row['id']}/{project}"
-    previous = state['targets'].get(key, {})
-    revision = generation['revisions'][project]
+    generation = state.setdefault('runs', {}).setdefault(generation['run_id'], generation)
+    nodes = generation.setdefault('nodes', {})
+    previous = nodes.get(key, {})
     if status not in ORDER:
         raise ValueError('Unknown status')
-    incoming = (int(revision), attempt)
-    existing = (int(previous.get('revision', 0)), previous.get('attempt', 0))
-    if incoming < existing:
-        return
-    if incoming == existing and previous:
-        if previous['run_id'] != generation['run_id']:
-            raise RuntimeError('Two runs claim the same project revision and attempt')
-        if previous['status'] in TERMINAL or ORDER[status] <= ORDER[previous['status']]:
-            return
-    timeline = state.setdefault('timeline', {}).setdefault(key, {})
-    previous_event = timeline.get('event', {})
-    identity = dict(revision=revision, attempt=attempt, run_id=generation['run_id'])
-    current_event = dict(previous_event) if all(previous_event.get(k) == v for k, v in identity.items()) else identity
-    now = os.environ.get('EVENT_TIME') or datetime.now(timezone.utc).isoformat()
-    current_event.update(status=status, updated_at=now, stage=os.environ.get('EVENT_STAGE') or
-                         ('publication' if status == 'published' or (incoming == existing and previous.get('status') == 'publishing') else 'build'))
-    if status == 'running':
-        current_event['started_at'] = now
-    if status in {'publishing', 'failed', 'cancelled'}:
-        current_event['ended_at'] = now
-    state['targets'][key] = dict(target=row, revision=revision, attempt=attempt,
-                                run_id=generation['run_id'], run_url=generation['run_url'], status=status,
-                                job_url=job_url or (previous.get('job_url') if previous.get('run_id') == generation['run_id']
-                                                   and previous.get('attempt') == attempt else None) or generation['run_url'])
-    if status == 'published':
-        current_event['published_at'] = now
-        timeline['published'] = dict(revision=revision, at=now, run_id=generation['run_id'],
-                                     job_url=state['targets'][key]['job_url'])
-    timeline['event'] = current_event
+    if attempt > previous.get('attempt', -1) or (attempt == previous.get('attempt') and
+            (status == 'published' and previous['status'] != 'published' or previous['status'] not in TERMINAL and ORDER[status] > ORDER[previous['status']])):
+        now = os.environ.get('EVENT_TIME') or datetime.now(timezone.utc).isoformat()
+        event = dict(revision=generation['revisions'][project], attempt=attempt, run_id=generation['run_id'],
+                     status=status, updated_at=now, stage=os.environ.get('EVENT_STAGE', 'publication' if status == 'published' else 'build'))
+        event.update({k: v for k, v in previous.get('event', {}).items() if k.endswith('_at') and k != 'updated_at'})
+        if status == 'running':
+            event['started_at'] = now
+        if status in {'publishing', 'failed', 'cancelled'}:
+            event['ended_at'] = now
+        nodes[key] = previous | dict(target=row, status=status, attempt=attempt, event=event,
+                                     job_url=job_url or (previous.get('job_url') if previous.get('attempt') == attempt else None))
+        if status == 'published':
+            event['published_at'] = now
+            nodes[key]['published'] = dict(revision=generation['revisions'][project], at=now,
+                                           run_id=generation['run_id'], job_url=nodes[key]['job_url'])
+    return None
 
 
 def reserve(root, project, run_id):
@@ -229,13 +262,21 @@ def reserve(root, project, run_id):
     path = root / 'status.json'
     state = read(path, dict(repository='SNodeC/Packages', branch='main', counters=dict.fromkeys(REPOSITORIES, 0), runs={}, targets={}))
     allocations = state.setdefault('allocations', {})
-    selected = affected(project)
-    if run_id not in allocations:
+    requests = state.setdefault('requests', {})
+    requested_at = os.environ.get('RELEASE_REQUESTED_AT')
+    if requested_at and (requests.get(project, {}).get('at', ''), int(requests.get(project, {}).get('run', 0))) > (requested_at, int(os.environ.get('RELEASE_RUN', 0))):
+        raise ValueError('A newer explicit request already exists')
+    if requested_at and requests.get(project, {}).get('run') == os.environ.get('RELEASE_RUN', '0') and requests[project].get('capture') != run_id:
+        raise ValueError('This source notification already has a capture: ' + str(requests[project].get('capture')))
+    selected = tuple(name for name in REPOSITORIES if any(name in affected(project, graph) for graph in ROW_PROJECTS.values()))
+    if run_id not in allocations or (requested_at and run_id not in state.get('runs', {}) and int(os.environ.get('GITHUB_RUN_ATTEMPT', '1')) > int(requests.get(project, {}).get('capture_attempt', 1))):
         for repo in selected:
             state['counters'][repo] = state['counters'].get(repo, 0) + 1
         allocations[run_id] = {repo: str(state['counters'][repo]) for repo in selected}
     if set(allocations[run_id]) != set(selected):
         raise RuntimeError('A retry cannot change its release project')
+    if requested_at:
+        requests[project] = dict(sha=os.environ['RELEASE_SHA'], tag=os.environ['RELEASE_TAG'], at=requested_at, run=os.environ.get('RELEASE_RUN', '0'), capture=run_id, capture_attempt=int(os.environ.get('GITHUB_RUN_ATTEMPT', '1')), revision=allocations[run_id][project])
     write(path, state)
     return allocations[run_id]
 
@@ -253,70 +294,76 @@ def record_run(bundle, state, context):
         generation = dict(revision=revisions[context['release_project']], revisions=revisions, context=context, sources=read(bundle / 'sources.json'),
                           targets=rows, profiles_hash=digest(bundle / 'profiles.json'), run_id=run_id, run_url=context['run_url'])
         state['runs'][run_id] = generation
+    if state.get('requests', {}).get(context['release_project'], {}).get('capture') == run_id:
+        state['requests'][context['release_project']].update(eligible=True, reason='Capture registered')
     return generation
 
 
 def publish(root, bundle, incoming, row, generation, project):
-    original = read(bundle / 'profiles.json')[row['id']]
-    if digest(bundle / 'profiles.json') != generation['profiles_hash']:
-        raise RuntimeError('Target source selection changed')
-    if project not in generation['revisions']:
-        raise RuntimeError('Project is not selected for this release')
-    current, _ = published(root, row)
-    baseline = original['baseline']
-    selected_dependencies = set(PROJECTS[project]['depends_on']).intersection(generation['revisions'])
-    if selected_dependencies:
-        for dependency in selected_dependencies:
-            if (project_revision(current, dependency) != int(generation['revisions'][dependency])
-                    or current.get('sources', {}).get(dependency) != original['sources'][dependency]):
-                raise RuntimeError('Corresponding dependency release has not been published or was superseded')
-        baseline = current
-    others = [repo for repo in REPOSITORIES if repo != project]
-    # Verify dependencies against the actual build manifest, and preserve unrelated
-    # products from the current feed inside this serialized publication transaction.
     manifests = list(incoming.rglob('build.json'))
     if len(manifests) != 1:
         raise RuntimeError('A publisher must receive exactly one target artifact')
     metadata = read(manifests[0])
-    for dependency in PROJECTS[project]['depends_on']:
-        files = lambda info: {k: v for k, v in info.get('files', {}).items() if project_file(k, dependency)}
-        if (metadata['sources'].get(dependency) != current.get('sources', {}).get(dependency)
-                or files(metadata) != files(current)):
-            raise RuntimeError('Superseded build: published dependency changed')
-    # The selected source and capture identity cannot be replaced by uploaded metadata.
-    profile = select(bundle, row['id'], project, baseline)
-    expected_context = dict(profile['context'])
-    for key in ('source_tags', 'versions'):
-        expected_context[key] = {project: profile['context'][key][project]}
-    actual_context = dict(metadata['context'])
-    for key in ('source_tags', 'versions'):
-        actual_context[key] = {project: metadata['context'][key].get(project)}
-    if (metadata['revision'] != generation['revisions'][project]
-            or metadata['sources'].get(project) != profile['sources'].get(project)
-            or actual_context != expected_context):
-        raise RuntimeError('Artifact does not belong to this project build generation')
-    if row['family'] == 'openwrt':
-        expected = incoming / 'openwrt' / row['suite'] / row['arch'] / 'build.json'
-    elif row['family'] == 'raspberrypi':
-        expected = incoming / 'raspberrypios' / row['suite'] / row['arch'] / 'build.json'
-    else:
-        expected = incoming / 'linux' / row['distribution'] / row['suite'] / row['arch'] / 'build.json'
-    if manifests[0] != expected:
-        raise RuntimeError('Artifact belongs to a different target')
-    if row['family'] != 'openwrt':
-        # Validate every incoming byte before replacing retained sibling packages.
-        directory = manifests[0].parent
-        for name, checksum in metadata['files'].items():
-            path = Path(name)
-            if path.is_absolute() or '..' in path.parts or (directory / path).is_symlink() or digest(directory / path) != checksum:
-                raise RuntimeError('Artifact checksum mismatch')
+    current, _ = published(root, row)
+    receipt = json.loads(os.environ.get('BUILD_RECEIPT', '{}'))
+    if generation.get('context', {}).get('contract') == 3 and not receipt:
+        raise ValueError('Publication requires an authenticated artifact receipt')
+    # Validate every incoming byte before replacing retained sibling packages.
+    directory = manifests[0].parent
+    for name, checksum in metadata['files'].items():
+        path = Path(name)
+        if path.is_absolute() or '..' in path.parts or not (directory / path).resolve().is_relative_to(directory.resolve()) or (directory / path).is_symlink() or digest(directory / path) != checksum:
+            raise RuntimeError('Artifact checksum mismatch')
+    incoming_owners, current_owners = ownership(metadata), ownership(current)
+    unsigned = {name: value for name, value in metadata['files'].items() if project_file(name, project, incoming_owners)}
+    previous = current.get('publications', {}).get(project, {})
+    identical = bool(receipt) and previous and all(previous.get(k) == v for k, v in receipt.items())
+    if identical and previous['unsigned_files'] != unsigned:
+        raise RuntimeError('Different package content under the same publication identity')
+    if not identical:
+        node = generation.get('nodes', {}).get(row['id'] + '/' + project, {})
+        if receipt and (node.get('source') and node['source'] != receipt['source'] or previous.get('source', {}).get('run') == receipt['source']['run'] and previous['source']['attempt'] > receipt['source']['attempt']):
+            raise RuntimeError('Superseded build attempt')
+        activate(bundle, row['id'], json.loads(os.environ.get('BUILD_BASELINE', '{}')) or None, project)
+        if digest(bundle / 'profiles.json') != generation['profiles_hash']:
+            raise RuntimeError('Target source selection changed')
+        if project not in generation['revisions']:
+            raise RuntimeError('Project is not selected for this release')
+        others = [repo for repo in current.get('sources', {}) if repo != project]
+        # Verify dependencies against the actual build manifest, and preserve unrelated
+        # products from the current feed inside this serialized publication transaction.
+        binding = json.loads(os.environ.get('BUILD_BASELINE', '{}'))
+        for dependency in dependencies(project):
+            if (source_commit(current.get('sources', {}).get(dependency)) is None or dependency_identity(metadata, dependency) != dependency_identity(current, dependency)
+                    or binding and dependency_identity(metadata, dependency) != dependency_identity(binding, dependency)):
+                raise RuntimeError('Superseded build: published dependency changed')
+        # The selected source and capture identity cannot be replaced by uploaded metadata.
+        profile = select(bundle, row['id'], project, current)
+        expected_context = dict(profile['context'])
+        for key in ('source_tags', 'versions'):
+            expected_context[key] = {project: profile['context'][key][project]}
+        actual_context = dict(metadata['context'])
+        for key in ('source_tags', 'versions'):
+            actual_context[key] = {project: metadata['context'][key].get(project)}
+        if (metadata['revision'] != generation['revisions'][project]
+                or metadata['sources'].get(project) != profile['sources'].get(project)
+                or actual_context != expected_context):
+            raise RuntimeError('Artifact does not belong to this project build generation')
+        if row['family'] == 'openwrt':
+            expected = incoming / 'openwrt' / row['suite'] / row['arch'] / 'build.json'
+        elif row['family'] == 'raspberrypi':
+            expected = incoming / 'raspberrypios' / row['suite'] / row['arch'] / 'build.json'
+        else:
+            expected = incoming / 'linux' / row['distribution'] / row['suite'] / row['arch'] / 'build.json'
+        if manifests[0] != expected:
+            raise RuntimeError('Artifact belongs to a different target')
         for other in others:
             for name in list(metadata['files']):
-                if project_file(name, other):
+                if project_file(name, other, incoming_owners):
                     (directory / name).unlink()
                     del metadata['files'][name]
             for name, checksum in current.get('files', {}).items():
-                if project_file(name, other):
+                if project_file(name, other, current_owners):
                     relative = (Path(row['distribution']) / 'pool' / row['suite'] / name
                                 if name.endswith('.deb') else Path(feed_paths(row)[0]) / name)
                     source = root / relative
@@ -325,54 +372,49 @@ def publish(root, bundle, incoming, row, generation, project):
                     (directory / name).parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(source, directory / name)
                     metadata['files'][name] = checksum
-        metadata['packages'] = sorted([name for name in metadata['packages'] if package_owner(name) == project]
-                                      + [name for name in current.get('packages', []) if package_owner(name) in others])
+        metadata['packages'] = sorted([name for name in metadata.get('packages', []) if package_owner(name, incoming_owners) == project]
+                                      + [name for name in current.get('packages', []) if package_owner(name, current_owners) in others])
         metadata['versions'] = {key: value for key, value in metadata['versions'].items()
                                 if key in (project, PROJECTS[project]['package'])}
         metadata['versions'].update({key: value for key, value in current.get('versions', {}).items()
                                     if key not in (project, PROJECTS[project]['package'])})
-        profile = select(bundle, row['id'], project, current)
         metadata.update(context=profile['context'], sources=profile['sources'])
         write(manifests[0], metadata)
-    else:
-        if metadata['sources'] != profile['sources'] or metadata['context'] != profile['context']:
-            raise RuntimeError('Artifact source context mismatch')
-        for other in others:
-            files = lambda info: {k: v for k, v in info.get('files', {}).items() if project_file(k, other)}
-            if files(metadata) != files(current):
-                raise RuntimeError('Artifact changed the published counterpart packages')
-    if row['family'] == 'openwrt':
-        importlib.import_module('ci.repository').publish(incoming, root, bundle)
-    elif row['family'] == 'raspberrypi':
-        importlib.import_module('ci.publish.apt').publish(incoming, root, bundle)
-    else:
-        importlib.import_module('ci.publish.linux').publish(incoming, root, bundle)
-    info, directory = published(root, row)
-    if 'published_at' not in info:
-        info['published_at'] = datetime.now(timezone.utc).isoformat()
-        manifest = root / directory / 'build.json'
-        aggregate = read(manifest)
-        if 'targets' in aggregate:
-            aggregate['targets'][row['arch']] = info
+        if row['family'] == 'openwrt':
+            from ci.publish.openwrt import reindex
+            reindex(directory, root / feed_paths(row)[0], metadata, project, current)
+            write(manifests[0], metadata)
+        if row['family'] == 'openwrt':
+            importlib.import_module('ci.repository').publish(incoming, root, bundle)
+        elif row['family'] == 'raspberrypi':
+            importlib.import_module('ci.publish.apt').publish(incoming, root, bundle)
         else:
-            aggregate = info
-        write(manifest, aggregate)
-    shutil.copytree(ROOT / 'keys', root / 'keys', dirs_exist_ok=True)
-    shutil.copy2(ROOT / 'keys/snodec-opkg.pub', root / 'keys/snodec-usign.pub')  # Stable legacy download URL.
-    importlib.import_module('ci.publish.cleanup').cleanup(root, row)
-
-
-def event(state, generation, row, project, status, attempt):
-    if row not in generation['targets'] or project not in generation['revisions']:
-        raise ValueError('Unknown build target or project')
-    update(state, row, generation, project, status, attempt, os.environ.get('BUILD_RUN_URL'))
-    current = state['targets'].get(f"{row['id']}/{project}", {})
-    if (current.get('run_id') == generation['run_id'] and current.get('attempt') == attempt
-            and current.get('status') in {'failed', 'cancelled', 'skipped', 'superseded'}):
-        # No application job has run yet. Its own attempt 1 supersedes this dependency placeholder.
-        for dependent in generation['revisions']:
-            if dependent != project and dependent in affected(project) and supports(dependent, row):
-                update(state, row, generation, dependent, 'skipped', 0)
+            importlib.import_module('ci.publish.linux').publish(incoming, root, bundle)
+        info, directory = published(root, row)
+        if 'published_at' not in info:
+            info['published_at'] = datetime.now(timezone.utc).isoformat()
+            manifest = root / directory / 'build.json'
+            aggregate = read(manifest)
+            if 'targets' in aggregate:
+                aggregate['targets'][row['arch']] = info
+            else:
+                aggregate = info
+            write(manifest, aggregate)
+        shutil.copytree(ROOT / 'keys', root / 'keys', dirs_exist_ok=True)
+        shutil.copy2(ROOT / 'keys/snodec-opkg.pub', root / 'keys/snodec-usign.pub')  # Stable legacy download URL.
+        importlib.import_module('ci.publish.cleanup').cleanup(root, row)
+        if receipt:
+            info, directory = published(root, row)
+            info['publications'] = current.get('publications', {}) | {project: receipt | dict(
+                revision=generation['revisions'][project], published_at=info['published_at'], unsigned_files=unsigned)}
+            manifest = root / directory / 'build.json'
+            aggregate = read(manifest)
+            if 'targets' in aggregate:
+                aggregate['targets'][row['arch']] = info
+            else:
+                aggregate = info
+            write(manifest, aggregate)
+    return None
 
 
 def merge_readme(root, previous, remote):
@@ -414,88 +456,79 @@ def copy_site(root):
 
 def main():
     command, *args = sys.argv[1:]
-    if command in {'render', 'merge-readme'}:
+    result = 0
+    if command in {'render', 'project', 'merge-readme', 'reserve', 'control'}:
         root = Path(args[0]).resolve()
         if command == 'merge-readme':
             merge_readme(root, *args[1:])
-        else:
+        elif command in {'render', 'project'}:
             render(root, read(root / 'status.json', {}))
-        return
-    if command == 'reserve':
-        if (os.environ.get('GITHUB_REPOSITORY') != 'SNodeC/DistributionPackages'
-                or os.environ.get('GITHUB_WORKFLOW_REF') != 'SNodeC/DistributionPackages/.github/workflows/orchestrate-packages.yml@refs/heads/main'):
-            raise ValueError('Only the coordinator workflow may reserve package revisions')
-        reserve(Path(args[0]), os.environ['RELEASE_PROJECT'], os.environ['GITHUB_RUN_ID'])
-        return
-    if command == 'matrix':
+        elif command == 'control':
+            if (os.environ.get('GITHUB_WORKFLOW_REF') != 'SNodeC/DistributionPackages/.github/workflows/control-packages.yml@refs/heads/main'
+                    or os.environ.get('GITHUB_REPOSITORY') != 'SNodeC/DistributionPackages'):
+                raise ValueError('Only the serialized coordinator may change admission state')
+            from ci.dispatch import change
+            change(root, read(Path(args[1])))
+        else:
+            if (os.environ.get('GITHUB_REPOSITORY') != 'SNodeC/DistributionPackages' or os.environ.get('GITHUB_WORKFLOW_REF') !=
+                    'SNodeC/DistributionPackages/.github/workflows/orchestrate-packages.yml@refs/heads/main'):
+                raise ValueError('Only the coordinator workflow may reserve package revisions')
+            reserve(root, os.environ['RELEASE_PROJECT'], os.environ['GITHUB_RUN_ID'])
+    elif command == 'matrix':
         print(json.dumps({'include': targets()}))
-        return
-    if command == 'scope':
+    elif command == 'scope':
         row = json.loads(args[0])
-        if row and row not in targets():
-            raise ValueError('Unknown publication target')
         print('\n'.join(['**/build.json', '/README.md', '/docs/', '/install/', '/status.json', '/retention.json', '/status/', '/keys/']
                         + ([f'/{path}/' for path in feed_paths(row)] if row else [])))
-        return
-    root, bundle = (Path(p).resolve() for p in args[:2])
-    state = read(root / 'status.json', dict(repository='SNodeC/Packages', branch='main', counters=dict.fromkeys(REPOSITORIES, 0), runs={}, targets={}))
-    if state.get('repository') != 'SNodeC/Packages' or state['branch'] != 'main':
-        raise RuntimeError('Publication destination mismatch')
-    context = read(bundle / 'context.json')
-    if context['destination'] != state['repository']:
-        raise RuntimeError('Publication destination mismatch')
-    generation = record_run(bundle, state, context)
-    attempt = int(os.environ.get('BUILD_ATTEMPT') or os.environ.get('GITHUB_RUN_ATTEMPT', '1'))
-    if command == 'status':
-        target, project, status = args[2:5]
-        if target == '-' and project == '-' and status == 'pending':
-            for row in generation['targets']:
-                for project in (project for project in generation['revisions'] if supports(project, row)):
-                    event(state, generation, row, project, status, 0)
-        else:
-            event(state, generation, json.loads(target), project, status, attempt)
-    elif command == 'finalize':
-        status = args[2]
-        if status not in {'cancelled', 'failed'}:
-            raise ValueError('Invalid final status')
-        for row in json.loads(args[3]):
-            project = os.environ['BUILD_PROJECT']
-            item = state['targets'].get(f"{row['id']}/{project}", {})
-            if (item.get('run_id') == generation['run_id'] and item['attempt'] in {0, attempt}
-                    and item['status'] not in TERMINAL and item['status'] != 'publishing'):
-                event(state, generation, row, project, status, attempt)
-    elif command == 'feed':
-        row, project = json.loads(args[2]), args[3]
-        original_context = (bundle / 'context.json').read_bytes()
-        original_sources = (bundle / 'sources.json').read_bytes()
-        result, status = 0, 'published'
-        try:
-            previous = state['targets'].get(f"{row['id']}/{project}", {})
-            if (int(generation['revisions'][project]), attempt) < (int(previous.get('revision', 0)), previous.get('attempt', 0)):
-                raise RuntimeError('Superseded build attempt')
-            if (previous.get('status') == 'published' and previous.get('run_id') == generation['run_id']
-                    and previous.get('attempt') == attempt and os.environ.get('BUILD_RUN_URL')
-                    and previous.get('job_url') == os.environ['BUILD_RUN_URL']):
-                print('published')  # This immutable upstream artifact was already committed.
-                return 0
-            publish(root, bundle, Path(args[4]).resolve(), row, generation, project)
-            copy_site(root)
-        except Exception as error:
-            print(f'Publication rejected: {error}', file=sys.stderr)
-            run('git', '-C', str(root), 'reset', '--hard', 'HEAD')
-            run('git', '-C', str(root), 'clean', '-fd')
-            status = 'superseded' if 'superseded' in str(error).lower() else 'failed'
-            result = 1
-        finally:
-            (bundle / 'context.json').write_bytes(original_context)
-            (bundle / 'sources.json').write_bytes(original_sources)
-        print(status)
-        return result
     else:
-        raise ValueError(f'Unknown publication operation: {command}')
-    write(root / 'status.json', state)
-    render(root, state)
-    return 0
+        root, bundle = (Path(p).resolve() for p in args[:2])
+        state = read(root / 'status.json', dict(repository='SNodeC/Packages', branch='main', counters={}, runs={}))
+        migrate(state)
+        context = read(bundle / 'context.json')
+        if state.get('repository') != context['destination'] or state['branch'] != 'main':
+            raise RuntimeError('Publication destination mismatch')
+        generation = record_run(bundle, state, context)
+        attempt = int(os.environ.get('BUILD_ATTEMPT') or os.environ.get('GITHUB_RUN_ATTEMPT', '1'))
+        if command == 'status':
+            target, project, status = args[2:5]
+            if target == '-' and project == '-' and status == 'pending':
+                for row in generation['targets']:
+                    for project in (p for p in generation['revisions'] if supports(p, row, read(bundle / 'profiles.json')[row['id']]['projects'])):
+                        profile = read(bundle / 'profiles.json')[row['id']]
+                        missing = missing_prerequisites(project, row, profile.get('baseline', {}), generation['revisions'], profile['projects']) if context.get('contract') == 3 else []
+                        error = profile.get('errors', {}).get(project)
+                        update(state, row, generation, project, 'unsatisfiable' if missing or error else status, 0)
+                        if error:
+                            generation['nodes'][row['id'] + '/' + project].update(category='excluded', reason=error)
+                        if missing:
+                            generation['nodes'][row['id'] + '/' + project].update(requires=list(dependencies(project, profile['projects'])), category='blocked', dependencies=binding(profile.get('baseline', {}), dependencies(project, profile['projects'])), reason='Missing prerequisite target or publication: ' + ', '.join(missing))
+            else:
+                update(state, json.loads(target), generation, project, status, attempt, os.environ.get('BUILD_RUN_URL'))
+            write(root / 'status.json', state)
+        elif command == 'feed':
+            row, project = json.loads(args[2]), args[3]
+            original_context, original_sources = (bundle / 'context.json').read_bytes(), (bundle / 'sources.json').read_bytes()
+            status = 'published'
+            try:
+                publish(root, bundle, Path(args[4]).resolve(), row, generation, project)
+            except Exception as error:
+                print(f'Publication rejected: {error}', file=sys.stderr)
+                run('git', '-C', str(root), 'reset', '--hard', 'HEAD')
+                run('git', '-C', str(root), 'clean', '-fd')
+                status = 'superseded' if 'superseded' in str(error).lower() else 'failed'
+                result = 1
+            finally:
+                (bundle / 'context.json').write_bytes(original_context)
+                (bundle / 'sources.json').write_bytes(original_sources)
+            if not result:
+                try:
+                    copy_site(root)
+                except (OSError, RuntimeError) as error:
+                    print(f'::warning::Guide update deferred: {error}', file=sys.stderr)
+            print(status)
+        else:
+            raise ValueError('Unknown publication operation: ' + command)
+    return result
 
 
 if __name__ == '__main__':

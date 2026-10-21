@@ -54,9 +54,10 @@ class PackagePagesTest(unittest.TestCase):
             info = existing
         publication.write(path, info)
 
-    def event(self, project, status, row=None, attempt=1, log='job-url'):
+    def event(self, project, status, row=None, attempt=1, log='https://github.com/SNodeC/snode.c/actions/runs/5/job/5'):
         with patch.dict(os.environ, EVENT_TIME='2026-10-10T11:00:00Z', EVENT_STAGE='publication' if status == 'published' else 'build'):
             publication.update(self.state, row or self.row, self.generation, project, status, attempt, log)
+        return None
 
     def text(self, package='snodec'):
         return (self.root / f'status/{package}.md').read_text()
@@ -135,37 +136,44 @@ class PackagePagesTest(unittest.TestCase):
 
     def test_build_log_selects_attempt_or_available_publication(self):
         self.feed(revision=5)
-        self.state['timeline'] = {self.key + '/snode.c': {'published': {'revision': '5', 'at': '2026-10-09T12:00:00Z', 'job_url': 'old-job'}}}
-        self.event('snode.c', 'running', log='new-job')
+        key = self.key + '/snode.c'
+        old = copy.deepcopy(self.generation)
+        old.update(run_id='old', revisions={'snode.c': '5'}, nodes={key: dict(status='published', attempt=1, job_url='https://github.com/SNodeC/snode.c/actions/runs/1/job/1', published=dict(revision='5', at='2026-10-09T12:00:00Z', job_url='https://github.com/SNodeC/snode.c/actions/runs/1/job/1'))})
+        self.state['runs']['old'] = old
+        self.event('snode.c', 'running', log='https://github.com/SNodeC/snode.c/actions/runs/2/job/2')
         publication.render(self.root, self.state)
-        self.assertIn('[Build log](new-job)', self.table_row())
+        self.assertIn('[Build log](https://github.com/SNodeC/snode.c/actions/runs/2/job/2)', self.table_row())
         self.assertIn('2026-10-09 12:00', self.table_row())
-        # An attempt for a previous revision is not In build for the latest release.
-        self.state['targets'][self.key + '/snode.c']['revision'] = '4'
+        self.generation['nodes'].pop(key)
+        old['nodes'][key]['status'] = 'running'
         publication.render(self.root, self.state)
-        self.assertIn('[Build log](old-job)', self.table_row())
+        self.assertIn('[Build log](https://github.com/SNodeC/snode.c/actions/runs/1/job/1)', self.table_row())
         self.assertNotIn('alt="running"', self.table_row())
-        del self.state['timeline'][self.key + '/snode.c']['published']['job_url']
+        old['nodes'][key]['published'].pop('job_url')
+        old['nodes'][key]['job_url'] = None
         publication.render(self.root, self.state)
         self.assertNotIn('[Build log]', self.table_row())
+        return None
 
     def test_publication_job_and_time_survive_later_attempt(self):
         self.feed()
-        self.event('snode.c', 'published', log='published-job')
-        self.assertEqual(self.state['timeline'][self.key + '/snode.c']['published']['job_url'], 'published-job')
-        self.generation = self.generation | dict(run_id='next', revisions={'snode.c': '10'})
+        self.event('snode.c', 'published', log='https://github.com/SNodeC/snode.c/actions/runs/4/job/4')
+        self.assertEqual(publication.projection(self.state)['timeline'][self.key + '/snode.c']['published']['job_url'], 'https://github.com/SNodeC/snode.c/actions/runs/4/job/4')
+        self.generation = copy.deepcopy(self.generation) | dict(run_id='next', revisions={'snode.c': '10'}, nodes={})
         self.state['runs']['next'] = self.generation
-        self.event('snode.c', 'running', log='next-job')
+        self.event('snode.c', 'running', log='https://github.com/SNodeC/snode.c/actions/runs/3/job/3')
         publication.render(self.root, self.state)
         self.assertIn('2026-10-10 11:00', self.table_row())
-        self.assertIn('[Build log](next-job)', self.table_row())
+        self.assertIn('[Build log](https://github.com/SNodeC/snode.c/actions/runs/3/job/3)', self.table_row())
+        return None
 
     def test_publication_without_job_id_never_borrows_previous_generation_job(self):
-        self.event('snode.c', 'published', log='old-job')
-        self.generation = self.generation | dict(run_id='next', run_url='new-run', revisions={'snode.c': '10'})
+        self.event('snode.c', 'published', log='https://github.com/SNodeC/snode.c/actions/runs/1/job/1')
+        self.generation = copy.deepcopy(self.generation) | dict(run_id='next', run_url='new-run', revisions={'snode.c': '10'}, nodes={})
         self.state['runs']['next'] = self.generation
         self.event('snode.c', 'published', log=None)
-        self.assertEqual(self.state['timeline'][self.key + '/snode.c']['published']['job_url'], 'new-run')
+        self.assertIsNone(publication.projection(self.state)['timeline'][self.key + '/snode.c']['published']['job_url'])
+        return None
 
     def test_unknown_latest_source_never_invents_attempt_version(self):
         self.generation['sources'] = {}
@@ -212,15 +220,16 @@ class PackagePagesTest(unittest.TestCase):
                 self.assertIn(f'<a id="{anchor}"></a>', self.text(package))
 
     def test_third_project_requires_only_registry_entry(self):
-        with patch.dict(repository.PROJECTS, {'new-project': dict(title='New project', package='new-package', depends_on=(), families=['linux', 'openwrt', 'raspberrypi'])}):
+        with patch.dict(repository.PROJECTS, {'new-project': dict(repository.PROJECTS['snode.c'], title='New project', package='new-package', depends_on=[])}):
             publication.render(self.root, self.state)
         self.assertTrue((self.root / 'status/new-package.md').exists())
         self.assertNotIn('alt="Catalog"', self.text('new-package'))
         (self.root / 'docs/catalogs/new-package.md').write_text('New catalog')
-        with patch.dict(repository.PROJECTS, {'new-project': dict(title='New project', package='new-package', depends_on=(), families=['linux', 'openwrt', 'raspberrypi'])}):
+        with patch.dict(repository.PROJECTS, {'new-project': dict(repository.PROJECTS['snode.c'], title='New project', package='new-package', depends_on=[])}):
             publication.render(self.root, self.state)
         for path in ['README.md', 'status/README.md']:
             self.assertIn('[New project](https://github.com/SNodeC/new-project#banner)', (self.root / path).read_text())
+        return None
 
 
 
@@ -244,9 +253,10 @@ class PackagePagesTest(unittest.TestCase):
         self.event('snode.c', 'publishing', attempt=2)
         with patch.dict(os.environ, EVENT_TIME='2026-10-10T12:00:00Z', EVENT_STAGE='publication'):
             publication.update(self.state, self.row, self.generation, 'snode.c', 'failed', 2)
-        event = self.state['timeline'][self.key + '/snode.c']['event']
+        event = publication.projection(self.state)['timeline'][self.key + '/snode.c']['event']
         self.assertEqual(event['stage'], 'publication')
         self.assertEqual(event['started_at'], '2026-10-10T11:00:00Z')
+        return None
 
 
 
@@ -339,7 +349,7 @@ class PackagePagesTest(unittest.TestCase):
         self.assertFalse(obsolete.exists())
         ns = '{http://www.w3.org/2000/svg}'
         badges = self.root / 'status/badges'
-        self.assertEqual(len(list(badges.glob('*.svg'))), 10)
+        self.assertEqual(len(list(badges.glob('*.svg'))), 11)
         for path in badges.glob('*.svg'):
             svg = ET.parse(path).getroot()
             self.assertEqual((svg.attrib['width'], svg.attrib['height'], svg.attrib['viewBox']), ('14', '14', '0 0 14 14'))
@@ -357,6 +367,23 @@ class PackagePagesTest(unittest.TestCase):
             self.assertIsNotNone(ET.parse(badges / f'{label}.svg').getroot().find(ns + 'path'))
         for label in ('current', 'outdated', 'skipped', 'running', 'publishing', 'failed', 'pending', 'superseded', 'not-built', 'cancelled'):
             self.assertEqual(self.text().count(f'alt="{label.replace("-", " ")}"'), 1)
+        return None
+
+    def test_released_rows_survive_head_matrix_removal_and_unreleased_rows_are_hidden(self):
+        config = copy.deepcopy(repository.PROJECTS['snode.c'])
+        config['title'] = 'Demo]\n|injected'
+        config['matrix'] = {'linux':[dict(distribution='debian',suite='trixie',image='debian:trixie',architectures=['amd64'])]}
+        config['build'] = {'native':'ci/package/native.sh'}
+        new = repository.rows(config)[0]
+        generation = dict(self.generation, targets=[self.row,new], revisions={'snode.c':'1'}, context={'contract':3,'projects':{'snode.c':config}}, sources={self.row['id']:{'snode.c':{'refs/tags/v1.0.0':'a'*40}}})
+        with patch.dict(repository.PROJECTS, repository.PROJECTS, clear=True):
+            publication.render(self.root, {'runs':{'capture':generation}})
+        page = (self.root/'status/snodec.md').read_text()
+        self.assertIn('### Debian sid', page)
+        self.assertIn('armhf', page)
+        self.assertNotIn('### Debian trixie', page)
+        self.assertNotIn('Demo]\n|injected', page)
+        return None
 
 
 if __name__ == '__main__':

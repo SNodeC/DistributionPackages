@@ -5,7 +5,7 @@ from pathlib import Path
 import shutil
 import tempfile
 
-from ci.repository import PROJECTS, ROOT, digest, run, signer, unchanged, publication_needed, project_file
+from ci.repository import PROJECTS, ROOT, digest, run, signer, unchanged, publication_needed, project_file, ownership
 
 
 def stage(row, packages, bundle, output):
@@ -14,7 +14,8 @@ def stage(row, packages, bundle, output):
     pool = directory / 'Packages'
     pool.mkdir(parents=True)
     project = json.loads((bundle / 'context.json').read_text())['build_project']
-    required = packages / (PROJECTS[project]['package'] + '.packages')
+    owners = ownership(dict(sources=json.loads((bundle / 'sources.json').read_text())))
+    required = packages / (owners[project]['package'] + '.packages')
     if not required.is_file():
         raise RuntimeError('Missing built project package inventory')
     expected = {name for inventory in packages.glob('*.packages') for name in inventory.read_text().splitlines()}
@@ -36,6 +37,7 @@ def stage(row, packages, bundle, output):
                 files={str(p.relative_to(directory)): digest(p) for p in directory.rglob('*') if p.is_file()})
     (directory / 'build.json').write_text(json.dumps(info, indent=2) + '\n')
     unchanged(bundle)
+    return None
 
 
 def publish(rows, incoming, checkout, bundle):
@@ -56,12 +58,13 @@ def publish(rows, incoming, checkout, bundle):
         if not publication_needed(previous, info):
             continue
         project = info['context']['build_project']
+        owners = ownership(info)
         pool = directory / 'Packages'
         with signer() as home:
             key = next(line.split(':')[9] for line in run('gpg', '--homedir', home, '--with-colons',
                                                          '--list-secret-keys').splitlines() if line.startswith('fpr:'))
             for package in pool.glob('*.rpm'):
-                if not project_file(package.name, project):
+                if not project_file(package.name, project, owners):
                     continue
                 run('rpmsign', '--define', f'_gpg_name {key}', '--define', f'_gpg_path {home}',
                     '--define', '_gpgbin /usr/bin/gpg', '--define', '_gpg_digest_algo sha256',
@@ -101,3 +104,4 @@ def publish(rows, incoming, checkout, bundle):
         relative = Path(row['distribution']) / row['suite'] / row['arch']
         shutil.copytree(incoming / relative, checkout / relative, dirs_exist_ok=True)
     unchanged(bundle)
+    return None

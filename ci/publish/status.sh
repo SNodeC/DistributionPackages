@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Shared metadata transaction: allocation is required; status delivery is best-effort.
+# Required metadata transaction; only automatic page projection is best-effort.
 set -euo pipefail
 root=$1
 command=$2
 shift 2
 export EVENT_TIME="${EVENT_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
-[[ "$command" = reserve || "$command" = render ]] || trap 'result=$?; if [ "$result" != 0 ]; then echo "::warning::Package status update failed (exit $result); continuing"; fi; exit 0' EXIT
+[[ "$command" != project ]] || trap 'result=$?; if [ "$result" != 0 ]; then echo "::warning::Package page rendering deferred (exit $result)"; fi; exit 0' EXIT
 if [ -n "${PACKAGES_TOKEN:-}" ]; then
     export GIT_CONFIG_COUNT=1
     export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
