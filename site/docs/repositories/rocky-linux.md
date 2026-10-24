@@ -38,7 +38,7 @@ sudo dnf config-manager --set-enabled crb
 
 These commands configure the signed repository without installing application packages.
 
-APT and RPM repositories use the same signing key. Its download filename is `snodec-apt.asc`; the commands below install it under the RPM-specific name `RPM-GPG-KEY-snodec`.
+APT and RPM repositories use the same signing key. Its download filename is `apt.asc`; the commands below install it under the RPM-specific name `RPM-GPG-KEY-snodec`.
 
 ```sh
 (
@@ -59,7 +59,7 @@ APT and RPM repositories use the same signing key. Its download filename is `sno
   trap 'rm -rf "$tmp"' EXIT HUP INT TERM
   base=https://raw.githubusercontent.com/SNodeC/Packages/main
   curl -fsSL "$base/rocky/$suite/$arch/repodata/repomd.xml" -o "$tmp/index"
-  curl -fsSL "$base/keys/snodec-apt.asc" -o "$tmp/key"
+  curl -fsSL "$base/keys/apt.asc" -o "$tmp/key"
   sudo install -d -m 755 /etc/pki/rpm-gpg /etc/yum.repos.d
   sudo install -m 644 "$tmp/key" /etc/pki/rpm-gpg/RPM-GPG-KEY-snodec
   sudo rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-snodec

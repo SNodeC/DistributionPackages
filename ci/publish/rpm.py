@@ -5,7 +5,8 @@ from pathlib import Path
 import shutil
 import tempfile
 
-from ci.repository import PROJECTS, ROOT, digest, run, signer, unchanged, publication_needed, project_file
+from ci.repository import (PROJECTS, ROOT, digest, run, signer, unchanged, publication_needed, project_file,
+                           ownership, release_view, source_tag, validate_package, package_metadata, package_version)
 
 
 def stage(row, packages, bundle, output):
@@ -14,19 +15,24 @@ def stage(row, packages, bundle, output):
     pool = directory / 'Packages'
     pool.mkdir(parents=True)
     project = json.loads((bundle / 'context.json').read_text())['build_project']
-    required = packages / (PROJECTS[project]['package'] + '.packages')
+    owners = ownership(dict(sources=json.loads((bundle / 'sources.json').read_text())))
+    required = packages / (owners[project]['package'] + '.packages')
     if not required.is_file():
         raise RuntimeError('Missing built project package inventory')
     expected = {name for inventory in packages.glob('*.packages') for name in inventory.read_text().splitlines()}
     names = set()
     versions = {}
+    context = json.loads((bundle / 'context.json').read_text())
+    expected_version = json.loads((bundle / 'baseline.json').read_text()).get('versions', {})
+    expected_version[project] = package_version(row, context['versions'][project], os.environ['PACKAGE_RELEASE'])
     for package in packages.glob('*.rpm'):
-        name, arch = run('rpm', '-qp', '--qf', '%{NAME} %{ARCH}', str(package)).split()
+        fields = package_metadata(package)
+        name, arch = fields['name'], fields['arch']
         if arch != row['arch'] or name in names:
             raise RuntimeError(f'Unexpected RPM: {name}/{arch}')
         names.add(name)
-        if name in {config['package'] for config in PROJECTS.values()}:
-            versions[name] = run('rpm', '-qp', '--qf', '%{VERSION}-%{RELEASE}', str(package))
+        owner = validate_package(owners, expected_version, package.name, fields, row)
+        versions[owner] = fields['version']
         shutil.copy2(package, pool / package.name)
     if names != expected:
         raise RuntimeError('Incomplete RPM component inventory')
@@ -36,6 +42,7 @@ def stage(row, packages, bundle, output):
                 files={str(p.relative_to(directory)): digest(p) for p in directory.rglob('*') if p.is_file()})
     (directory / 'build.json').write_text(json.dumps(info, indent=2) + '\n')
     unchanged(bundle)
+    return None
 
 
 def publish(rows, incoming, checkout, bundle):
@@ -56,12 +63,14 @@ def publish(rows, incoming, checkout, bundle):
         if not publication_needed(previous, info):
             continue
         project = info['context']['build_project']
+        owners = ownership(info)
         pool = directory / 'Packages'
         with signer() as home:
             key = next(line.split(':')[9] for line in run('gpg', '--homedir', home, '--with-colons',
                                                          '--list-secret-keys').splitlines() if line.startswith('fpr:'))
             for package in pool.glob('*.rpm'):
-                if not project_file(package.name, project):
+                if (not project_file(package.name, project, owners)
+                        or str(package.relative_to(directory)) not in release_view(info, project, source_tag(info, project))['files']):
                     continue
                 run('rpmsign', '--define', f'_gpg_name {key}', '--define', f'_gpg_path {home}',
                     '--define', '_gpgbin /usr/bin/gpg', '--define', '_gpg_digest_algo sha256',
@@ -75,7 +84,7 @@ def publish(rows, incoming, checkout, bundle):
                          for p in directory.rglob('*') if p.is_file() and p.name != 'build.json'}
         (directory / 'build.json').write_text(json.dumps(info, indent=2) + '\n')
         with tempfile.TemporaryDirectory() as home:
-            key = str(ROOT / 'keys/snodec-apt.asc')
+            key = str(ROOT / 'keys/apt.asc')
             run('gpg', '--homedir', home, '--batch', '--import', key)
             index = directory / 'repodata/repomd.xml'
             run('gpg', '--homedir', home, '--batch', '--verify', str(index) + '.asc', str(index))
@@ -94,10 +103,11 @@ def publish(rows, incoming, checkout, bundle):
                 if arch != row['arch']:
                     raise RuntimeError('RPM architecture mismatch')
                 names.append(package)
-            if sorted(names) != info['packages']:
+            if sorted(set(names)) != info['packages']:
                 raise RuntimeError('Unexpected RPM inventory')
         changed.append(row)
     for row in changed:
         relative = Path(row['distribution']) / row['suite'] / row['arch']
         shutil.copytree(incoming / relative, checkout / relative, dirs_exist_ok=True)
     unchanged(bundle)
+    return None

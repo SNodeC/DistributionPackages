@@ -7,40 +7,38 @@ import shutil
 import sys
 import tempfile
 
-from ci.repository import PROJECTS, ROOT, digest, run, unchanged, linux_matrix, signer, publication_needed
+from ci.repository import (PROJECTS, rows, ROOT, digest, run, unchanged, signer, publication_needed,
+                           ownership, COORDINATOR, validate_package, package_metadata, package_version)
 
 
-def suites(distribution='raspberrypios'):
-    if distribution == 'raspberrypios':
-        return json.loads((ROOT / 'ci/targets/raspberrypi.json').read_text())
-    return {row['suite']: row['image'] for row in linux_matrix() if row['distribution'] == distribution}
-
-
-def architectures(distribution, suite):
-    return ['arm64'] if distribution == 'raspberrypios' else sorted(
-        row['arch'] for row in linux_matrix() if row['distribution'] == distribution and row['suite'] == suite)
+def images(distribution, project):
+    return {(row['suite'], row['arch']): row['build'].get('image', row['build']) for row in rows(PROJECTS[project]) if row['distribution'] == distribution}
 
 
 def stage(suite, packages, bundle, output, distribution='raspberrypios'):
-    image = suites(distribution)[suite]
+    project = json.loads((bundle / 'context.json').read_text())['build_project']
+    supported = images(distribution, project)
     unchanged(bundle)
     names = set()
     versions = {}
     by_arch = {}
+    context = json.loads((bundle / 'context.json').read_text())
+    owners = ownership(dict(sources=json.loads((bundle / 'sources.json').read_text())))
+    row = dict(distribution=distribution, suite=suite)
+    expected_version = json.loads((bundle / 'baseline.json').read_text()).get('versions', {})
+    expected_version[project] = package_version(row, context['versions'][project], os.environ['PACKAGE_RELEASE'])
     for package in packages.glob('*.deb'):
-        name, architecture = run('dpkg-deb', '-f', str(package), 'Package', 'Architecture').splitlines()
-        name = name.removeprefix('Package: ')
-        architecture = architecture.removeprefix('Architecture: ')
+        fields = package_metadata(package)
+        name, architecture = fields['name'], fields['arch']
         if (name, architecture) in names:
             raise RuntimeError(f'Duplicate Debian package: {name}')
         names.add((name, architecture))
-        if name in {config['package'] for config in PROJECTS.values()}:
-            versions[name] = run('dpkg-deb', '-f', str(package), 'Version')
+        owner = validate_package(owners, expected_version, package.name, fields, row)
+        versions[owner] = fields['version']
         by_arch.setdefault(architecture, set()).add(name)
-        if architecture not in architectures(distribution, suite):
+        if (suite, architecture) not in supported:
             raise RuntimeError(f'Unexpected architecture: {architecture}')
-    project = json.loads((bundle / 'context.json').read_text())['build_project']
-    required = packages / (PROJECTS[project]['package'] + '.packages')
+    required = packages / (owners[project]['package'] + '.packages')
     if not required.is_file():
         raise RuntimeError('Missing built project package inventory')
     expected = {name for inventory in packages.glob('*.packages') for name in inventory.read_text().splitlines()}
@@ -49,6 +47,7 @@ def stage(suite, packages, bundle, output, distribution='raspberrypios'):
     if len(by_arch) != 1:
         raise RuntimeError('Build artifact must contain exactly one architecture')
     arch = next(iter(by_arch))
+    image = supported[suite, arch]
     target = output / distribution / suite / arch
     target.mkdir(parents=True)
     for path in [*packages.glob('*.deb'), *packages.glob('*.packages')]:
@@ -60,6 +59,7 @@ def stage(suite, packages, bundle, output, distribution='raspberrypios'):
                 files={p.name: digest(p) for p in target.iterdir() if p.is_file()})
     (target / 'build.json').write_text(json.dumps(info, indent=2) + '\n')
     unchanged(bundle)
+    return None
 
 
 def index(apt, suite, by_arch):
@@ -80,7 +80,7 @@ def index(apt, suite, by_arch):
                   '-o', f'APT::FTPArchive::Release::Suite={suite}',
                   '-o', 'APT::FTPArchive::Release::Architectures=' + ' '.join(sorted(by_arch)),
                   '-o', 'APT::FTPArchive::Release::Components=main',
-                  '-o', 'APT::FTPArchive::Release::Origin=SNodeC',
+                  '-o', f'APT::FTPArchive::Release::Origin={COORDINATOR}',
                   '-o', 'APT::FTPArchive::Release::Acquire-By-Hash=yes',
                   'release', f'dists/{suite}', cwd=apt)
     (dist / 'Release').write_text(release + '\n')
@@ -90,46 +90,28 @@ def index(apt, suite, by_arch):
                 '--output', str(dist / filename), option, str(dist / 'Release'))
 
     with tempfile.TemporaryDirectory() as home:
-        run('gpg', '--homedir', home, '--batch', '--import', str(ROOT / 'keys/snodec-apt.asc'))
+        run('gpg', '--homedir', home, '--batch', '--import', str(ROOT / 'keys/apt.asc'))
         run('gpg', '--homedir', home, '--batch', '--verify', str(dist / 'InRelease'))
         run('gpg', '--homedir', home, '--batch', '--verify', str(dist / 'Release.gpg'), str(dist / 'Release'))
 
 
 def active_targets(base, suite):
-    """Read per-architecture generations; import older suite inventories once."""
+    """Validate and read canonical per-architecture inventories."""
     manifest = base / 'dists' / suite / 'build.json'
-    if not manifest.exists():
-        return {}
-    previous = json.loads(manifest.read_text())
+    previous = json.loads(manifest.read_text()) if manifest.exists() else dict(files={}, targets={})
     for name, checksum in previous['files'].items():
         path = Path(name)
         if path.is_absolute() or '..' in path.parts or digest(base / path) != checksum:
             raise RuntimeError(f'Existing APT inventory mismatch: {name}')
-    if 'targets' in previous:
-        return previous['targets']
-    targets = {}
-    for arch in previous['architectures']:
-        records = (base / 'dists' / suite / f'main/binary-{arch}/Packages').read_text().split('\n\n')
-        files, names = {}, []
-        for record in records:
-            fields = dict(line.split(': ', 1) for line in record.splitlines() if ': ' in line and not line.startswith(' '))
-            if not fields:
-                continue
-            filename = fields['Filename']
-            if fields['Architecture'] != arch or previous['files'].get(filename) != fields['SHA256']:
-                raise RuntimeError('Cannot import existing APT index into architecture inventory')
-            files[Path(filename).name] = fields['SHA256']
-            names.append(fields['Package'])
-        targets[arch] = dict(distribution=previous['distribution'], suite=suite,
-                             image=previous['image'], architectures=[arch], packages=sorted(names),
-                             revision=previous['revision'], sources=previous['sources'],
-                             context=previous['context'], files=files)
-    return targets
+    return previous['targets']
+
 
 
 def publish(incoming, checkout, bundle, distribution='raspberrypios'):
     unchanged(bundle)
-    expected = {(suite, arch) for suite in suites(distribution) for arch in architectures(distribution, suite)}
+    project = json.loads((bundle / 'context.json').read_text())['build_project']
+    supported = images(distribution, project)
+    expected = set(supported)
     found = {p.parent.relative_to(incoming / distribution).parts
              for p in (incoming / distribution).glob('*/*/build.json')}
     if not found or not found <= expected:
@@ -146,7 +128,7 @@ def publish(incoming, checkout, bundle, distribution='raspberrypios'):
                     or info['context'] != json.loads((bundle / 'context.json').read_text())):
                 raise RuntimeError('Mixed source generations')
             if (info['suite'] != suite or info['distribution'] != distribution
-                    or info['architectures'] != [arch] or info['image'] != suites(distribution)[suite]):
+                    or info['architectures'] != [arch] or info['image'] != supported[suite, arch]):
                 raise RuntimeError('Unexpected APT target')
             names = []
             for name, checksum in info['files'].items():
@@ -162,7 +144,7 @@ def publish(incoming, checkout, bundle, distribution='raspberrypios'):
                     if existing.exists() and digest(existing) != checksum:
                         raise RuntimeError(f'Refusing to replace existing package bytes: {name}')
                     incoming_packages[name] = path
-            if sorted(names) != info['packages']:
+            if sorted(set(names)) != info['packages']:
                 raise RuntimeError('Incomplete Debian package set')
             if arch in targets and not publication_needed(targets[arch], info):
                 continue
@@ -195,6 +177,7 @@ def publish(incoming, checkout, bundle, distribution='raspberrypios'):
             # Keep old .debs and by-hash indexes for clients with cached metadata.
             shutil.copytree(apt, base, dirs_exist_ok=True)
     unchanged(bundle)
+    return None
 
 
 if __name__ == '__main__':

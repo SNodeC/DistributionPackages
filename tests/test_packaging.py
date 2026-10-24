@@ -7,31 +7,55 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from support import PinnedJsonCase
 from unittest.mock import patch
 
 from ci import repository
 from ci.publish import cleanup, publication
 
 
-class PackagingTest(unittest.TestCase):
+class PackagingTest(PinnedJsonCase):
     def test_complete_matrix_and_dependency_files(self):
         rows = publication.targets()
         self.assertEqual(len(rows), 76)
         self.assertEqual(len({r['id'] for r in rows}), 76)
-        self.assertEqual({r['build_slot'] for r in rows}, set(range(19)))
+        self.assertTrue(all('build_slot' not in r for r in rows))
         self.assertEqual(sum(r['family'] == 'openwrt' for r in rows), 50)
         self.assertEqual(sum(r['family'] == 'raspberrypi' for r in rows), 2)
         self.assertEqual(sum(r['family'] == 'linux' for r in rows), 24)
         for row in rows:
-            if row['family'] == 'linux' and row['arch'] in {'armhf', 'riscv64'}:
-                self.assertEqual(row['build_slot'], 0 if row['arch'] == 'armhf' else 1)
-            else:
-                self.assertIn(row['build_slot'], range(2, 19))
             self.assertEqual(len(publication.feed_paths(row)),
                              2 if row['distribution'] in {'debian', 'ubuntu', 'raspberrypios'} else 1)
         for name in ['snodec-openwrt-build-deps-2.0.0-r124.tar.zst', 'snodec-core_2.0.0-124~trixie_arm64.deb']:
             self.assertTrue(repository.project_file(name, 'snode.c'))
             self.assertFalse(repository.project_file(name, 'mqttsuite'))
+        return None
+
+    def test_sdk_export_cli_preserves_relative_operands_and_rejects_escape(self):
+        import sys
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sdk, bundle = root / 'sdk', root / 'bundle'
+            recipe = sdk / 'recipes/snode.c'
+            recipe.mkdir(parents=True)
+            (recipe / 'Makefile').write_text('captured recipe')
+            publication.write(sdk / 'ci-sdk.json', dict(release='24.10.8', arch='x86_64'))
+            publication.write(bundle / 'context.json', dict(build_project='snode.c', versions={'snode.c': '2.0.0'}))
+            env = os.environ | dict(PYTHONPATH=str(repository.ROOT), PACKAGE_RELEASE='9', PYTHONDONTWRITEBYTECODE='1')
+            command = [sys.executable, '-m', 'ci.repository', 'sdk-export', str(sdk), str(bundle)]
+            result = subprocess.run(command + ['recipes/snode.c'], cwd=sdk, env=env, text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            archive = sdk / 'snodec-openwrt-build-deps-2.0.0-r9.tar.zst'
+            names = subprocess.check_output(['tar', '--zstd', '-tf', str(archive)], text=True).splitlines()
+            self.assertEqual(set(names), {'sdk-development.json', 'recipes/snode.c/', 'recipes/snode.c/Makefile'})
+            original = repository.digest(archive)
+            for operand in [str(recipe), '../outside-sdk']:
+                with self.subTest(operand=operand):
+                    result = subprocess.run(command + [operand], cwd=sdk, env=env, text=True, capture_output=True)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn('Development export paths must stay inside the SDK', result.stderr)
+                    self.assertEqual(repository.digest(archive), original)
+        return None
 
     def test_openwrt_uses_captured_recipe_and_published_dependency_recipe(self):
         import shutil
@@ -41,7 +65,7 @@ class PackagingTest(unittest.TestCase):
             feed, bundle, dependencies = (root / name for name in ('feed', 'bundle', 'dependencies'))
             shutil.copytree(repository.ROOT / 'ci', feed / 'ci')
             (feed / 'keys').mkdir()
-            for name in ('snodec-opkg.pub', 'snodec-apk.pem'):
+            for name in ('opkg.pub', 'apk.pem'):
                 (feed / 'keys' / name).write_text('test public key')
             # A stale recipe next to the CI tools must never be selected.
             (feed / 'net/snode.c').mkdir(parents=True)
@@ -58,7 +82,7 @@ class PackagingTest(unittest.TestCase):
             for path in binary.iterdir():
                 path.chmod(0o755)
             env = os.environ | {'PATH': str(binary) + ':' + os.environ['PATH'],
-                                'PACKAGE_RELEASE': '1',
+                                'PACKAGE_RELEASE': '1', 'PACKAGE_COORDINATOR': 'SNodeC/DistributionPackages',
                                 'PYTHONDONTWRITEBYTECODE': '1'}
             info = dict(release='25.12.5', target='mediatek/filogic', arch='aarch64_cortex-a53', sha256='sdk')
             baseline = {}
@@ -71,6 +95,9 @@ class PackagingTest(unittest.TestCase):
                     (recipe / 'Config.in').write_text('config for ' + project)
                     (recipe / 'files/helper.sh').write_text('#!/bin/sh\nexit 0\n')
                     (recipe / 'files/helper.sh').chmod(0o755)
+                    hook = source / repository.PROJECTS[project]['build']['openwrt']
+                    hook.parent.mkdir(parents=True)
+                    hook.write_text(f'cp -a source/{parent}/openwrt/. recipes/{project}/\ncompile() {{ return 0; }}\n')
                     archive = bundle / (project + '-2.0.0.tar.gz')
                     repository.run('tar', '-czf', str(archive), '--exclude=.git',
                                    f'--transform=s,^,{project}-2.0.0/,', '-C', str(source), '.')
@@ -78,7 +105,9 @@ class PackagingTest(unittest.TestCase):
                     (sdk / 'staging_dir').mkdir()
                     (sdk / 'feeds.conf.default').write_text('')
                     (sdk / 'scripts/feeds').write_text(
-                        '#!/bin/sh\nset -eu\ntest -f "recipes/$BUILD_PROJECT/Makefile"\n'
+                        '#!/bin/sh\nset -eu\n'
+                        "awk '/^src-/ { if ($2 !~ /^[A-Za-z0-9_]+$/) { exit 25 } }' feeds.conf || exit 25\n"
+                        'test -f "recipes/$BUILD_PROJECT/Makefile"\n'
                         'if [ "$BUILD_PROJECT" = mqttsuite ]; then\n'
                         '  test -f recipes/snode.c/Makefile\n'
                         '  test -f staging_dir/target-test/usr/include/snodec.h\nfi\n')
@@ -88,16 +117,17 @@ class PackagingTest(unittest.TestCase):
                     publication.write(bundle / 'context.json', dict(build_project=project,
                                       versions={project: '2.0.0'}, source_tags={project: 'v2.0.0'}))
                     result = subprocess.run(['bash', str(feed / 'ci/build/openwrt.sh'), str(feed),
-                                             str(bundle), str(sdk)], env=env | {'BUILD_PROJECT': project},
+                                             str(bundle), str(sdk)], env=env | {'BUILD_PROJECT': project, 'GITHUB_REPOSITORY': 'SNodeC/'+project,
+                                                'PACKAGE_REQUEST': json.dumps({'definitions': {'snode.c': {'_commit': 'a'*40, 'package': 'snodec'}}})},
                                             text=True, capture_output=True)
                     self.assertEqual(result.returncode, 37, result.stderr)
                     self.assertEqual((sdk / 'recipes' / project / 'Makefile').read_text(), 'captured ' + project)
                     self.assertEqual((sdk / 'recipes' / project / 'Config.in').read_bytes(), (recipe / 'Config.in').read_bytes())
                     self.assertEqual((sdk / 'recipes' / project / 'files/helper.sh').stat().st_mode & 0o777, 0o755)
-                    self.assertIn(f'src-link snodec {sdk}/recipes', (sdk / 'feeds.conf').read_text())
+                    self.assertIn(f'src-link package_ci {sdk}/recipes', (sdk / 'feeds.conf').read_text())
                     selections = [line for line in (sdk / '.config').read_text().splitlines()
                                   if line.startswith('CONFIG_PACKAGE_')]
-                    self.assertEqual(selections, ['CONFIG_PACKAGE_' + project.replace('.', '') + '=m'])
+                    self.assertEqual(selections, ['CONFIG_PACKAGE_' + repository.PROJECTS[project]['package'] + '=m'])
                     self.assertFalse((sdk / 'key-build').exists())
                     self.assertFalse((sdk / 'private-key.pem').exists())
                     self.assertIn('# CONFIG_SIGNED_PACKAGES is not set', (sdk / '.config').read_text())
@@ -109,16 +139,18 @@ class PackagingTest(unittest.TestCase):
                         (target / 'usr/lib/snodec.cmake').write_text(str(sdk) + '/staging_dir/target-test/usr/lib')
                         (target / 'pkginfo/snodec.provides').write_text('libsnodec.so')
                         with patch.dict(os.environ, {'PACKAGE_RELEASE': '1'}):
-                            repository.sdk_dependency(sdk, bundle, dependencies)
+                            repository.sdk_export(sdk, bundle, 'recipes/snode.c', 'staging_dir/target-test/usr/include', 'staging_dir/target-test/usr/lib', 'staging_dir/target-test/pkginfo/snodec.provides')
                         archive, = sdk.glob('snodec-openwrt-build-deps-*.tar.zst')
                         shutil.copy2(archive, dependencies / archive.name)
-                        baseline = info | {'files': {archive.name: repository.digest(archive)}}
+                        baseline = info | {'files': {archive.name: repository.digest(archive)},
+                                           'sources': {'snode.c': {'refs/tags/v2.0.0': 'a'*40}}}
                     else:
                         self.assertEqual((sdk / 'recipes/snode.c/Makefile').read_text(), 'captured snode.c')
                         self.assertEqual((sdk / 'staging_dir/target-test/usr/lib/snodec.cmake').read_text(),
                                          str(sdk) + '/staging_dir/target-test/usr/lib')
                         self.assertEqual((sdk / 'staging_dir/target-test/pkginfo/snodec.provides').read_text(), 'libsnodec.so')
                         self.assertEqual(sorted(p.name for p in (sdk / 'recipes').iterdir()), ['mqttsuite', 'snode.c'])
+        return None
 
     def test_status_render_is_immutable_and_does_not_copy_documentation(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -127,60 +159,41 @@ class PackagingTest(unittest.TestCase):
             (root / 'status/old-target.svg').write_text('obsolete')
             publication.render(root, {'targets': {}})
             before = {p.name: p.read_bytes() for p in (root / 'status/badges').iterdir()}
-            self.assertEqual(set(before), {label + ".svg" for label in ["current", "outdated", "pending", "running", "publishing", "failed", "cancelled", "skipped", "superseded", "not-built"]})
+            self.assertEqual(set(before), {label + ".svg" for label in ["waiting", "blocked", "pending", "running", "publishing",
+                "failed", "cancelled", "skipped", "superseded", "unsatisfiable", "not-built"]})
             self.assertNotIn("published.svg", before)
             for name, svg in before.items():
                 self.assertIn(b'width="14" height="14"', svg)
                 self.assertIn(b'<circle cx="7" cy="7"', svg)
-                radius = b'r="5.25"' if name in {'pending.svg', 'superseded.svg', 'not-built.svg', 'cancelled.svg', 'skipped.svg'} else b'r="6"'
+                radius = b'r="5.25"' if name in {'pending.svg', 'superseded.svg', 'not-built.svg', 'cancelled.svg', 'skipped.svg', 'unsatisfiable.svg'} else b'r="6"'
                 self.assertIn(radius, svg)
             (root / 'status/badges/pending.svg').write_text('previous badge design')
             self.assertFalse((root / 'status/old-target.svg').exists())
             state = dict(targets={})
             row = publication.targets()[0]
-            generation = dict(revisions={'snode.c':'1'},run_id='one',run_url='url')
+            generation = dict(revisions={'snode.c':'1'},run_id='one',run_url='url', context=dict(tag='v1.0.0',
+                release_project='snode.c', projects={'snode.c': repository.PROJECTS['snode.c']}))
             publication.update(state,row,generation,'snode.c','running',1)
             publication.render(root,state)
             self.assertEqual(before,{p.name:p.read_bytes() for p in (root/'status/badges').iterdir()})
             text=(root/'status/snodec.md').read_text()
             self.assertIn('alt="running"', text)
-            self.assertIn('| Architecture | Available | Published (UTC) | In build | Links |', text)
-            self.assertEqual(text.count('| Architecture | Available | Published (UTC) | In build | Links |'),
+            self.assertIn('<th>Architecture</th><th>Available</th><th>Published (UTC)</th><th>In build</th><th>Links</th>', text)
+            self.assertEqual(text.count('<th>Architecture</th><th>Available</th><th>Published (UTC)</th><th>In build</th><th>Links</th>'),
                              len({(r['distribution'], r['suite']) for r in publication.targets()}))
-            self.assertEqual(sum(line.startswith('| '+chr(96)) for line in text.splitlines()),
+            self.assertEqual(sum(line.startswith('<tr><td ') for line in text.splitlines()),
                              len(publication.targets()))
             self.assertIn('### Debian trixie', text)
             self.assertIn('<a id="debian-trixie"></a>', text)
             self.assertNotIn('## Needs attention', text)
-            self.assertIn('latest release —', text)
+            self.assertIn('latest release 1.0.0', text)
             self.assertFalse((root/'docs/status.md').exists())
             self.assertIn('snodec.md#banner', (root/'status/README.md').read_text())
             self.assertFalse((root/'README.md').exists())
             self.assertFalse((root/'install').exists())
+        return None
 
 
-    def test_key_rename_keeps_legacy_download_identical_at_publication(self):
-        import shutil
-        with tempfile.TemporaryDirectory() as temporary:
-            root, bundle, incoming = (Path(temporary) / name for name in ('root', 'bundle', 'incoming'))
-            row = publication.targets()[0]
-            profile = dict(baseline={}, sources={}, context={'build_project': 'snode.c', 'release_project': 'snode.c', 'source_tags': {'snode.c': 'v2.0.0'}, 'versions': {'snode.c': '2.0.0'}})
-            publication.write(bundle / 'profiles.json', {row['id']: profile})
-            metadata = dict(revision='1', sources=profile['sources'], context=profile['context'], files={})
-            publication.write(incoming / 'openwrt' / row['suite'] / row['arch'] / 'build.json', metadata)
-            generation = dict(revisions={'snode.c': '1'}, profiles_hash=repository.digest(bundle / 'profiles.json'))
-            def copy_feed(*args):
-                shutil.copytree(incoming / 'openwrt', root / 'openwrt')
-            with patch.object(publication, 'select', return_value=profile), patch.object(repository, 'publish', side_effect=copy_feed), patch.object(cleanup, 'cleanup'):
-                publication.publish(root, bundle, incoming, row, generation, 'snode.c')
-            # Authored presentation is now handed off by the shared helper used
-            # by the full feed transaction and explicit documentation rendering.
-            publication.copy_site(root)
-            canonical = (repository.ROOT / 'keys/snodec-opkg.pub').read_bytes()
-            self.assertEqual((root / 'keys/snodec-opkg.pub').read_bytes(), canonical)
-            self.assertEqual((root / 'keys/snodec-usign.pub').read_bytes(), canonical)
-            self.assertTrue((root / 'keys/README.md').exists())
-            self.assertFalse((repository.ROOT / 'keys/snodec-usign.pub').exists())
 
     def test_native_cpack_consumes_shared_version_policy_without_changing_formats(self):
         source = (repository.ROOT / 'ci/build/native.sh').read_text()
@@ -238,19 +251,15 @@ class PackagingTest(unittest.TestCase):
             self.assertNotEqual(subprocess.run(['sh', str(script), '--prepare'], capture_output=True).returncode, 0)
             self.assertEqual(subprocess.run(['sh', str(script), '--prepare', '--suite', '25.12'], capture_output=True).returncode, 0)
 
-    def test_revision_floor_rejects_downgrade_before_source_download(self):
-        row = publication.targets()[0]
-        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {
-            'RELEASE_PROJECT': 'mqttsuite', 'RELEASE_TAG': 'v1.0.2',
-            'GITHUB_RUN_ID': 'new'}), \
-                patch.object(publication, 'targets', return_value=[row]), \
-                patch.object(publication, 'published', return_value=({'revision': '121', 'versions': {'mqttsuite': '1.0.2-r121'}}, 'feed')), \
-                patch.object(repository, 'run', return_value='recipe-commit'), \
-                patch.object(repository, 'sources') as fetch:
-            (Path(directory) / 'status.json').write_text(json.dumps({'allocations': {'new': {'mqttsuite': '120'}}}))
-            with self.assertRaisesRegex(RuntimeError, 'Package revision must exceed'):
-                repository.prepare(Path(directory), Path(directory) / 'bundle')
-            fetch.assert_not_called()
+    def test_revision_floor_rejects_downgrade_before_publication(self):
+        source = {'snode.c': {'refs/tags/v1.0.2': 'a' * 40}}
+        context = dict(build_project='snode.c', source_tags={'snode.c': 'v1.0.2'})
+        previous = dict(revision='121', context=context, sources=source, files={}, unsigned_files={})
+        current = dict(releases={'snode.c': {'v1.0.2': previous}})
+        incoming = previous | dict(revision='120')
+        with self.assertRaisesRegex(RuntimeError, 'Superseded publication'):
+            repository.publication_needed(current, incoming)
+        return None
 
     def test_independent_reservations_survive_retries_and_cancelled_runs(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -258,21 +267,21 @@ class PackagingTest(unittest.TestCase):
             publication.write(root / 'status.json', {'counters': {'snode.c': 128, 'mqttsuite': 129}})
             self.assertEqual(publication.reserve(root, 'mqttsuite', 'one'), {'mqttsuite': '130'})
             self.assertEqual(publication.read(root / 'status.json')['counters'], {'snode.c': 128, 'mqttsuite': 130})
-            self.assertEqual(publication.reserve(root, 'snode.c', 'two'), {'snode.c': '129', 'mqttsuite': '131', 'snode.c-idp': '1'})
+            self.assertEqual(publication.reserve(root, 'snode.c', 'two'), {'snode.c': '129'})
             before = (root / 'status.json').read_bytes()
             self.assertEqual(publication.reserve(root, 'mqttsuite', 'one'), {'mqttsuite': '130'})
             self.assertEqual((root / 'status.json').read_bytes(), before)
-            self.assertEqual(publication.reserve(root, 'mqttsuite', 'three'), {'mqttsuite': '132'})
-            self.assertEqual(publication.read(root / 'status.json')['counters'], {'snode.c': 129, 'mqttsuite': 132, 'snode.c-idp': 1})
+            self.assertEqual(publication.reserve(root, 'mqttsuite', 'three'), {'mqttsuite': '131'})
+            self.assertEqual(publication.read(root / 'status.json')['counters'], {'snode.c': 129, 'mqttsuite': 131})
             with self.assertRaisesRegex(RuntimeError, 'release project'):
                 publication.reserve(root, 'snode.c', 'one')
-            self.assertEqual(publication.read(root / 'status.json')['counters'], {'snode.c': 129, 'mqttsuite': 132, 'snode.c-idp': 1})
+            self.assertEqual(publication.read(root / 'status.json')['counters'], {'snode.c': 129, 'mqttsuite': 131})
 
     def test_fresh_repository_allocates_revision_one(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            self.assertEqual(publication.reserve(root, 'snode.c', 'first'), {'snode.c': '1', 'mqttsuite': '1', 'snode.c-idp': '1'})
-            self.assertEqual(publication.read(root / 'status.json')['counters'], {'snode.c': 1, 'mqttsuite': 1, 'snode.c-idp': 1})
+            self.assertEqual(publication.reserve(root, 'snode.c', 'first'), {'snode.c': '1'})
+            self.assertEqual(publication.read(root / 'status.json')['counters'], {'snode.c': 1, 'mqttsuite': 0, 'snode.c-idp': 0})
 
     def test_reset_counters_override_history_and_published_versions(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -284,34 +293,38 @@ class PackagingTest(unittest.TestCase):
                 'counters': {'snode.c': 0, 'mqttsuite': 0},
                 'allocations': {'old': {'snode.c': '200', 'mqttsuite': '250'}},
                 'runs': {'old': {'revisions': {'snode.c': '200', 'mqttsuite': '250'}}}})
-            self.assertEqual(publication.reserve(root, 'snode.c', 'fresh'), {'snode.c': '1', 'mqttsuite': '1', 'snode.c-idp': '1'})
+            self.assertEqual(publication.reserve(root, 'snode.c', 'fresh'), {'snode.c': '1'})
             state = publication.read(root / 'status.json')
             state['counters'] = {'snode.c': 7, 'mqttsuite': 0}
             publication.write(root / 'status.json', state)
-            self.assertEqual(publication.reserve(root, 'snode.c', 'another'), {'snode.c': '8', 'mqttsuite': '1', 'snode.c-idp': '1'})
+            self.assertEqual(publication.reserve(root, 'snode.c', 'another'), {'snode.c': '8'})
 
     def test_publication_orders_only_the_affected_project(self):
-        for version in ['2.0.0-r128', '2.0.0-128~trixie', '2.0.0-128.el9']:
-            old = {'versions': {'snodec': version, 'mqttsuite': '1.0.2-r200'}, 'revision': '200'}
-            incoming = {'context': {'build_project': 'snode.c'}, 'revision': '129', 'files': {}, 'sources': {}}
-            self.assertTrue(repository.publication_needed(old, incoming))
-            incoming['revision'] = '127'
-            with self.assertRaisesRegex(RuntimeError, 'Superseded'):
-                repository.publication_needed(old, incoming)
-            incoming['revision'] = '129'
-            self.assertFalse(repository.publication_needed(incoming, incoming))
-            with self.assertRaisesRegex(RuntimeError, 'Different package content'):
-                repository.publication_needed(incoming, incoming | {'files': {'changed': 'hash'}})
+        source = {'snode.c': {'refs/tags/v2.0.0': 'a' * 40}}
+        own = dict(revision='128', sources=source, files={}, unsigned_files={},
+                   context=dict(build_project='snode.c', source_tags={'snode.c': 'v2.0.0'}))
+        old = dict(revision='200', releases={'snode.c': {'v2.0.0': own}, 'mqttsuite': {}})
+        incoming = own | dict(revision='129')
+        self.assertTrue(repository.publication_needed(old, incoming))
+        with self.assertRaisesRegex(RuntimeError, 'Superseded'):
+            repository.publication_needed(old, incoming | dict(revision='127'))
+        self.assertFalse(repository.publication_needed(incoming, incoming))
+        with self.assertRaisesRegex(RuntimeError, 'Different package content'):
+            repository.publication_needed(incoming, incoming | dict(files={'changed': 'hash'}))
+        return None
 
     def test_newer_attempt_cannot_be_overwritten_by_older_generation(self):
         row = publication.targets()[0]
         state = {'targets': {}}
-        generation = dict(revisions={'snode.c': '124'}, run_id='new', run_url='new-url')
+        generation = dict(revisions={'snode.c': '124'}, run_id='new', run_url='new-url', context=dict(tag='v1.0.0',
+            release_project='snode.c', projects=repository.PROJECTS))
         publication.update(state, row, generation, 'snode.c', 'published', 2)
-        old = dict(revisions={'snode.c': '122'}, run_id='old', run_url='old-url')
+        old = dict(revisions={'snode.c': '122'}, run_id='old', run_url='old-url', context=dict(tag='v1.0.0',
+            release_project='snode.c', projects=repository.PROJECTS))
         publication.update(state, row, old, 'snode.c', 'failed', 3)
-        item = state['targets'][row['id'] + '/snode.c']
+        item = publication.projection(state)['targets'][row['id'] + '/snode.c']
         self.assertEqual((item['revision'], item['status'], item['run_id']), ('124', 'published', 'new'))
+        return None
 
     def test_snapshot_writer_preserves_other_feeds_and_rejects_stale_writer(self):
         def git(*args, cwd):
@@ -356,14 +369,26 @@ class StatusEventsTest(unittest.TestCase):
         self.git('commit','-m','seed',cwd=self.seed)
         self.git('push','origin','main',cwd=self.seed)
         self.bundle=self.root/'bundle'
-        self.rows=publication.targets()[:20]
-        self.context=dict(run_id='100',run_url='https://example.invalid/100',destination='SNodeC/Packages',release_project='snode.c')
-        for name,value in dict(context=self.context,targets=self.rows,revisions={'snode.c':'1','mqttsuite':'1'},sources={'snode.c': {'refs/tags/v2.0.0': 'fixture'}, 'mqttsuite': {'refs/tags/v1.0.2': 'fixture'}},profiles={}).items():
+        self.rows=[r for r in publication.targets() if r['family']=='openwrt'][:20]
+        self.context=dict(contract=3, projects=repository.PROJECTS, run_id='100',run_url='https://example.invalid/100',
+            destination='SNodeC/Packages',release_project='snode.c')
+        for name,value in dict(context=self.context,targets=self.rows,revisions={'snode.c':'1','mqttsuite':'1'},
+            sources={r['id']: {'snode.c': {'refs/tags/v2.0.0': 'a'*40},
+            'mqttsuite': {'refs/tags/v1.0.2': 'b'*40}} for r in self.rows},profiles={r['id']: dict(projects=repository.PROJECTS,
+            baseline={}, sources={}) for r in self.rows}).items():
             publication.write(self.bundle/f'{name}.json',value)
         self.env=os.environ | {'GITHUB_RUN_ATTEMPT':'1','PYTHONPATH':str(repository.ROOT), 'GITHUB_REPOSITORY':'SNodeC/DistributionPackages',
                                   'GITHUB_WORKFLOW_REF':'SNodeC/DistributionPackages/.github/workflows/orchestrate-packages.yml@refs/heads/main'}
+        binary = self.root / 'python-bin'
+        binary.mkdir()
+        interpreter = binary / 'python3'
+        import sys
+        interpreter.write_text('#!/bin/sh\nexec ' + sys.executable + ' ' + str(repository.ROOT / 'tests/offline.py') + ' "$@"\n')
+        interpreter.chmod(0o755)
+        self.env['PATH'] = str(binary) + ':' + self.env['PATH']
         self.status_script=repository.ROOT/'ci/publish/status.sh'
         self.push_script=repository.ROOT/'ci/publish/push.sh'
+        return None
 
     def git(self,*args,cwd=None):
         return subprocess.check_output(['git','-c','commit.gpgsign=false',*args],cwd=cwd or self.root,text=True,stderr=subprocess.DEVNULL).strip()
@@ -386,6 +411,36 @@ class StatusEventsTest(unittest.TestCase):
     def snapshot(self):
         return json.loads(self.git('show','main:status.json',cwd=self.remote))
 
+    def test_status_writer_replaces_checkout_authorization_header(self):
+        import base64
+        import shutil
+        writer = self.clone('authenticated-writer')
+        config = writer / '.git/config'
+        config.write_text(config.read_text() + '\n[http \"https://github.com/\"]\n'
+                          '    extraheader = AUTHORIZATION: basic checkout-token\n')
+        binary = self.root / 'git-bin'
+        binary.mkdir()
+        recorded = self.root / 'headers.txt'
+        real_git = shutil.which('git')
+        wrapper = binary / 'git'
+        wrapper.write_text('#!/bin/bash\nset -eu\n'
+            'if [ "${3:-}" = fetch ]; then\n'
+            f'  "{real_git}" -C "$2" config --get-all http.https://github.com/.extraheader > "{recorded}"\n'
+            'fi\n'
+            f'exec "{real_git}" "$@"\n')
+        wrapper.chmod(0o755)
+        command = ['bash', str(self.status_script), str(writer), 'status', str(self.bundle),
+                   json.dumps(self.rows[0]), 'snode.c', 'running']
+        result = subprocess.run(command, env=self.env | dict(PACKAGES_TOKEN='feed-token',
+            PATH=str(binary) + ':' + self.env['PATH']), capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        expected = 'AUTHORIZATION: basic ' + base64.b64encode(b'x-access-token:feed-token').decode()
+        self.assertEqual(recorded.read_text().splitlines(),
+                         ['AUTHORIZATION: basic checkout-token', '', expected])
+        targets = publication.projection(self.snapshot())['targets']
+        self.assertEqual(targets[self.rows[0]['id'] + '/snode.c']['status'], 'running')
+        return None
+
     def test_twenty_concurrent_writers_lose_no_events(self):
         jobs=[]
         for index,row in enumerate(self.rows):
@@ -399,13 +454,14 @@ class StatusEventsTest(unittest.TestCase):
             log.seek(0)
             self.assertNotIn('::warning::',log.read())
         state=self.snapshot()
-        self.assertEqual(len(state['targets']),20)
-        self.assertTrue(all(v['status']=='running' for v in state['targets'].values()))
+        self.assertEqual(len(publication.projection(state)['targets']),20)
+        self.assertTrue(all(v['status']=='running' for v in publication.projection(state)['targets'].values()))
         self.assertEqual(self.git('show','main:feed',cwd=self.remote),'original feed')
         # Status commits retain parents; the next feed publication creates the new orphan.
         self.assertEqual(self.git('rev-list','--count','main',cwd=self.remote),'21')
         self.assertEqual(self.git('rev-parse','main~20',cwd=self.remote),
                          self.git('rev-parse','HEAD',cwd=self.seed))
+        return None
 
     def test_concurrent_upstream_allocations_are_unique_and_retry_idempotent(self):
         jobs=[]
@@ -419,9 +475,9 @@ class StatusEventsTest(unittest.TestCase):
             self.assertEqual(process.returncode,0,error)
             self.assertNotIn('::warning::',output)
         state=self.snapshot()
-        self.assertEqual(state['counters'],{'snode.c':7,'mqttsuite':13,'snode.c-idp':6})
+        self.assertEqual(state['counters'],{'snode.c':7,'mqttsuite':7})
         self.assertEqual(len(state['allocations']),12)
-        for project,count in [('snode.c',6),('mqttsuite',12),('snode.c-idp',6)]:
+        for project,count in [('snode.c',6),('mqttsuite',6),('snode.c-idp',0)]:
             values=[entry[project] for entry in state['allocations'].values() if project in entry]
             self.assertEqual(len(set(values)),count)
         subprocess.run(jobs[0][1],env=jobs[0][2],check=True,capture_output=True)
@@ -436,26 +492,30 @@ class StatusEventsTest(unittest.TestCase):
         self.event(self.seed,'running')
         state=publication.read(self.seed/'status.json')
         key=self.rows[0]['id']
-        self.assertEqual(state['targets'][key+'/snode.c']['status'],'failed')
-        self.assertEqual(state['targets'][key+'/mqttsuite']['status'],'skipped')
+        self.assertEqual(publication.projection(state)['targets'][key+'/snode.c']['status'],'failed')
+        self.assertNotIn(key+'/mqttsuite', publication.projection(state)['targets'])  # Admission owns descendant transitions.
         self.event(self.seed,'running',attempt=2)
         self.event(self.seed,'publishing',attempt=1)
-        self.assertEqual(publication.read(self.seed/'status.json')['targets'][key+'/snode.c']['status'],'running')
+        self.assertEqual(publication.projection(publication.read(self.seed/'status.json'))['targets'][key+'/snode.c']['status'],'running')
         self.event(self.seed,'pending',attempt=2)
-        self.assertEqual(publication.read(self.seed/'status.json')['targets'][key+'/snode.c']['status'],'running')
+        self.assertEqual(publication.projection(publication.read(self.seed/'status.json'))['targets'][key+'/snode.c']['status'],'running')
+        return None
 
-    def test_finalize_preserves_terminal_other_runs_and_attempts(self):
-        for index,status in enumerate(['pending','running','publishing','published','failed','cancelled','skipped','superseded']):
-            self.event(self.seed,status,self.rows[index],project='mqttsuite')
-        self.event(self.seed,'running',self.rows[8],project='mqttsuite',attempt=2)
-        for result in ['cancelled','failed']:
-            baseline=(self.seed/'status.json').read_bytes()
-            subprocess.run(['python3','-m','ci.publish.publication','finalize',str(self.seed),str(self.bundle),result,json.dumps(self.rows)],env=self.env | {'BUILD_PROJECT':'mqttsuite'},check=True)
-            values=publication.read(self.seed/'status.json')['targets']
-            for index,status in enumerate(['pending','running','publishing','published','failed','cancelled','skipped','superseded']):
-                self.assertEqual(values[self.rows[index]['id']+'/mqttsuite']['status'],result if index<2 else status)
-            self.assertEqual(values[self.rows[8]['id']+'/mqttsuite']['status'],'running')
-            (self.seed/'status.json').write_bytes(baseline)
+    def test_terminal_events_preserve_other_rows_and_attempts(self):
+        states = ['pending','running','publishing','published','failed','cancelled','skipped','superseded']
+        for index, status in enumerate(states):
+            self.event(self.seed, status, self.rows[index], project='mqttsuite')
+        self.event(self.seed, 'running', self.rows[8], project='mqttsuite', attempt=2)
+        before = publication.projection(publication.read(self.seed/'status.json'))['targets']
+        self.event(self.seed, 'failed', self.rows[0], project='mqttsuite')
+        self.event(self.seed, 'cancelled', self.rows[0], project='mqttsuite')
+        self.event(self.seed, 'failed', self.rows[3], project='mqttsuite')
+        self.event(self.seed, 'failed', self.rows[8], project='mqttsuite', attempt=1)
+        after = publication.projection(publication.read(self.seed/'status.json'))['targets']
+        self.assertEqual(after[self.rows[0]['id']+'/mqttsuite']['status'], 'failed')
+        for row in self.rows[1:9]:
+            self.assertEqual(after[row['id']+'/mqttsuite'], before[row['id']+'/mqttsuite'])
+        return None
 
     def test_publisher_merges_status_commits_but_rejects_feed_changes(self):
         publisher=self.clone('publisher')
@@ -465,7 +525,7 @@ class StatusEventsTest(unittest.TestCase):
         subprocess.run(['bash',str(self.status_script),str(status),'status',str(self.bundle),json.dumps(self.rows[1]),'mqttsuite','running'],env=self.env,check=True,capture_output=True)
         result=subprocess.run(['bash',str(self.push_script),str(publisher),previous,'publish',*self.command(publisher,'published')],env=self.env,capture_output=True,text=True)
         self.assertEqual(result.returncode,0,result.stderr)
-        state=self.snapshot()['targets']
+        state=publication.projection(self.snapshot())['targets']
         self.assertEqual(state[self.rows[0]['id']+'/snode.c']['status'],'published')
         self.assertEqual(state[self.rows[1]['id']+'/mqttsuite']['status'],'running')
         self.assertEqual(self.git('show','main:feed',cwd=self.remote),'published feed')
@@ -479,6 +539,7 @@ class StatusEventsTest(unittest.TestCase):
         self.assertNotEqual(result.returncode,0)
         self.assertIn('Remote feed changed',result.stderr)
         self.assertEqual(self.git('show','main:feed',cwd=self.remote),'new remote feed')
+        return None
 
     def test_concurrent_status_and_feed_writers_preserve_authored_readme(self):
         import shutil
@@ -505,10 +566,11 @@ class StatusEventsTest(unittest.TestCase):
         self.assertIn('REMOTE FOOTER', readme)
         self.assertIn('| Project | Latest release | Status |', readme)
         self.assertEqual(readme.count('| [SNode.C]'), 1)
-        state = self.snapshot()['targets']
+        state = publication.projection(self.snapshot())['targets']
         self.assertEqual(state[self.rows[0]['id'] + '/snode.c']['status'], 'published')
         self.assertEqual(state[self.rows[1]['id'] + '/mqttsuite']['status'], 'running')
         self.assertEqual(self.git('show', 'main:feed', cwd=self.remote), 'published feed')
+        return None
 
     def test_authored_readme_conflict_fails_closed(self):
         (self.seed / 'README.md').write_text('BASE\n')
@@ -536,9 +598,11 @@ class StatusEventsTest(unittest.TestCase):
         self.git('push', 'origin', 'main', cwd=self.seed)
         writer = self.clone('readme-sparse-writer', sparse=True)
         subprocess.run(['bash', str(self.status_script), str(writer), 'status', str(self.bundle), '-', '-', 'pending'], env=self.env, check=True, capture_output=True)
+        subprocess.run(['bash', str(self.status_script), str(writer), 'project'], env=self.env, check=True, capture_output=True)
         readme = self.git('show', 'main:README.md', cwd=self.remote)
-        self.assertIn('2.0.0 · r1', readme)
-        self.assertIn('1.0.2 · r1', readme)
+        self.assertIn('2.0.0', readme)
+        self.assertIn('1.0.2', readme)
+        self.assertNotIn(' · r', readme)
 
     def test_reservation_survives_status_commit_with_sparse_checkout(self):
         allocator=self.clone('allocator',sparse=True)
@@ -553,31 +617,36 @@ class StatusEventsTest(unittest.TestCase):
         state=self.snapshot()
         self.assertEqual(state['allocations']['200']['mqttsuite'],'2')
         self.assertEqual(state['counters'],{'snode.c':1,'mqttsuite':2})
-        self.assertEqual(state['targets'][self.rows[1]['id']+'/mqttsuite']['status'],'running')
+        self.assertEqual(publication.projection(state)['targets'][self.rows[1]['id']+'/mqttsuite']['status'],'running')
+        return None
 
     def test_late_terminal_event_cannot_skip_a_published_dependency(self):
         self.event(self.seed,'published')
         self.event(self.seed,'failed')
         state=publication.read(self.seed/'status.json')
-        self.assertEqual(state['targets'][self.rows[0]['id']+'/snode.c']['status'],'published')
-        self.assertNotIn(self.rows[0]['id']+'/mqttsuite',state['targets'])
+        self.assertEqual(publication.projection(state)['targets'][self.rows[0]['id']+'/snode.c']['status'],'published')
+        self.assertNotIn(self.rows[0]['id']+'/mqttsuite',publication.projection(state)['targets'])
+        return None
 
     def test_pending_initializes_both_projects_without_regressing_running(self):
         command=['python3','-m','ci.publish.publication','status',str(self.seed),str(self.bundle),'-','-','pending']
         subprocess.run(command,env=self.env,check=True)
         state=publication.read(self.seed/'status.json')
-        self.assertEqual(len(state['targets']),40)
-        self.assertTrue(all(v['status']=='pending' for v in state['targets'].values()))
+        self.assertEqual(len(publication.projection(state)['targets']),40)
+        self.assertTrue(all(v['status']=='pending' for v in publication.projection(state)['targets'].values()))
         self.event(self.seed,'running')
         subprocess.run(command,env=self.env,check=True)
-        self.assertEqual(publication.read(self.seed/'status.json')['targets'][self.rows[0]['id']+'/snode.c']['status'],'running')
+        self.assertEqual(publication.projection(publication.read(self.seed/'status.json'))['targets'][self.rows[0]['id']+'/snode.c']['status'],'running')
+        return None
 
     def test_feed_phase_preserves_original_capture_and_copies_documentation(self):
         obsolete_doc = self.seed / 'docs/removed/guide.md'
         obsolete_doc.parent.mkdir(parents=True)
         obsolete_doc.write_text('removed guide')
         (self.seed / 'docs/status.md').write_text('stale generated status')
-        self.event(self.seed, 'running', row=self.rows[1])
+        subprocess.run(['bash', str(self.status_script), str(self.seed), 'status', str(self.bundle),
+                        json.dumps(self.rows[1]), 'snode.c', 'running'], env=self.env, check=True, capture_output=True)
+        subprocess.run(['bash', str(self.status_script), str(self.seed), 'project'], env=self.env, check=True, capture_output=True)
         status_before = (self.seed / 'status.json').read_bytes()
         badges_before = {p.name: p.read_bytes() for p in (self.seed / 'status/badges').iterdir()}
         original={name:(self.bundle/name).read_bytes() for name in ['context.json','sources.json']}
@@ -592,7 +661,7 @@ class StatusEventsTest(unittest.TestCase):
         stdout,stderr=StringIO(),StringIO()
         def publish(*args):
             cleanup.cleanup(self.seed,self.rows[0])
-            publication.write(self.bundle/'context.json',{'selected':'modified'})
+            publication.write(self.bundle/'context.json',publication.read(self.bundle/'context.json') | {'selected':'modified'})
             publication.write(self.bundle/'sources.json',{'selected':'modified'})
         with patch('sys.argv',['publication','feed',str(self.seed),str(self.bundle),json.dumps(self.rows[0]),'snode.c','unused']), patch.object(publication,'publish',side_effect=publish), patch.object(publication,'render',side_effect=RuntimeError('Unavailable documentation renderer')), redirect_stdout(stdout), redirect_stderr(stderr):
             self.assertEqual(publication.main(),0)
@@ -610,7 +679,7 @@ class StatusEventsTest(unittest.TestCase):
                        for p in (self.seed / 'docs').rglob('*') if p.is_file() and p.name != 'status.md'}
         self.assertEqual(actual_docs, expected_docs)
         self.event(self.seed,stdout.getvalue().strip())
-        self.assertEqual(publication.read(self.seed/'status.json')['targets'][self.rows[0]['id']+'/snode.c']['status'],'published')
+        self.assertEqual(publication.projection(publication.read(self.seed/'status.json'))['targets'][self.rows[0]['id']+'/snode.c']['status'],'published')
         for name,data in original.items():
             self.assertEqual((self.bundle/name).read_bytes(),data)
         self.assertIn('# SNode.C Packages', (self.seed/'README.md').read_text())
@@ -618,6 +687,7 @@ class StatusEventsTest(unittest.TestCase):
         self.assertNotIn('# DistributionPackages', (self.seed/'README.md').read_text())
         self.assertEqual((self.seed/'install/install.sh').read_bytes(),(repository.ROOT/'install/install.sh').read_bytes())
         self.assertFalse((self.seed / 'net').exists())
+        return None
 
     def test_authored_snapshot_copies_matching_installers(self):
         import shutil
@@ -637,7 +707,7 @@ class StatusEventsTest(unittest.TestCase):
 
     def test_manual_render_handoff_replaces_docs_without_changing_state_or_keys(self):
         (self.seed / 'keys').mkdir()
-        (self.seed / 'keys/snodec-opkg.pub').write_bytes(b'fixture public key')
+        (self.seed / 'keys/opkg.pub').write_bytes(b'fixture public key')
         (self.seed / 'docs/media/navigation-evidence').mkdir(parents=True)
         (self.seed / 'docs/media/navigation-evidence/old.md').write_text('obsolete evidence')
         (self.seed / 'docs/status.md').write_text('legacy page')
@@ -645,11 +715,12 @@ class StatusEventsTest(unittest.TestCase):
         self.git('commit', '-m', 'published documentation fixture', cwd=self.seed)
         self.git('push', 'origin', 'main', cwd=self.seed)
         state = self.snapshot()
-        subprocess.run(['bash', str(self.status_script), str(self.seed), 'render'],
-                       env=self.env, check=True, capture_output=True)
+        rendered = subprocess.run(['bash', str(self.status_script), str(self.seed), 'render'],
+                                  env=self.env, text=True, capture_output=True)
+        self.assertEqual(rendered.returncode, 0, rendered.stderr)
         self.assertEqual(self.snapshot(), state)
         self.assertEqual(self.git('show', 'main:feed', cwd=self.remote), 'original feed')
-        self.assertEqual((self.seed / 'keys/snodec-opkg.pub').read_bytes(), b'fixture public key')
+        self.assertEqual((self.seed / 'keys/opkg.pub').read_bytes(), b'fixture public key')
         self.assertEqual({p.name: p.read_bytes() for p in (self.seed / 'install').iterdir()},
                          {p.name: p.read_bytes() for p in (repository.ROOT / 'install').iterdir()})
         self.assertEqual((self.seed / 'keys/README.md').read_bytes(),
@@ -662,7 +733,7 @@ class StatusEventsTest(unittest.TestCase):
                          {p.relative_to(repository.ROOT / 'site/docs'): p.read_bytes()
                           for p in (repository.ROOT / 'site/docs').rglob('*') if p.is_file()})
 
-    def test_status_exhaustion_only_warns(self):
+    def test_required_status_exhaustion_fails_closed(self):
         # Exercise all retries without a network or real sleeps.
         binary=self.root/'bin';binary.mkdir()
         git_path=subprocess.check_output(['which','git'],text=True).strip()
@@ -671,10 +742,10 @@ class StatusEventsTest(unittest.TestCase):
         wrapper.chmod(0o755)
         sleep=binary/'sleep';sleep.write_text('#!/bin/sh\nexit 0\n');sleep.chmod(0o755)
         result=subprocess.run(['bash',str(self.status_script),str(self.seed),'status',str(self.bundle),json.dumps(self.rows[0]),'snode.c','running'],env=self.env | {'PATH':str(binary)+':'+self.env['PATH']},capture_output=True,text=True)
-        self.assertEqual(result.returncode,0)
+        self.assertNotEqual(result.returncode,0)
         self.assertIn('::warning::Package status update exhausted',result.stdout)
         self.assertEqual(len((self.root/'pushes').read_text().splitlines()),30)
-        self.assertEqual(self.snapshot()['targets'],{})
+        self.assertEqual(publication.projection(self.snapshot())['targets'],{})
         result=subprocess.run(['bash',str(self.status_script),str(self.seed),'reserve'],
                               env=self.env | {'PATH':str(binary)+':'+self.env['PATH'],
                                               'RELEASE_PROJECT':'mqttsuite','GITHUB_RUN_ID':'500'},
@@ -682,16 +753,29 @@ class StatusEventsTest(unittest.TestCase):
         self.assertNotEqual(result.returncode,0)
         self.assertEqual(len((self.root/'pushes').read_text().splitlines()),60)
         self.assertEqual(self.snapshot()['counters'],{'snode.c':1,'mqttsuite':1})
+        return None
 
-    def test_status_errors_only_warn(self):
+    def test_required_status_errors_fail_closed(self):
         result=subprocess.run(['bash',str(self.status_script),str(self.seed),'status',str(self.bundle),'{}','snode.c','invalid'],env=self.env,capture_output=True,text=True)
-        self.assertEqual(result.returncode,0)
-        self.assertIn('::warning::',result.stdout)
-        self.assertEqual(self.snapshot()['targets'],{})
+        self.assertNotEqual(result.returncode,0)
+        self.assertEqual(publication.projection(self.snapshot())['targets'],{})
         self.git('remote','set-url','origin',str(self.root/'missing.git'),cwd=self.seed)
         result=subprocess.run(['bash',str(self.status_script),str(self.seed),'finalize',str(self.bundle),'failed'],env=self.env,capture_output=True,text=True)
-        self.assertEqual(result.returncode,0)
-        self.assertIn('::warning::',result.stdout)
+        self.assertNotEqual(result.returncode,0)
+        return None
+    def test_optional_projection_errors_warn_without_losing_registered_capture(self):
+        self.event(self.seed, 'running')
+        before = self.snapshot()
+        binary = self.root/'failing-renderer'
+        binary.mkdir()
+        python = binary/'python3'
+        python.write_text('#!/bin/sh\nif [ "$1 $2" = "-m ci.publish.publication" ]; then exit 9; fi\nexec /usr/bin/python3 "$@"\n')
+        python.chmod(0o755)
+        result = subprocess.run(['bash',str(self.status_script),str(self.seed),'project'], env=self.env|{'PATH':str(binary)+':'+self.env['PATH']}, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn('rendering deferred', result.stdout)
+        self.assertEqual(self.snapshot(), before)
+        return None
 
 
 if __name__ == '__main__':

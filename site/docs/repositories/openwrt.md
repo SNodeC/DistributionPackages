@@ -47,7 +47,7 @@ Run the block for your release as `root`. These commands only configure the feed
   feed="$base/openwrt/24.10/$DISTRIB_ARCH"
   # Download both files successfully before writing configuration.
   wget -O "$tmp/index" "$feed/build.json"
-  wget -O "$tmp/key" "$base/keys/snodec-opkg.pub"
+  wget -O "$tmp/key" "$base/keys/opkg.pub"
   opkg-key add "$tmp/key"
   touch /etc/opkg/customfeeds.conf
   sed -i '/^src\/gz snodec /d' /etc/opkg/customfeeds.conf
@@ -72,9 +72,9 @@ Run the block for your release as `root`. These commands only configure the feed
   feed="$base/openwrt/25.12/$DISTRIB_ARCH"
   # Download both files successfully before writing configuration.
   wget -O "$tmp/index" "$feed/build.json"
-  wget -O "$tmp/key" "$base/keys/snodec-apk.pem"
+  wget -O "$tmp/key" "$base/keys/apk.pem"
   mkdir -p /etc/apk/keys /etc/apk/repositories.d
-  cp "$tmp/key" /etc/apk/keys/snodec-apk.pem
+  cp "$tmp/key" /etc/apk/keys/apk.pem
   printf '%s/packages.adb\n' "$feed" > /etc/apk/repositories.d/snodec.list
   apk update
 )

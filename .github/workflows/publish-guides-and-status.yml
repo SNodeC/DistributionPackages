@@ -20,13 +20,19 @@ jobs:
           path: feed
           persist-credentials: false
           ref: ${{ github.event.repository.default_branch }}
+      - name: Verify operator authority
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -m ci.dispatch operator
+      - id: deployment
+        run: PYTHONPATH=feed python3 -m ci.repository deployment >> "$GITHUB_OUTPUT"
       - uses: actions/create-github-app-token@v3
         id: publisher
         with:
           client-id: ${{ vars.PACKAGES_APP_CLIENT_ID }}
           private-key: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
-          owner: SNodeC
-          repositories: Packages
+          owner: ${{ steps.deployment.outputs.owner }}
+          repositories: ${{ steps.deployment.outputs.feed_name }}
           permission-contents: write
       - name: Publish guides and render package availability indicators
         env:

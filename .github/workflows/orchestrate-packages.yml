@@ -1,16 +1,22 @@
 name: Orchestrate package release
-run-name: Release · ${{ github.event.client_payload.project }} · ${{ github.event.client_payload.tag }} · ${{ github.event.client_payload.run }}
+run-name: >-
+  ${{ fromJSON(inputs.request).kind == 'capture' && format('Capture · {0}', fromJSON(inputs.request).intent) ||
+      format('Release · {0} · {1}', fromJSON(inputs.request).project, fromJSON(inputs.request).tag) }}
 on:
-  repository_dispatch:
-    types: [release-packages]
+  workflow_dispatch:
+    inputs:
+      request:
+        type: string
+        required: true
 permissions:
   contents: read
   actions: read
 concurrency:
-  group: package-release-${{ github.event.client_payload.project }}-${{ github.event.client_payload.run }}
+  group: package-release-${{ fromJSON(inputs.request).project }}
   cancel-in-progress: false
   queue: max
 env:
+  PACKAGE_COORDINATOR_REF: ${{ github.event.repository.default_branch }}
   PYTHONPATH: ${{ github.workspace }}/feed
 jobs:
   capture:
@@ -21,23 +27,43 @@ jobs:
         with:
           path: feed
           persist-credentials: false
-      - name: Scope coordinator token to registered repositories
-        id: repositories
-        run: echo "names=$(jq -r 'keys + ["DistributionPackages", "Packages"] | join(",")' feed/ci/projects.json)" >> "$GITHUB_OUTPUT"
+      - id: deployment
+        run: PYTHONPATH=feed python3 -m ci.repository deployment >> "$GITHUB_OUTPUT"
       - uses: actions/create-github-app-token@v3
         id: coordinator
         with:
           client-id: ${{ vars.PACKAGES_APP_CLIENT_ID }}
           private-key: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
-          owner: SNodeC
-          repositories: ${{ steps.repositories.outputs.names }}
+          owner: ${{ steps.deployment.outputs.owner }}
+          repositories: ${{ steps.deployment.outputs.readers }}
           permission-actions: read
+          permission-contents: read
+      - uses: actions/create-github-app-token@v3
+        id: feed-write
+        with:
+          client-id: ${{ vars.PACKAGES_APP_CLIENT_ID }}
+          private-key: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
+          owner: ${{ steps.deployment.outputs.owner }}
+          repositories: ${{ steps.deployment.outputs.feed_name }}
           permission-contents: write
+      - uses: actions/checkout@v6
+        with:
+          repository: ${{ steps.deployment.outputs.feed }}
+          ref: ${{ steps.deployment.outputs.branch }}
+          path: published
+          token: ${{ steps.feed-write.outputs.token }}
+          sparse-checkout: |
+            **/build.json
+            /status.json
+          sparse-checkout-cone-mode: false
       - name: Validate source notification
         id: release
         env:
           GH_TOKEN: ${{ steps.coordinator.outputs.token }}
-        run: python3 -m ci.dispatch intake
+          COORDINATOR_ACTOR: ${{ steps.coordinator.outputs.app-slug }}[bot]
+        run: |
+          gh auth setup-git --hostname github.com
+          python3 -m ci.dispatch intake
       - uses: actions/download-artifact@v8
         id: previous
         if: steps.release.outputs.duplicate != 'true' && github.run_attempt > 1
@@ -48,16 +74,20 @@ jobs:
       - name: Reserve revisions and capture immutable inputs
         if: steps.release.outputs.duplicate != 'true' && steps.previous.outcome != 'success'
         env:
-          PACKAGES_TOKEN: ${{ steps.coordinator.outputs.token }}
+          PACKAGES_TOKEN: ${{ steps.feed-write.outputs.token }}
           GH_TOKEN: ${{ steps.coordinator.outputs.token }}
+          RELEASE_CAUSE: ${{ steps.release.outputs.cause }}
+          RELEASE_PARENT: ${{ steps.release.outputs.parent }}
           RELEASE_PROJECT: ${{ steps.release.outputs.project }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           RELEASE_SHA: ${{ steps.release.outputs.sha }}
+          RELEASE_RUN: ${{ steps.release.outputs.run }}
+          RELEASE_REQUESTED_AT: ${{ steps.release.outputs.requested_at }}
         run: |
           python3 -m ci.dispatch retry-capture
           rm -rf bundle
           bash feed/ci/publish/status.sh published reserve
-          python3 -m ci.repository prepare published bundle
+          python3 -m ci.dispatch prepare published bundle
       - name: Save immutable release capture
         uses: actions/upload-artifact@v7
         if: steps.release.outputs.duplicate != 'true' && steps.previous.outcome != 'success'
@@ -69,9 +99,14 @@ jobs:
         if: steps.release.outputs.duplicate != 'true'
         env:
           GH_TOKEN: ${{ steps.coordinator.outputs.token }}
-          PACKAGES_TOKEN: ${{ steps.coordinator.outputs.token }}
+          PACKAGES_TOKEN: ${{ steps.feed-write.outputs.token }}
         run: |
-          tar -xzf bundle/feed.tar.gz -C feed
           python3 -m ci.repository check bundle
           bash feed/ci/publish/status.sh published status bundle '-' '-' pending
-          python3 -m ci.dispatch start bundle
+      - name: Save classified capture failure
+        if: ${{ failure() && fromJSON(inputs.request).kind == 'capture' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: capture-result-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/capture-result.json
+          if-no-files-found: warn

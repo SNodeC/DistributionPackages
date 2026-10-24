@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Feed writers are serialized; only status commits may be merged on a lease conflict.
 set -euo pipefail
+readarray -t feed < <(python3 -c 'from ci.repository import FEED, FEED_BRANCH; print(FEED); print(FEED_BRANCH)')
+repository=${feed[0]}
+branch=${feed[1]}
 root=$1
 previous=$2
 message=$3
@@ -15,11 +18,11 @@ for attempt in {1..30}; do
         exit 0
     fi
     snapshot=$(git -C "$root" commit-tree "$(git -C "$root" write-tree)" -m "$message")
-    if git -C "$root" push --force-with-lease="refs/heads/main:$previous" origin "$snapshot:refs/heads/main"; then
+    if git -C "$root" push --force-with-lease="refs/heads/$branch:$previous" origin "$snapshot:refs/heads/$branch"; then
         [ -z "${GITHUB_OUTPUT:-}" ] || echo "snapshot=$snapshot" >> "$GITHUB_OUTPUT"
         exit 0
     fi
-    git -C "$root" fetch --quiet origin main
+    git -C "$root" fetch --quiet origin "$branch"
     remote=$(git -C "$root" rev-parse FETCH_HEAD)
     if [ "$remote" = "$snapshot" ]; then
         [ -z "${GITHUB_OUTPUT:-}" ] || echo "snapshot=$snapshot" >> "$GITHUB_OUTPUT"

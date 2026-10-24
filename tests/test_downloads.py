@@ -8,6 +8,7 @@ import ssl
 import tempfile
 from pathlib import Path
 import unittest
+from support import PinnedJsonCase
 from unittest.mock import call, patch
 import urllib.error
 
@@ -27,7 +28,7 @@ def http_error(code, retry_after=None):
     return urllib.error.HTTPError('https://example.invalid/package', code, 'failure', headers, None)
 
 
-class DownloadTest(unittest.TestCase):
+class DownloadTest(PinnedJsonCase):
     def test_metadata_and_file_use_one_transport_with_timeout(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'package'
@@ -155,16 +156,18 @@ class DownloadTest(unittest.TestCase):
                                                                           'context': {'packages_commit': 'captured'}}}))
             (bundle / 'targets.json').write_text(json.dumps([{'id': 'linux-test', 'family': 'linux',
                                                             'distribution': 'fedora', 'suite': '44'}]))
-            (bundle / 'baseline.json').write_text(json.dumps({'files': {'mqttsuite-test.rpm': 'wrong checksum'}}))
-            (bundle / 'context.json').write_text(json.dumps({'build_project': 'snode.c'}))
+            (bundle / 'baseline.json').write_text(json.dumps({'sources': {'snode.c': {'refs/tags/v1.0.0': 'a' * 40}},
+                                                             'files': {'snodec-test.rpm': 'wrong checksum'}}))
+            (bundle / 'context.json').write_text(json.dumps({'build_project': 'mqttsuite'}))
             with patch.dict(repository.os.environ, {'PUBLISHED_REF': ''}):
                 with patch.object(repository.urllib.request, 'urlopen', return_value=response()) as opened:
                     with patch.object(repository.time, 'sleep') as sleep:
                         with self.assertRaisesRegex(RuntimeError, 'Published dependency checksum mismatch'):
                             repository.reuse(bundle, 'linux-test', root / 'dependencies')
-            opened.assert_called_once_with('https://raw.githubusercontent.com/SNodeC/Packages/captured/feed/mqttsuite-test.rpm',
+            opened.assert_called_once_with('https://raw.githubusercontent.com/SNodeC/Packages/captured/feed/snodec-test.rpm',
                                            timeout=120)
             sleep.assert_not_called()
+        return None
 
     def test_sdk_checksum_failure_is_never_retried_or_extracted(self):
         row = {'release': '25.12.5', 'target': 'test/target', 'arch': 'test_arch'}

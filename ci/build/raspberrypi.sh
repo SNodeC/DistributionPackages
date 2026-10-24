@@ -8,7 +8,9 @@ enter=(sudo unshare --mount --pid --fork --kill-child --mount-proc="$root/proc" 
 mkdir -p "$root" pi-image output logs
 readarray -t image < <(python3 - "$suite" <<'PY'
 import json, sys
-row = json.load(open('feed/ci/targets/raspberrypi.json'))[sys.argv[1]]
+from ci.repository import PROJECTS
+import os
+row = PROJECTS[os.environ['BUILD_PROJECT']]['matrix']['raspberrypi'][sys.argv[1]]
 print(row['url'])
 print(row['sha256'])
 PY
@@ -36,7 +38,7 @@ sudo mount --make-rslave "$root/dev"
 printf '#!/bin/sh\nexit 101\n' | sudo tee "$root/usr/sbin/policy-rc.d" >/dev/null
 sudo chmod +x "$root/usr/sbin/policy-rc.d"
 "${enter[@]}" sh -c '. /etc/os-release; test "$VERSION_CODENAME" = "$1"; test "$(dpkg --print-architecture)" = arm64' sh "$suite"
-"${enter[@]}" env PACKAGE_RELEASE="$PACKAGE_RELEASE" SUITE="$suite" BUILD_PROJECT="${BUILD_PROJECT:-}" \
+"${enter[@]}" env PACKAGE_COORDINATOR="$PACKAGE_COORDINATOR" PACKAGE_RELEASE="$PACKAGE_RELEASE" SUITE="$suite" BUILD_PROJECT="${BUILD_PROJECT:-}" \
     bash /work/feed/ci/build/native.sh 2>&1 | tee logs/build.log
 python3 -m ci.publish.apt stage "$suite" packages bundle output
 sudo umount -R "$root/dev"

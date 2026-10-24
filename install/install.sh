@@ -108,10 +108,10 @@ case "$arch" in ''|*[!a-zA-Z0-9_-]*) echo 'Invalid package architecture' >&2; ex
 base=https://raw.githubusercontent.com/SNodeC/Packages/main
 url=$base/$distribution
 case "$manager" in
-    apt) metadata=$url/dists/$suite/main/binary-$arch/Packages.gz; key=snodec-apt.asc ;;
-    dnf) url=$url/$suite/$arch; metadata=$url/repodata/repomd.xml; key=snodec-apt.asc ;;
-    opkg) url=$url/$suite/$arch; metadata=$url/Packages.gz; key=snodec-opkg.pub ;;
-    apk) url=$url/$suite/$arch; metadata=$url/packages.adb; key=snodec-apk.pem ;;
+    apt) metadata=$url/dists/$suite/main/binary-$arch/Packages.gz; key=apt.asc ;;
+    dnf) url=$url/$suite/$arch; metadata=$url/repodata/repomd.xml; key=apt.asc ;;
+    opkg) url=$url/$suite/$arch; metadata=$url/Packages.gz; key=opkg.pub ;;
+    apk) url=$url/$suite/$arch; metadata=$url/packages.adb; key=apk.pem ;;
 esac
 fetch() {
     if command -v curl >/dev/null 2>&1; then
@@ -157,7 +157,7 @@ REPO
         ;;
     apk)
         mkdir -p /etc/apk/keys /etc/apk/repositories.d
-        cp "$temporary/key" /etc/apk/keys/snodec-apk.pem
+        cp "$temporary/key" /etc/apk/keys/apk.pem
         printf '%s/packages.adb\n' "$url" > /etc/apk/repositories.d/snodec.list
         apk update
         ;;
