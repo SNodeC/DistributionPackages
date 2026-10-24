@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from support import PinnedJsonCase
+from support import PinnedJsonCase, feed_manifest
 from unittest.mock import patch
 
 from ci import repository, dispatch
@@ -30,8 +30,8 @@ class IdpTest(PinnedJsonCase):
             root = Path(tmp)
             publication.write(root / 'status.json', {'counters': {'snode.c': 17, 'mqttsuite': 21}})
             self.assertEqual(publication.reserve(root, 'snode.c', '100'),
-                             {'snode.c': '18', 'mqttsuite': '22', 'snode.c-idp': '1'})
-            self.assertEqual(publication.reserve(root, 'snode.c-idp', '101'), {'snode.c-idp': '2'})
+                             {'snode.c': '18'})
+            self.assertEqual(publication.reserve(root, 'snode.c-idp', '101'), {'snode.c-idp': '1'})
 
     def test_idp_handoff_uses_the_shared_identity_contract(self):
         import yaml
@@ -58,14 +58,14 @@ class IdpTest(PinnedJsonCase):
                            versions={'snode.c': '2.0.0', 'mqttsuite': '1.0.0', 'snode.c-idp': '2.0.0'})
             baseline = dict(sources={'snode.c': {'refs/tags/v2.0.0':'a'*40}, 'mqttsuite': {'refs/tags/v1.0.0':'b'*40}}, context=copy.deepcopy(context),
                             files={k: files[k] for k in ['snodec_2_amd64.deb', 'mqttsuite_1_amd64.deb']},
-                            packages=['snodec', 'mqttsuite'], versions={'snodec': '2.0.0-2~trixie', 'mqttsuite': '1.0.0-1~trixie'})
+                            packages=['snodec', 'mqttsuite'], versions={'snode.c': '2.0.0-2~trixie', 'mqttsuite': '1.0.0-1~trixie'})
             current = copy.deepcopy(baseline)
             current['sources']['mqttsuite'] = {'refs/tags/v1.0.1':'c'*40}
             current['context']['source_tags']['mqttsuite'] = 'v1.0.1'
             current['context']['versions']['mqttsuite'] = '1.0.1'
             current['versions']['mqttsuite'] = '1.0.1-2~trixie'
             current['files'] = {k: files[k] for k in ['snodec_2_amd64.deb', 'mqttsuite_2_amd64.deb']}
-            publication.write(root / 'debian/dists/trixie/build.json', {'targets': {'amd64': current}})
+            publication.write(root / 'debian/dists/trixie/build.json', {'targets': {'amd64': feed_manifest(current)}})
             profile = dict(projects=copy.deepcopy(repository.PROJECTS), baseline=baseline, context=context, sources={'snode.c-idp': {'refs/tags/v2.0.0':'d'*40}},
                            archives={'snode.c-idp': 'idp.tar.gz'})
             publication.write(bundle / 'profiles.json', {row['id']: profile})
@@ -73,13 +73,13 @@ class IdpTest(PinnedJsonCase):
             (bundle / 'archives/idp.tar.gz').touch()
             selected = repository.select(bundle, row['id'], 'snode.c-idp')
             metadata = dict(revision='1', sources=selected['sources'], context=selected['context'],
-                            versions=baseline['versions'] | {'snodec-idp': '2.0.0-1~trixie'},
+                            versions=baseline['versions'] | {'snode.c-idp': '2.0.0-1~trixie'},
                             packages=['snodec', 'mqttsuite', 'snodec-idp'],
                             files=baseline['files'] | {'snodec-idp_2_amd64.deb': files['snodec-idp_2_amd64.deb']})
             for name in metadata['files']:
                 (directory / name).write_bytes((pool / name).read_bytes())
             publication.write(directory / 'build.json', metadata)
-            generation = dict(revisions={'snode.c-idp': '1'}, profiles_hash=repository.digest(bundle / 'profiles.json'))
+            generation = dict(context=context, revisions={'snode.c-idp': '1'}, profiles_hash=repository.digest(bundle / 'profiles.json'))
             import ci.publish.linux as linux
             def sign(*args):
                 result = publication.read(directory / 'build.json')
@@ -88,22 +88,29 @@ class IdpTest(PinnedJsonCase):
                 self.assertEqual(result['sources']['mqttsuite'], {'refs/tags/v1.0.1':'c'*40})
                 self.assertEqual(result['versions']['mqttsuite'], '1.0.1-2~trixie')
                 self.assertEqual(result['files']['snodec-idp_2_amd64.deb'], files['snodec-idp_2_amd64.deb'])
+                publication.write(root / 'debian/dists/trixie/build.json', {'targets': {'amd64': result}})
                 return None
-            with patch.object(repository, 'activate'), patch.object(publication, 'activate'), patch.object(linux, 'publish', side_effect=sign), patch('ci.publish.cleanup.cleanup'):
+            def controls(path):
+                owner = repository.package_owner(path.name)
+                versions = current['versions'] | {'snode.c-idp':'2.0.0-1~trixie'}
+                return dict(name=repository.PROJECTS[owner]['package'],version=versions[owner],arch='amd64')
+            with patch.object(repository, 'activate'), patch.object(publication, 'activate'), \
+                    patch.object(linux, 'publish', side_effect=sign), \
+                    patch.object(publication,'package_metadata',side_effect=controls), patch('ci.publish.cleanup.cleanup'):
                 publication.publish(root, bundle, incoming, row, generation, 'snode.c-idp')
             # Same source and revision with changed prerequisite bytes is also stale.
             prerequisite=pool/'snodec_2_amd64.deb'
             original=prerequisite.read_bytes()
             prerequisite.write_bytes(b'replaced prerequisite bytes')
             current['files'][prerequisite.name]=repository.digest(prerequisite)
-            publication.write(root/'debian/dists/trixie/build.json',{'targets':{'amd64':current}})
+            publication.write(root/'debian/dists/trixie/build.json',{'targets':{'amd64':feed_manifest(current)}})
             with patch.object(repository,'activate'),patch.object(publication,'activate'),self.assertRaisesRegex(RuntimeError,'dependency changed'):
                 publication.publish(root,bundle,incoming,row,generation,'snode.c-idp')
             prerequisite.write_bytes(original)
             current['files'][prerequisite.name]=repository.digest(prerequisite)
             # A changed framework is a real dependency conflict, unlike its unrelated sibling.
             current['sources']['snode.c'] = {'refs/tags/v2.0.0':'e'*40}
-            publication.write(root / 'debian/dists/trixie/build.json', {'targets': {'amd64': current}})
+            publication.write(root / 'debian/dists/trixie/build.json', {'targets': {'amd64': feed_manifest(current)}})
             with patch.object(repository, 'activate'), patch.object(publication, 'activate'), self.assertRaisesRegex(RuntimeError, 'dependency changed'):
                 publication.publish(root, bundle, incoming, row, generation, 'snode.c-idp')
         return None

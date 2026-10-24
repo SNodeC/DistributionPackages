@@ -3,7 +3,7 @@ import copy
 from pathlib import Path
 import tempfile
 import unittest
-from support import PinnedJsonCase
+from support import PinnedJsonCase, feed_manifest, ipk
 from unittest.mock import patch
 from ci import repository
 from ci.publish import publication, openwrt, linux
@@ -35,6 +35,7 @@ class SiblingFormatsTest(PinnedJsonCase):
                     path=root/(Path('debian/pool/trixie')/filename if extension=='deb' else Path(publication.feed_paths(row)[0])/filename)
                     path.parent.mkdir(parents=True,exist_ok=True);path.write_text(filename)
                     current['files'][filename]=repository.digest(path)
+                current=feed_manifest(current, graph)
                 manifest=root/publication.feed_paths(row)[0]/'build.json'
                 publication.write(manifest,{'targets':{row['arch']:current}} if extension=='deb' else current)
                 context=dict(build_project='mqttsuite',release_project='mqttsuite',source_tags=dict.fromkeys(graph,'v1.0.0'),versions=dict.fromkeys(graph,'1.0.0'))
@@ -48,8 +49,11 @@ class SiblingFormatsTest(PinnedJsonCase):
                     path.parent.mkdir(parents=True,exist_ok=True);path.write_text(filename)
                     metadata['files'][filename]=repository.digest(path)
                 if extension=='ipk':
-                    (directory/'Packages').write_text('Package: mqttsuite\nVersion: 1-r2\n\nPackage: snodec-extra\nVersion: 1-r1\n\n')
-                    (manifest.parent/'Packages').write_text('Package: snodec\nVersion: 1-r1\n\nPackage: snodec-extra\nVersion: 1-r2\n\n')
+                    (directory/'Packages').write_text(f'Package: mqttsuite\nVersion: 1-r2\nFilename: {name("mqttsuite",
+                        2)}\n\nPackage: snodec-extra\nVersion: 1-r1\nFilename: {name("demo",1)}\n\n')
+                    (manifest.parent/'Packages').write_text(f'Package: snodec\nVersion: 1-r1\nFilename: {name("snode.c",
+                        1)}\n\nPackage: snodec-extra\nVersion: 1-r2\nFilename: {name("demo",2)}\n\n')
+                    metadata['files']['Packages'] = repository.digest(directory/'Packages')
                 publication.write(directory/'build.json',metadata)
                 def sign(*args):
                     result=publication.read(directory/'build.json')
@@ -57,15 +61,40 @@ class SiblingFormatsTest(PinnedJsonCase):
                     self.assertNotIn(name('demo',1),result['files'])
                     self.assertEqual(result['sources']['demo'],current['sources']['demo'])
                     self.assertEqual(result['versions']['demo'],current['versions']['demo'])
+                    if extension == 'ipk':
+                        index = (directory/'Packages').read_text()
+                        for project, revision in [('snode.c',1),('mqttsuite',2),('demo',2)]:
+                            self.assertIn('Filename: '+name(project,revision), index)
+                        self.assertNotIn('Filename: '+name('demo',1), index)
                     publication.write(manifest,{'targets':{row['arch']:result}} if extension=='deb' else result)
                     return None
                 def index(*args):
-                    self.assertIn(str(directory/name('demo',2)),args)
-                    self.assertNotIn(str(directory/name('demo',1)),args)
-                    (directory/'packages.adb').write_text('index rebuilt from retained bytes')
-                    return None
-                with patch.object(repository,'PROJECTS',graph),patch.object(publication,'PROJECTS',graph),patch.object(repository,'REPOSITORIES',tuple(graph)+('unpublished',)),patch.object(publication,'REPOSITORIES',tuple(graph)+('unpublished',)),patch.object(repository,'activate'),patch.object(publication,'activate'),patch.object(repository,'publish',side_effect=sign),patch.object(linux,'publish',side_effect=sign),patch.object(openwrt,'run',side_effect=index),patch('ci.publish.cleanup.cleanup'):
-                    publication.publish(root,bundle,incoming,row,dict(revisions={'mqttsuite':'2'},profiles_hash=repository.digest(bundle/'profiles.json')),'mqttsuite')
+                    result = None
+                    if args[1] == 'mkndx':
+                        self.assertIn(str(directory/name('demo',2)),args)
+                        self.assertNotIn(str(directory/name('demo',1)),args)
+                        (directory/'packages.adb').write_text('index rebuilt from retained bytes')
+                    else:
+                        import json
+                        result = json.dumps(dict(packages=[controls(p) for p in sorted(directory.glob('*.apk'))]))
+                    return result
+                def controls(path):
+                    project = repository.package_owner(path.name, graph)
+                    revision = path.stem.rsplit('_',1)[1]
+                    fields = dict(name=graph[project]['package'], arch=row['arch'],
+                                  version=repository.package_version(row,'1.0.0',revision))
+                    fields['control'] = ''.join(f'{k}: {fields[v]}\n' for k,v in [
+                        ('Package','name'),('Version','version'),('Architecture','arch')])
+                    return fields
+                with patch.object(repository,'PROJECTS',graph), patch.object(publication,'PROJECTS',graph), \
+                        patch.object(repository,'REPOSITORIES',tuple(graph)+('unpublished',)), \
+                        patch.object(publication,'REPOSITORIES',tuple(graph)+('unpublished',)), \
+                        patch.object(repository,'activate'), patch.object(publication,'activate'), \
+                        patch.object(repository,'publish',side_effect=sign), patch.object(linux,'publish',side_effect=sign), \
+                        patch.object(openwrt,'run',side_effect=index), \
+                        patch.object(publication,'package_metadata',side_effect=controls), patch('ci.publish.cleanup.cleanup'):
+                    generation = dict(context=context, revisions={'mqttsuite': '2'}, profiles_hash=repository.digest(bundle / 'profiles.json'))
+                    publication.publish(root, bundle, incoming, row, generation, 'mqttsuite')
         return None
 
     def test_unknown_retained_sibling_ownership_fails_before_feed_mutation(self):
@@ -76,7 +105,8 @@ class SiblingFormatsTest(PinnedJsonCase):
             directory.mkdir(parents=True)
             package=directory/'snodec_2.deb'
             package.write_bytes(b'unsigned fixture')
-            publication.write(directory/'build.json',dict(files={package.name:repository.digest(package)}))
+            publication.write(directory/'build.json',dict(sources={'snode.c':{'refs/tags/v1.0.0':'b'*40}},
+                files={package.name:repository.digest(package)}))
             publication.write(bundle/'profiles.json',{row['id']:{'projects':repository.PROJECTS}})
             publication.write(root/'debian/dists/trixie/build.json',dict(targets={'amd64':dict(sources={'historical':{'refs/tags/v1.0.0':'a'*40}},files={'historical_1.deb':'f'*64})}))
             before={str(p.relative_to(root)):p.read_bytes() for p in root.rglob('*') if p.is_file()}
@@ -89,15 +119,18 @@ class SiblingFormatsTest(PinnedJsonCase):
         import os
         with tempfile.TemporaryDirectory() as temporary:
             sdk,bundle,output=(Path(temporary)/n for n in ['sdk','bundle','output'])
-            feed=sdk/'bin/packages/test/snodec';feed.mkdir(parents=True)
+            feed=sdk/'bin/packages/test/package_ci';feed.mkdir(parents=True)
             publication.write(sdk/'ci-sdk.json',dict(arch='test',series='24.10'))
-            for name in ['demo.ipk','Packages','Packages.gz']:
+            for name in ['Packages','Packages.gz']:
                 (feed/name).write_bytes(b'fixture')
+            ipk(feed/'demo_1.0.0-r9_test.ipk','demo','1.0.0-r9','test')
             publication.write(bundle/'context.json',dict(build_project='demo',versions={'demo':'1.0.0','snode.c':'2.0.0','mqttsuite':'1.0.2'}))
-            publication.write(bundle/'sources.json',{})
+            publication.write(bundle/'sources.json',{'demo':{'refs/tags/v1.0.0':'d'*40}})
             retained={'snode.c':'2.0.0-r2','mqttsuite':'1.0.2-r3'}
             publication.write(bundle/'baseline.json',dict(versions=retained))
-            with patch.dict(os.environ,PACKAGE_RELEASE='9'):
+            demo = dict(repository.PROJECTS['snode.c'],package='demo')
+            with patch.dict(os.environ,PACKAGE_RELEASE='9'), patch.dict(repository.PROJECTS,demo=demo), \
+                    patch.object(repository,'REPOSITORIES',repository.REPOSITORIES+('demo',)):
                 repository.stage(sdk,bundle,output)
             self.assertEqual(publication.read(output/'openwrt/24.10/test/build.json')['versions'],retained|{'demo':'1.0.0-r9'})
         return None
@@ -115,7 +148,7 @@ class SiblingFormatsTest(PinnedJsonCase):
             repository.run('dpkg-deb','--build','--root-owner-group',str(package),str(pool/'demo.deb'))
             repository.run('gpg','--homedir',str(home),'--batch','--pinentry-mode','loopback','--passphrase','','--quick-generate-key','Fixture <fixture@example.invalid>','rsa2048','sign','1d',stderr=subprocess.DEVNULL)
             private=repository.run('gpg','--homedir',str(home),'--batch','--armor','--export-secret-keys')
-            (root/'keys/snodec-apt.asc').write_text(repository.run('gpg','--homedir',str(home),'--batch','--armor','--export'))
+            (root/'keys/apt.asc').write_text(repository.run('gpg','--homedir',str(home),'--batch','--armor','--export'))
             with patch.object(apt,'ROOT',root),patch.dict(os.environ,APT_SIGNING_KEY=private):
                 apt.index(feed,'trixie',{'amd64':{}})
             dist=feed/'dists/trixie'
@@ -137,14 +170,15 @@ class SiblingFormatsTest(PinnedJsonCase):
             root=Path(temporary);bundle=root/'bundle';packages=root/'packages';packages.mkdir()
             package=root/'package';(package/'DEBIAN').mkdir(parents=True)
             (package/'DEBIAN/control').write_text('Package: mqttsuite\nVersion: 1.0.0-1~trixie\nArchitecture: amd64\nMaintainer: Fixture <fixture@example.invalid>\nDescription: repository-owned image fixture\n')
-            repository.run('dpkg-deb','--build','--root-owner-group',str(package),str(packages/'mqttsuite.deb'))
+            repository.run('dpkg-deb','--build','--root-owner-group',str(package),str(packages/'mqttsuite_1.0.0-1~trixie_amd64.deb'))
             (packages/'mqttsuite.packages').write_text('mqttsuite\n')
-            for name,value in dict(context={'build_project':'mqttsuite'},sources={'mqttsuite':{'refs/tags/v1.0.0':'a'*40}},checksums={}).items():
+            for name,value in dict(context={'build_project':'mqttsuite', 'versions':{'mqttsuite':'1.0.0'}},
+                sources={'mqttsuite':{'refs/tags/v1.0.0':'a'*40}},baseline={},checksums={}).items():
                 publication.write(bundle/(name+'.json'),value)
             home=root/'gnupg';home.mkdir(mode=0o700);(root/'keys').mkdir()
             repository.run('gpg','--homedir',str(home),'--batch','--pinentry-mode','loopback','--passphrase','','--quick-generate-key','Image fixture <fixture@example.invalid>','rsa2048','sign','1d',stderr=subprocess.DEVNULL)
             private=repository.run('gpg','--homedir',str(home),'--batch','--armor','--export-secret-keys')
-            (root/'keys/snodec-apt.asc').write_text(repository.run('gpg','--homedir',str(home),'--batch','--armor','--export'))
+            (root/'keys/apt.asc').write_text(repository.run('gpg','--homedir',str(home),'--batch','--armor','--export'))
             output,feed=root/'output',root/'feed'
             with patch.dict(apt.PROJECTS,graph,clear=True),patch.object(apt,'ROOT',root),patch.dict(os.environ,PACKAGE_RELEASE='1',APT_SIGNING_KEY=private):
                 apt.stage('trixie',packages,bundle,output,'debian')

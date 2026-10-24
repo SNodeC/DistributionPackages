@@ -9,7 +9,7 @@ case "${DISTRIBUTION:-raspberrypios}" in
         format=DEB
         libdir=lib
         apt-get update
-        apt-get install -y build-essential cmake ninja-build pkg-config git ca-certificates adduser passwd util-linux file python3
+        apt-get install -y git ca-certificates adduser passwd util-linux file python3
         ;;
     rocky|fedora)
         format=RPM
@@ -18,11 +18,7 @@ case "${DISTRIBUTION:-raspberrypios}" in
             dnf install -y dnf-plugins-core epel-release
             dnf config-manager --set-enabled crb
         fi
-        dnf install -y gcc gcc-c++ cmake ninja-build make pkgconf-pkg-config git ca-certificates file python3 rpm-build shadow-utils util-linux
-        if [ "$DISTRIBUTION:$SUITE" = rocky:9 ]; then
-            dnf install -y gcc-toolset-14-gcc-c++
-            source /opt/rh/gcc-toolset-14/enable
-        fi
+        dnf install -y git ca-certificates file python3 shadow-utils util-linux
         ;;
 esac
 mkdir -p sources packages
@@ -57,6 +53,6 @@ if [ "${#prerequisite_packages[@]}" != 0 ]; then
     install_packages "${prerequisite_packages[@]}"
 fi
 ldconfig
-useradd --system --user-group --create-home snodec-test
+useradd --system --user-group --create-home package-test
 source "sources/$BUILD_PROJECT/$(python3 -c 'import os; from ci.repository import PROJECTS; print(PROJECTS[os.environ["BUILD_PROJECT"]]["build"]["native"])')"
 find dependencies -maxdepth 1 -type f -exec cp -t packages {} +

@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
-from support import PinnedJsonCase
+from support import PinnedJsonCase, ipk
 from unittest.mock import patch
 from ci import repository, dispatch
 from ci.publish import publication, openwrt
@@ -17,12 +17,12 @@ class ContractTest(PinnedJsonCase):
         with tempfile.TemporaryDirectory() as temporary:
             path=Path(temporary)/'master.json'
             publication.write(path,dict(repositories=['demo_repo']))
-            self.assertEqual(repository.load_master(path)['settings'],dict(capacity='plan',headroom=2,dependent_version='published',rebuild_overlap=True))
+            self.assertEqual(repository.load_master(path)['settings'],dict(capacity='plan',headroom=2,rebuild_overlap=True))
             for names in [['..'],['demo','Demo'],['a/b']]:
                 publication.write(path,dict(repositories=names))
                 with self.subTest(names=names),self.assertRaises(ValueError):
                     repository.load_master(path)
-            settings=dict(capacity=7,headroom=1,dependent_version='latest',rebuild_overlap=False)
+            settings=dict(capacity=7,headroom=1,rebuild_overlap=False)
             publication.write(path,dict(repositories=['demo'],settings=settings))
             self.assertEqual(repository.load_master(path)['settings'],settings)
             for extra in [dict(matrix=[]),dict(depends_on=[]),dict(build={}),dict(settings={'fairness':True}),dict(settings={'capacity':True}),dict(settings={'headroom':-1}),dict(settings={'dependent_version':'branch'}),dict(settings={'dependent_version':[]}),dict(settings={'rebuild_overlap':'yes'})]:
@@ -62,36 +62,9 @@ class ContractTest(PinnedJsonCase):
                 with patch.dict(os.environ,RELEASE_RUN='100',RELEASE_SHA='b'*40):
                     moved=publication.reserve(root,'snode.c','101')
                 self.assertEqual(int(moved['snode.c']),int(allocation['snode.c'])+1)
-                self.assertEqual(publication.read(root/'status.json')['requests']['snode.c']['sha'],'b'*40)
+                self.assertEqual(publication.read(root/'status.json')['requests']['snode.c']['v1.0.0']['sha'],'b'*40)
         return None
 
-    def test_pinned_per_row_definitions_select_last_published_and_pending_explicit(self):
-        graph=copy.deepcopy(repository.PROJECTS)
-        root_config=graph['snode.c']
-        root_config['build']={'native':'ci/package/native.sh'}
-        root_config['matrix']={'linux':[dict(distribution='debian',suite='trixie',image='debian:trixie',architectures=['amd64','arm64'])]}
-        seen=[]
-        def definition(project,commit):
-            seen.append((project,commit))
-            return copy.deepcopy(graph[project])|dict(_commit=commit,_digest='f'*64)
-        def api(path,*args,**kwargs):
-            return {'default_branch':'main'} if '/git/' not in path else {'object':{'sha':'d'*40}}
-        def published(root,row):
-            ref='b'*40 if row['arch']=='amd64' else 'c'*40
-            return dict(sources={'mqttsuite':{'refs/tags/v1.0.0':ref}},versions={'mqttsuite':'1.0.0-1~trixie'}),'feed'
-        with tempfile.TemporaryDirectory() as temporary:
-            root=Path(temporary)
-            publication.write(root/'status.json',{})
-            with patch.object(repository,'DEFINITIONS',root/'definitions.json'),patch.object(repository,'definition',side_effect=definition),patch.object(dispatch,'api',side_effect=api),patch.object(publication,'published',side_effect=published),patch.dict(repository.PROJECTS,repository.PROJECTS,clear=True),patch.dict(repository.ROW_PROJECTS,{},clear=True):
-                repository.configure(root,'snode.c','a'*40,root_config)
-                self.assertEqual(repository.ROW_PROJECTS['debian-trixie-amd64']['mqttsuite']['_commit'],'b'*40)
-                self.assertEqual(repository.ROW_PROJECTS['debian-trixie-arm64']['mqttsuite']['_commit'],'c'*40)
-                publication.write(root/'status.json',dict(requests={'mqttsuite':dict(sha='e'*40,tag='v2.0.0',revision='2')}))
-                repository.configure(root,'snode.c','a'*40,root_config)
-                self.assertTrue(all(p['mqttsuite']['_commit']=='e'*40 and p['mqttsuite']['_tag']=='v2.0.0' for p in repository.ROW_PROJECTS.values()))
-                with self.assertRaisesRegex(ValueError,'does not match'):
-                    repository.configure(root,'snode.c','a'*40,root_config|dict(title='forged'))
-        return None
 
     def test_identical_receipt_is_noop_but_conflicting_bytes_and_path_escape_fail(self):
         row=publication.targets()[0]
@@ -120,12 +93,38 @@ class ContractTest(PinnedJsonCase):
             incoming,previous=(Path(temporary)/n for n in ['incoming','previous'])
             incoming.mkdir();previous.mkdir()
             graph=repository.PROJECTS|{'demo':dict(package='demo')}
-            (incoming/'Packages').write_text('Package: demo\nVersion: 2-r2\n\nPackage: mqttsuite\nVersion: 1-r1\n\n')
-            (previous/'Packages').write_text('Package: demo\nVersion: 1-r1\n\nPackage: mqttsuite\nVersion: 3-r3\n\nPackage: snodec\nVersion: 2-r4\n\n')
-            info=dict(series='24.10',files={},sources={p:{'refs/tags/v1.0.0':'a'*40} for p in graph})
+            (incoming/'Packages').write_text(
+                'Package: demo\n'
+                'Version: 2-r2\n'
+                'Filename: demo_2.ipk\n'
+                '\n'
+                'Package: mqttsuite\n'
+                'Version: 1-r1\n'
+                'Filename: mqttsuite_1.ipk\n'
+                '\n')
+            (previous/'Packages').write_text(
+                'Package: demo\n'
+                'Version: 1-r1\n'
+                'Filename: demo_1.ipk\n'
+                '\n'
+                'Package: mqttsuite\n'
+                'Version: 3-r3\n'
+                'Filename: mqttsuite_3.ipk\n'
+                '\n'
+                'Package: snodec\n'
+                'Version: 2-r4\n'
+                'Filename: snodec_2.ipk\n'
+                '\n')
+            info=dict(series='24.10',files=dict.fromkeys(['demo_2.ipk', 'mqttsuite_3.ipk', 'snodec_2.ipk'], 'hash'),
+                sources={p:{'refs/tags/v1.0.0':'a'*40} for p in graph})
             publication.write(previous/'build.json',info)
+            controls = {}
+            for filename, name, release in [('demo_2.ipk','demo','2-r2'),('mqttsuite_3.ipk','mqttsuite','3-r3'),
+                                             ('snodec_2.ipk','snodec','2-r4')]:
+                ipk(incoming/filename,name,release)
+                controls[filename] = repository.package_metadata(incoming/filename)
             with patch.object(repository,'PROJECTS',graph),patch.object(repository,'REPOSITORIES',tuple(graph)):
-                openwrt.reindex(incoming,previous,info,'demo',info)
+                openwrt.reindex(incoming,info,controls)
             index=(incoming/'Packages').read_text()
             for value in ['2-r2','3-r3','2-r4']:
                 self.assertIn('Version: '+value,index)
@@ -162,6 +161,46 @@ class CapacityTest(unittest.TestCase):
         self.assertEqual(free,18)
         self.assertEqual(set(occupied),{('public',1),('private',1)})
         self.assertTrue(any('/private/' in path for path in self.seen))
+        return None
+
+    def test_missing_optional_private_count_still_counts_visible_private_jobs(self):
+        self.org.pop('total_private_repos')
+        with patch.dict(os.environ, OBSERVER_TOKEN='fixture'), patch.object(dispatch, 'api', side_effect=self.api):
+            free, occupied = dispatch.capacity()
+        self.assertEqual(free, 18)
+        self.assertEqual(set(occupied), {('public', 1), ('private', 1)})
+        self.assertTrue(any('/private/' in path for path in self.seen))
+        return None
+
+    def test_missing_private_count_requires_every_inventory_page(self):
+        self.org.pop('total_private_repos')
+        self.org['public_repos'] = 100
+        original = self.api
+        def paginated(path, payload=None, token=None):
+            if path.startswith('orgs/SNodeC/repos'):
+                self.seen.append(path)
+                value = [dict(name='public' + str(i)) for i in range(100)] if path.endswith('&page=1') else [dict(name='private')]
+            elif '/public' in path:
+                self.seen.append(path)
+                value = dict(total_count=0, workflow_runs=[])
+            else:
+                value = original(path, payload, token)
+            return value
+        with patch.dict(os.environ, OBSERVER_TOKEN='fixture'), patch.object(dispatch, 'api', side_effect=paginated):
+            free, occupied = dispatch.capacity()
+        self.assertEqual(free, 19)
+        self.assertEqual(set(occupied), {('private', 1)})
+        self.assertEqual([p for p in self.seen if p.startswith('orgs/SNodeC/repos')],
+                         ['orgs/SNodeC/repos?type=all&per_page=100&page=1', 'orgs/SNodeC/repos?type=all&per_page=100&page=2'])
+        self.seen.clear()
+        def failed_page(path, payload=None, token=None):
+            if path.startswith('orgs/SNodeC/repos') and path.endswith('&page=2'):
+                raise dispatch.ApiError(403, 'inventory page unavailable')
+            return paginated(path, payload, token)
+        with patch.dict(os.environ, OBSERVER_TOKEN='fixture'), patch.object(dispatch, 'api', side_effect=failed_page):
+            with self.assertRaisesRegex(dispatch.ApiError, 'inventory page unavailable'):
+                dispatch.capacity()
+        self.assertFalse(any('/actions/' in path for path in self.seen))
         return None
 
     def test_waiting_run_is_inspected_for_allocated_jobs(self):

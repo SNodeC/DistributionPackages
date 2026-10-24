@@ -20,19 +20,19 @@ The [installer](../install/install.sh) configures the correct verification key. 
 
 ### OpenPGP: APT and RPM
 
-[`snodec-apt.asc`](snodec-apt.asc) is shared by Debian, Ubuntu and Raspberry Pi OS (APT), and Rocky Linux and Fedora (DNF/RPM). APT guides download the ASCII-armored key unchanged to `/etc/apt/keyrings/snodec.asc` and reference it using `signed-by`. RPM guides install the same key as `RPM-GPG-KEY-snodec` and keep package and repository signature checks enabled.
+[`apt.asc`](apt.asc) is shared by Debian, Ubuntu and Raspberry Pi OS (APT), and Rocky Linux and Fedora (DNF/RPM). APT guides download the ASCII-armored key unchanged to `/etc/apt/keyrings/snodec.asc` and reference it using `signed-by`. RPM guides install the same key as `RPM-GPG-KEY-snodec` and keep package and repository signature checks enabled.
 
 Next: [Debian](../docs/installation/debian.md#banner), [Ubuntu](../docs/installation/ubuntu.md#banner), [Raspberry Pi OS](../docs/installation/raspberry-pi-os.md#banner), [Rocky Linux](../docs/installation/rocky-linux.md#banner), [Fedora](../docs/installation/fedora.md#banner).
 
 ### opkg: OpenWrt 24.10
 
-[`snodec-opkg.pub`](snodec-opkg.pub) verifies opkg feed-index signatures. Import it with `opkg-key add`, then configure the matching signed feed. opkg is the package manager; usign is the feed-signing tool/format. `snodec-opkg.pub` is the canonical filename; [`snodec-usign.pub`](snodec-usign.pub) is the byte-identical former name, preserved for older instructions.
+[`opkg.pub`](opkg.pub) verifies opkg feed-index signatures. Import it with `opkg-key add`, then configure the matching signed feed. opkg is the package manager; usign is the feed-signing tool/format. `opkg.pub` is the canonical filename for this first deployment; no legacy key alias is published.
 
 Next: [OpenWrt](../docs/installation/openwrt.md#banner).
 
 ### APK: OpenWrt 25.12
 
-[`snodec-apk.pem`](snodec-apk.pem) verifies APK v3 feed-index signatures. Install it in `/etc/apk/keys/`, then configure the matching APK feed. This key is for OpenWrt, not an Alpine Linux repository or Android application signing. The opkg and APK keys cannot be substituted for each other.
+[`apk.pem`](apk.pem) verifies APK v3 feed-index signatures. Install it in `/etc/apk/keys/`, then configure the matching APK feed. This key is for OpenWrt, not an Alpine Linux repository or Android application signing. The opkg and APK keys cannot be substituted for each other.
 
 Next: [OpenWrt](../docs/installation/openwrt.md#banner).
 
@@ -53,10 +53,10 @@ Compare a key’s computed fingerprint with the table below to detect a mismatch
 From a local checkout (or a download saved at these same paths), use `gpg`, `usign` and `openssl` as applicable:
 
 ```sh
-gpg --batch --show-keys --with-colons keys/snodec-apt.asc |
+gpg --batch --show-keys --with-colons keys/apt.asc |
   awk -F: '$1 == "fpr" { print $10; exit }'
-usign -F -p keys/snodec-opkg.pub
-openssl pkey -pubin -in keys/snodec-apk.pem -outform DER | openssl dgst -sha256
+usign -F -p keys/opkg.pub
+openssl pkey -pubin -in keys/apk.pem -outform DER | openssl dgst -sha256
 ```
 
 ### Installed keys
@@ -85,8 +85,12 @@ done
 On OpenWrt 25.12:
 
 ```sh
-openssl pkey -pubin -in /etc/apk/keys/snodec-apk.pem -outform DER |
+openssl pkey -pubin -in /etc/apk/keys/apk.pem -outform DER |
   openssl dgst -sha256
 ```
 
 [Installation troubleshooting](../docs/troubleshooting.md#banner) covers missing keys, rejected signatures and dependency errors. Do not bypass a signature error with an untrusted-install option.
+
+## Maintainer key deployment
+
+Public keys are published from the coordinator default branch. Capture-pinned verification keys must match the deployed key for the signing family; mismatches stop publication. Key rotation is a separate operator procedure requiring fresh captures and explicit re-signing of already-published rows. Never disable verification to work around a mismatch.

@@ -59,7 +59,7 @@ Select your suite below (`trixie` is the example), then run the block:
   base=https://raw.githubusercontent.com/SNodeC/Packages/main
   url="$base/debian"
   curl -fsSL "$url/dists/$suite/main/binary-$arch/Packages.gz" -o "$tmp/index"
-  curl -fsSL "$base/keys/snodec-apt.asc" -o "$tmp/key"
+  curl -fsSL "$base/keys/apt.asc" -o "$tmp/key"
   sudo install -d -m 755 /etc/apt/keyrings /etc/apt/sources.list.d
   sudo install -m 644 "$tmp/key" /etc/apt/keyrings/snodec.asc
   printf 'deb [arch=%s signed-by=/etc/apt/keyrings/snodec.asc] %s %s main\n' \

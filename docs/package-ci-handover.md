@@ -1,3 +1,7 @@
+> Historical design/handover. Current publisher metadata checks, control-derived indexes, CAS graph validation and key authority are documented in [CI orchestration](ci-orchestration.md). Earlier capture-pinned feed-key copying is superseded.
+
+> Historical design/evidence. Superseded by the canonical first-deployment agreement; current operations are in [setup](setup.md) and [orchestration](ci-orchestration.md).
+
 # Local package CI refactor handover
 
 > The initial implementation below was independently reviewed and corrected. See [the correction handover](package-ci-corrections.md) for the current state, final tests and accounting; original evidence is preserved under `/tmp/codex/build/snodec/package-ci`.

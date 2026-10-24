@@ -10,6 +10,7 @@ permissions:
   contents: read
   actions: read
 env:
+  PACKAGE_COORDINATOR_REF: ${{ github.event.repository.default_branch }}
   PYTHONPATH: ${{ github.workspace }}/feed
   PACKAGE_REQUEST: ${{ inputs.request }}
 jobs:
@@ -26,16 +27,15 @@ jobs:
           path: feed
           fetch-depth: 0
           persist-credentials: false
-      - name: Scope coordinator token to registered repositories
-        id: repositories
-        run: echo "names=$(jq -r '.repositories + ["DistributionPackages", "Packages"] | join(",")' feed/ci/projects.json)" >> "$GITHUB_OUTPUT"
+      - id: deployment
+        run: PYTHONPATH=feed python3 -m ci.repository deployment >> "$GITHUB_OUTPUT"
       - uses: actions/create-github-app-token@v3
         id: publisher
         with:
           client-id: ${{ vars.PACKAGES_APP_CLIENT_ID }}
           private-key: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
-          owner: SNodeC
-          repositories: ${{ steps.repositories.outputs.names }}
+          owner: ${{ steps.deployment.outputs.owner }}
+          repositories: ${{ steps.deployment.outputs.readers }}
           permission-contents: read
           permission-actions: read
       - uses: actions/create-github-app-token@v3
@@ -43,8 +43,8 @@ jobs:
         with:
           client-id: ${{ vars.PACKAGES_APP_CLIENT_ID }}
           private-key: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
-          owner: SNodeC
-          repositories: Packages
+          owner: ${{ steps.deployment.outputs.owner }}
+          repositories: ${{ steps.deployment.outputs.feed_name }}
           permission-contents: write
       - name: Verify coordinator publication authority
         env:
@@ -55,7 +55,7 @@ jobs:
           if [ "$GITHUB_TRIGGERING_ACTOR" != "$EXPECTED_ACTOR" ]; then python3 -m ci.dispatch operator; fi
       - uses: actions/download-artifact@v8
         with:
-          repository: SNodeC/DistributionPackages
+          repository: ${{ steps.deployment.outputs.coordinator }}
           run-id: ${{ fromJSON(inputs.request).capture }}
           github-token: ${{ steps.publisher.outputs.token }}
           name: source-pair
@@ -76,7 +76,7 @@ jobs:
           git -C feed merge-base --is-ancestor "$commit" HEAD
           # Publish current guides and downloadable installers; keep CI tooling capture-pinned.
           mkdir -p "$RUNNER_TEMP/package-site"
-          git -C feed archive "origin/$DOCS_BRANCH" site install |
+          git -C feed archive "origin/$DOCS_BRANCH" site install keys |
             tar -x -C "$RUNNER_TEMP/package-site"
           echo "PACKAGE_SITE=$RUNNER_TEMP/package-site/site" >> "$GITHUB_ENV"
           git -C feed checkout --detach "$commit"
@@ -94,8 +94,8 @@ jobs:
         run: python3 -m ci.dispatch artifact incoming
       - uses: actions/checkout@v6
         with:
-          repository: SNodeC/Packages
-          ref: main
+          repository: ${{ steps.deployment.outputs.feed }}
+          ref: ${{ steps.deployment.outputs.branch }}
           token: ${{ steps.feed-write.outputs.token }}
           path: published
           sparse-checkout: ${{ steps.scope.outputs.paths }}

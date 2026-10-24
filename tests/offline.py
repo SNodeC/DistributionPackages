@@ -1,8 +1,7 @@
-"""Local navigation fixture and a transport guard, also used by CLI subprocesses."""
+"""Subprocess transport guard, also used by isolated CLI fixtures."""
 import os
 from pathlib import Path
 import runpy
-import shutil
 import subprocess
 import sys
 
@@ -10,14 +9,7 @@ _original = subprocess.run
 
 
 def offline(args, **kwargs):
-    if 'https://github.com/SNodeC/.github.git' in args and 'clone' in args:
-        destination = Path(args[-1])
-        source = Path(os.environ['SNODEC_TEST_TOOLING'])
-        for name in ('tools', 'navigation', 'brand'):
-            shutil.copytree(source / name, destination / name)
-        shutil.copy2(source / 'catalog.yml', destination / 'catalog.yml')
-        result = subprocess.CompletedProcess(args, 0)
-    elif len(args) > 3 and args[1] == '-C' and args[3] == 'sparse-checkout' and not (Path(args[2]) / '.git').exists():
+    if len(args) > 3 and args[1] == '-C' and args[3] == 'sparse-checkout' and not (Path(args[2]) / '.git').exists():
         result = subprocess.CompletedProcess(args, 0)
     else:
         command = Path(str(args[0])).name

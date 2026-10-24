@@ -13,7 +13,7 @@ def check(path):
         entry = workflow['jobs'][job]
         assert entry['uses'] == f'SNodeC/DistributionPackages/.github/workflows/{shared}.yml@main'
         assert set(entry) == {'if', 'uses', 'secrets'}
-        expected = ['PACKAGE_NOTIFY_APP_PRIVATE_KEY'] + (['PACKAGE_CAPTURE_APP_PRIVATE_KEY'] if job == 'build' else [])
+        expected = ['PACKAGE_NOTIFY_APP_PRIVATE_KEY', 'PACKAGE_CAPTURE_APP_PRIVATE_KEY']
         assert entry['secrets'] == {key: '${{ secrets.' + key + ' }}' for key in expected}
     assert workflow['jobs']['notify']['if'] == "github.event_name == 'push' && github.event.deleted == false"
     assert workflow['jobs']['build']['if'] == "github.event_name == 'workflow_dispatch'"
@@ -24,7 +24,7 @@ def check(path):
     assert set(tokens) == {'capture', 'notify'}
     for name, permissions in [('capture', {'permission-actions': 'read', 'permission-contents': 'read'}),
                               ('notify', {'permission-actions': 'write'})]:
-        assert tokens[name]['repositories'] == 'DistributionPackages'
+        assert tokens[name]['repositories'] == '${{ steps.location.outputs.name }}'
         assert {k: v for k, v in tokens[name].items() if k.startswith('permission-')} == permissions
     print(f'{path}: thin tag notification and coordinator build entry points passed')
     return None

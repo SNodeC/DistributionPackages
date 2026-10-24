@@ -2,6 +2,8 @@
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+from email.parser import Parser
+import io
 import http.client
 from graphlib import TopologicalSorter
 from functools import cache
@@ -16,30 +18,66 @@ import shutil
 import socket
 import subprocess
 import sys
+import tarfile
 import time
 import urllib.error
 import urllib.request
 
 ROOT = Path(__file__).resolve().parent.parent
+TAG = r'v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)'
+
+
+def version(tag):
+    if not isinstance(tag, str) or not re.fullmatch(TAG, tag):
+        raise ValueError('Expected vMAJOR.MINOR.PATCH without leading zeros: ' + str(tag))
+    return tuple(map(int, tag[1:].split('.')))
+
+
+def source_tag(info, project):
+    refs = info.get('sources', {}).get(project, {})
+    return next((k.removeprefix('refs/tags/') for k in refs if not k.endswith('^{}')),
+                info.get('context', {}).get('source_tags', {}).get(project))
+
+
+def release_view(info, project, tag=None):
+    releases = info.get('releases', {}).get(project, {})
+    return (releases.get(tag or max(releases, key=version, default=None), {}) if 'releases' in info else info)
+
+
+def generation_tag(generation, project, target=None):
+    tags = [source_tag(dict(sources=values), project) for key, values in generation.get('sources', {}).items()
+            if (target is None or target == key) and project in values]
+    context = generation.get('context', {})
+    fallback = context.get('tag') if context.get('release_project') == project else None
+    return max((t for t in tags if t), key=version, default=fallback)
 
 def load_master(path):
     value = json.loads(path.read_text())
-    defaults = dict(capacity='plan', headroom=2, dependent_version='published', rebuild_overlap=True)
-    if not isinstance(value, dict) or set(value) - {'repositories', 'settings'}:
+    defaults = dict(capacity='plan', headroom=2, rebuild_overlap=True)
+    if not isinstance(value, dict) or set(value) - {'repositories', 'settings', 'feed'}:
         raise ValueError('Master configuration contains repositories and optional settings only')
     names = value.get('repositories')
     if not isinstance(names, list) or not names or any(not isinstance(n, str) or not re.fullmatch(r'[A-Za-z0-9._-]{1,100}', n) or n in {'.', '..'} for n in names) or len({n.casefold() for n in names}) != len(names):
         raise ValueError('repositories must be unique repository names')
     settings = value.get('settings', {})
+    if isinstance(settings, dict) and 'dependent_version' in settings:
+        raise ValueError('Cascades always select the highest semantic version; remove dependent_version')
     if not isinstance(settings, dict) or set(settings) - defaults.keys():
         raise ValueError('Unknown coordinator setting')
     defaults.update(settings)
     if (defaults['capacity'] != 'plan' and (type(defaults['capacity']) is not int or defaults['capacity'] < 3)
             or type(defaults['headroom']) is not int or defaults['headroom'] < 1
-            or defaults['dependent_version'] not in ('published', 'latest') or type(defaults['rebuild_overlap']) is not bool
+            or type(defaults['rebuild_overlap']) is not bool
             or type(defaults['capacity']) is int and defaults['headroom'] >= defaults['capacity']):
-        raise ValueError('Invalid capacity, headroom, dependent_version or rebuild_overlap setting')
-    return dict(repositories=names, settings=defaults)
+        raise ValueError('Invalid capacity, headroom or rebuild_overlap setting')
+    if not isinstance(value.get('feed', {}), dict):
+        raise ValueError('feed must be an object with repository and branch')
+    feed = dict(repository='Packages', branch='main') | value.get('feed', {})
+    if (set(feed) != {'repository', 'branch'} or any(not isinstance(v, str) for v in feed.values()) or not re.fullmatch(r'[A-Za-z0-9._-]+', feed['repository'])
+            or feed['repository'] in {'.', '..'} or not re.fullmatch(r'[A-Za-z0-9_-][A-Za-z0-9_/-]*', feed['branch'])
+            or '//' in feed['branch'] or feed['branch'].endswith('/')):
+        raise ValueError('feed needs a safe repository name and branch')
+    return dict(repositories=names, settings=defaults, feed=feed)
 
 
 def rows(config):
@@ -106,13 +144,15 @@ def validate_projects(projects):
     if len({c['package'] for c in projects.values()}) != len(projects):
         raise ValueError('Repository package namespaces must be unique')
     order = tuple(TopologicalSorter({n: c['depends_on'] for n, c in projects.items()}).static_order())
-    if set(order) != set(projects):
-        raise ValueError('Missing dependency definitions')
-    return {name: projects[name] for name in order}
+    return {name: projects[name] for name in order if name in projects}
 
 
 def load_projects(path):
     return validate_projects(json.loads(path.read_text())['projects']) if path.exists() else {}
+
+
+def requested_projects(requests):
+    return {project: values[max(values, key=version)]['definition'] for project, values in requests.items() if values}
 
 
 def bind_projects(projects, baseline, project):
@@ -123,15 +163,15 @@ def bind_projects(projects, baseline, project):
         if dependency not in visited:
             visited.add(dependency)
             ref = source_commit(baseline.get('sources', {}).get(dependency))
-            if ref is not None and projects[dependency].get('_commit') != ref:
+            if ref is not None and projects.get(dependency, {}).get('_commit') != ref:
                 supplied = json.loads(os.environ.get('PACKAGE_REQUEST', '{}')).get('definitions', {})
-                if os.environ.get('GITHUB_REPOSITORY') not in (None, '', 'SNodeC/DistributionPackages'):
+                if os.environ.get('GITHUB_REPOSITORY') not in (None, '', COORDINATOR):
                     if supplied.get(dependency, {}).get('_commit') != ref:
                         raise ValueError(f'Pinned definition unavailable for {dependency}@{ref} in coordinator request')
                     projects[dependency] = supplied[dependency]
                 else:
                     projects[dependency] = definition(dependency, ref)
-            pending.extend(projects[dependency]['depends_on'])
+            pending.extend(projects.get(dependency, {}).get('depends_on', []))
     return validate_projects(projects)
 
 
@@ -147,9 +187,9 @@ def activate(bundle, target, baseline=None, project=None):
 def content(project, path, ref):
     from ci.dispatch import api
     import base64
-    value = api(f'repos/SNodeC/{project}/contents/{path}?ref={ref}')
+    value = api(f'repos/{OWNER}/{project}/contents/{path}?ref={ref}')
     if value.get('encoding') == 'none':
-        value = api(f'repos/SNodeC/{project}/git/blobs/{value["sha"]}')
+        value = api(f'repos/{OWNER}/{project}/git/blobs/{value["sha"]}')
     return base64.b64decode(value.get('content', ''))
 
 
@@ -179,8 +219,8 @@ def ownership(info):
         if project not in REPOSITORIES or commit is None:
             raise ApiError(422, f'Retained sibling ownership unavailable for {project}@{commit}; register an exact source')
         config = (dict(definition_data(project, commit)[0], _commit=commit)
-                  if not source or source == 'SNodeC/DistributionPackages' else supplied.get(project, {}))
-        if source.casefold() == ('SNodeC/' + project).casefold() and PROJECTS.get(project, {}).get('_commit') == commit:
+                  if not source or source == COORDINATOR else supplied.get(project, {}))
+        if source.casefold() == (OWNER + '/' + project).casefold() and PROJECTS.get(project, {}).get('_commit') == commit:
             config = PROJECTS[project]
         if config.get('_commit') != commit or not re.fullmatch(r'[a-z0-9][a-z0-9-]*', config.get('package', '')):
             raise ValueError(f'Pinned ownership unavailable for {project}@{commit}; supply its matching package namespace')
@@ -188,73 +228,73 @@ def ownership(info):
     return facts
 
 
-def dependent_source(name, row, info, requests):
-    from ci.dispatch import api, ApiError, failure
-    try:
-        previous = ref = source_commit(info.get('sources', {}).get(name))
-        request = requests.get(name, {})
-        pending = request.get('eligible', True) and request and (
-            ref != request['sha'] or project_revision(info, name, ownership(info)) < int(request['revision']))
-        tag = request['tag'] if pending else None
-        if CONFIG['settings']['dependent_version'] == 'latest' and not pending:
-            refs = run('git', 'ls-remote', '--tags', f'https://github.com/SNodeC/{name}.git', 'refs/tags/v*')
-            tags = [line.split()[1].removeprefix('refs/tags/') for line in refs.splitlines()
-                    if re.fullmatch(r'refs/tags/v[0-9]+\.[0-9]+\.[0-9]+', line.split()[1])]
-            tag = max(tags, key=lambda t: tuple(map(int, t[1:].split('.')))) if tags else None
-        ref = request['sha'] if pending else source_commit(sources({name: tag})[name]) if tag else ref
-        if ref is None:
-            branch = api(f'repos/SNodeC/{name}')['default_branch']
-            ref = api(f'repos/SNodeC/{name}/git/ref/heads/{branch}')['object']['sha']
-        result, reason = dict(definition(name, ref)) | (dict(_tag=tag) if tag else {}), ''
-        validate_project(name, result)
-        if pending and not supports(name, row, {name: result}):
-            if previous is None:
-                raise ValueError('Explicit request omits this row and no last-published source exists')
-            result = definition(name, previous)
-    except (ApiError, ValueError, TypeError, OSError, subprocess.SubprocessError) as error:
-        result = None
-        reason = ('Source definition temporarily unavailable: ' if failure(error)['category'] == 'transient'
-                  else 'Selected source definition excluded: ') + str(error)
-    return result, reason
+def work_index(state):
+    work, captures = {}, {}
+    for capture, generation in state['runs'].items():
+        for target, sources in generation['sources'].items():
+            for project, revision in generation['revisions'].items():
+                if project in sources:
+                    key = target, project, generation_tag(generation, project, target)
+                    previous = work.get(key, (0, None, 0))
+                    node = generation.get('nodes', {}).get(target + '/' + project, {})
+                    dependent = node.get('cause', generation['context'].get('cause')) == 'dependent'
+                    expected = max(previous[2], int(revision) if dependent else 0)
+                    work[key] = max(previous[:2], (int(revision), capture), key=lambda item: item[0]) + (expected,)
+        captures.update({(capture, key): node for key, node in generation.get('nodes', {}).items()
+                         if key.rsplit('/', 1)[1] not in generation['revisions']
+                         and generation['context'].get('cascade', capture) == capture})
+    return work, captures
 
 
-def isolate(projects, errors):
+def cascade_blockers(info, required, state, target, index):
+    from ci.publish.publication import TERMINAL
+    work, captures = index
     result = {}
-    for name in projects:
-        try:
-            selected, pending = {}, [name]
-            while pending:
-                dependency = pending.pop()
-                if dependency not in selected:
-                    selected[dependency] = projects[dependency]
-                    pending.extend(projects[dependency]['depends_on'])
-            result = validate_projects(result | selected)
-        except (ValueError, KeyError, TypeError) as error:
-            errors[name] = 'Invalid pinned dependency graph: ' + str(error)
+    for project in required:
+        own = release_view(info, project)
+        receipt = own.get('publications', {}).get(project, {})
+        node = state['runs'].get(receipt.get('capture'), {}).get('nodes', {}).get(target + '/' + project, {})
+        if (not info.get('sources', {}).get(project) or node.get('dependencies') is not None
+                and node['dependencies'] != binding(info, node.get('requires', []))):
+            result[project] = ('pending', 'Awaiting a current prerequisite publication: ' + project)
+        published = version(source_tag(own, project) or 'v0.0.0'), project_revision(own, project)
+        expected = max(((version(tag), revision, capture) for (row, name, tag), (_, capture, revision) in work.items()
+                        if row == target and name == project and revision), default=((), 0, None))
+        if expected[:2] > published:
+            selected = state['runs'][expected[2]].get('nodes', {}).get(target + '/' + project, {})
+            result[project] = (selected.get('status', 'pending'), selected.get('reason', 'Awaiting selected arm: ' + project))
+        if any(key == target + '/' + project and node['status'] not in TERMINAL for (_, key), node in captures.items()):
+            result[project] = ('pending', 'Awaiting prerequisite capture: ' + project)
+    return result
+
+
+def dependent_source(name, requests):
+    if not requests.get(name):
+        raise ValueError('Cascade cannot select an inactive repository: ' + name)
+    refs = dict(line.split()[::-1] for line in run(
+        'git', 'ls-remote', '--tags', f'https://github.com/{OWNER}/{name}.git', 'refs/tags/v*').splitlines())
+    tags = [r.removeprefix('refs/tags/') for r in refs if re.fullmatch('refs/tags/' + TAG, r)]
+    if not tags:
+        raise ValueError(name + ': no semantic version tag exists')
+    tag = max(tags, key=version)
+    commit = refs.get('refs/tags/' + tag + '^{}', refs['refs/tags/' + tag])
+    result = dict(definition(name, commit), _tag=tag)
+    validate_project(name, result)
     return result
 
 
 def configure(root, project, commit, claimed):
-    from ci.publish.publication import published
     current = definition(project, commit)
     if {k: v for k, v in current.items() if not k.startswith('_')} != claimed:
         raise ValueError('Notification matrix does not match its source commit')
     requests = json.loads((root / 'status.json').read_text()).get('requests', {})
-    snapshots, failures = {}, {}
-    for row in rows(current):
-        info, _ = published(root, row)
-        choices = {n: dependent_source(n, row, info, requests) for n in REPOSITORIES if n != project}
-        selected = {project: current} | {n: c for n, (c, _) in choices.items() if c is not None}
-        errors = {n: reason for n, (_, reason) in choices.items() if reason}
-        snapshots[row['id']] = isolate(selected, errors)
-        if project not in snapshots[row['id']]:
-            raise ValueError(project + ': ' + errors[project])
-        failures[row['id']] = errors
+    selected = requested_projects({p: values for p, values in requests.items() if p in REPOSITORIES})
+    selected = validate_projects(selected | {project: current})
     PROJECTS.clear()
-    PROJECTS.update({n: c for graph in snapshots.values() for n, c in graph.items()})
+    PROJECTS.update(selected)
     ROW_PROJECTS.clear()
-    ROW_PROJECTS.update(snapshots)
-    DEFINITIONS.write_text(json.dumps(dict(projects=PROJECTS, targets=snapshots, errors=failures)))
+    ROW_PROJECTS.update({r['id']: selected for r in rows(current)})
+    DEFINITIONS.write_text(json.dumps(dict(projects=selected, targets=ROW_PROJECTS)))
     return None
 
 
@@ -266,14 +306,18 @@ def source_commit(value):
     return result
 
 
-CONFIG = load_master(ROOT / "ci/projects.json")
+CONFIG = load_master(Path(os.environ.get('CI_MASTER', ROOT / 'ci/projects.json')))
+COORDINATOR = os.environ.get('PACKAGE_COORDINATOR') or re.sub(
+    r'^.*github.com[:/]|\.git$', '', subprocess.check_output(['git', '-C', str(ROOT), 'remote', 'get-url', 'origin'], text=True).strip())
+OWNER, COORDINATOR_NAME = COORDINATOR.split('/')
+FEED, FEED_BRANCH = OWNER + '/' + CONFIG['feed']['repository'], CONFIG['feed']['branch']
 REPOSITORIES = tuple(CONFIG["repositories"])
 DEFINITIONS = Path(os.environ.get("CI_DEFINITIONS", ROOT / "ci/definitions.json"))
 PROJECTS = load_projects(DEFINITIONS)
 ROW_PROJECTS = json.loads(DEFINITIONS.read_text()).get("targets") or {r['id']: PROJECTS for c in PROJECTS.values() for r in rows(c)} if DEFINITIONS.exists() else {}
 
-def missing_prerequisites(project, row, info, revisions, projects):
-    return [dependency for dependency in dependencies(project, projects) if not supports(dependency, row, projects) or not info.get('sources', {}).get(dependency) and dependency not in revisions]
+def missing_prerequisites(project, info, revisions, projects):
+    return [dependency for dependency in dependencies(project, projects) if not info.get('sources', {}).get(dependency) and dependency not in revisions]
 
 
 def affected(project, projects=None):
@@ -291,7 +335,7 @@ def dependencies(project, projects=None):
     for name in reversed(projects):
         if name in selected:
             selected.update(projects[name]['depends_on'])
-    return tuple(name for name in projects if name in selected)
+    return tuple(name for name in projects if name in selected) + tuple(sorted(selected - projects.keys()))
 
 
 def supports(project, row, projects=None):
@@ -308,7 +352,7 @@ def package_owner(name, projects=None):
 
 
 def run(*args, **kwargs):
-    return subprocess.check_output(args, text=True, **(dict(timeout=120) if args[0] == 'gh' else {}), **kwargs).strip()
+    return subprocess.check_output(args, text=True, **(dict(timeout=120) if args[0] in {'gh', 'git'} else {}), **kwargs).strip()
 
 
 def digest(path):
@@ -333,17 +377,51 @@ def linux_matrix():
     return list({json.dumps(row['build'], sort_keys=True): row['build'] for config in PROJECTS.values() for row in rows(config) if row['family'] == 'linux'}.values())
 
 
-def sources(tags):
-    result = {}
-    for repo, tag in tags.items():
-        if not re.fullmatch(r'v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', tag):
-            raise ValueError(f'{repo}: select vMAJOR.MINOR.PATCH tags only')
-        refs = run('git', 'ls-remote', f'https://github.com/SNodeC/{repo}.git',
-                   f'refs/tags/{tag}', f'refs/tags/{tag}^{{}}').splitlines()
-        if not refs:
-            raise RuntimeError(f'{repo}: {tag} tag is missing')
-        result[repo] = dict(line.split()[::-1] for line in refs)
-    return result
+def package_metadata(path):
+    """Read controls from package bytes; the publisher applies the pinned policy."""
+    control, fields = '', {}
+    if path.suffix == '.deb':
+        control = run('dpkg-deb', '-f', str(path))
+    elif path.suffix == '.rpm':
+        name, release, arch, epoch = run('rpm', '-qp', '--qf', '%{NAME}\n%{VERSION}-%{RELEASE}\n%{ARCH}\n%{EPOCHNUM}', str(path)).splitlines()
+        fields = dict(name=name, version=(epoch + ':' if epoch not in {'0', '(none)'} else '') + release, arch=arch)
+    elif path.suffix == '.ipk':
+        with tarfile.open(path, 'r:gz') as outer:
+            members = [m for m in outer if m.name.removeprefix('./') == 'control.tar.gz' and m.isfile()]
+            if len(members) != 1:
+                raise ValueError('IPK needs exactly one control archive: ' + path.name)
+            with tarfile.open(fileobj=io.BytesIO(outer.extractfile(members[0]).read()), mode='r:gz') as inner:
+                controls = [m for m in inner if m.name.removeprefix('./') == 'control' and m.isfile()]
+                if len(controls) != 1:
+                    raise ValueError('IPK needs exactly one control file: ' + path.name)
+                control = inner.extractfile(controls[0]).read().decode()
+    elif path.suffix == '.apk':
+        fields = json.loads(run('apk', 'adbdump', '--format', 'json', str(path)))['info']
+    else:
+        raise ValueError('Unsupported package metadata: ' + path.name)
+    if control:
+        parsed = Parser().parsestr(control)
+        if (parsed.defects or parsed.is_multipart() or parsed.get_payload().strip()
+                or any(len(parsed.get_all(k, [])) != 1 for k in ['Package', 'Version', 'Architecture'])):
+            raise ValueError('Package needs one control paragraph with unique name, version and architecture: ' + path.name)
+        if path.suffix == '.ipk' and any(k in parsed for k in ['Filename', 'Size', 'SHA256sum']):
+            raise ValueError('IPK control must not supply generated index fields: ' + path.name)
+        fields = dict(zip(['name', 'version', 'arch'], (parsed[k] for k in ['Package', 'Version', 'Architecture'])), control=control)
+    if any(not isinstance(fields.get(k), str) or not fields[k] for k in ['name', 'version', 'arch']):
+        raise ValueError('Incomplete package metadata: ' + path.name)
+    return fields
+
+
+def validate_package(owners, versions, filename, fields, row):
+    owner = package_owner(fields['name'], owners)
+    if (re.search(r'[\x00-\x1f\x7f]', filename + fields['name'])
+            or owner not in versions or not project_file(filename, owner, owners)):
+        raise ValueError('Package name and filename disagree with pinned ownership: ' + ascii(fields['name'])[1:-1])
+    if fields['version'] != versions[owner]:
+        raise ValueError('Package version disagrees with pinned release: ' + fields['name'])
+    if row.get('arch') and fields['arch'] not in {row['arch'], 'noarch' if filename.endswith('.rpm') else 'all'}:
+        raise ValueError('Package architecture disagrees with target: ' + fields['name'])
+    return owner
 
 
 def unchanged(bundle):
@@ -360,7 +438,7 @@ def archive_source(repo, config, source_tag, archives):
         if not re.fullmatch(r'[0-9a-f]{40}', commit):
             raise ValueError('Capture requires an exact source commit')
         run('git', 'init', str(source))
-        run('git', '-C', str(source), 'remote', 'add', 'origin', f'https://github.com/SNodeC/{repo}.git')
+        run('git', '-C', str(source), 'remote', 'add', 'origin', f'https://github.com/{OWNER}/{repo}.git')
         run('git', '-C', str(source), 'fetch', '--depth', '1', 'origin', commit)
         run('git', '-C', str(source), 'checkout', '--detach', 'FETCH_HEAD')
         run('git', '-C', str(source), 'submodule', 'update', '--init', '--recursive', '--depth', '1')
@@ -369,20 +447,31 @@ def archive_source(repo, config, source_tag, archives):
         if hashlib.sha256((source / 'ci/packages.json').read_bytes()).hexdigest() != config['_digest']:
             raise RuntimeError('Source definition differs from captured JSON')
         version_file = source / 'VERSION'
-        # Older published releases used a literal project VERSION.
-        version = version_file.read_text().strip() if version_file.exists() else re.search(
-            r'\bVERSION\s+([0-9]+\.[0-9]+\.[0-9]+)', (source / 'CMakeLists.txt').read_text())[1]
-        if not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version) or source_tag != f'v{version}':
+        release_version = version_file.read_text().strip()
+        version('v' + release_version)
+        if source_tag != f'v{release_version}':
             raise RuntimeError(f'{repo}: release tag and VERSION disagree')
-        name = f'{repo}-{version}'
+        name = f'{repo}-{release_version}'
         archive = f'{name}-{commit}.tar.gz'
         run('tar', '-czf', str(archives / archive), '--exclude=.git',
             f'--transform=s,^,{name}/,', '-C', str(source), '.')
-    return version, {f'refs/tags/{source_tag}': commit}, archive
+    return release_version, {f'refs/tags/{source_tag}': commit}, archive
+
+
+def recipe_commit():
+    return run('git', '-C', str(ROOT), 'rev-parse', 'HEAD')
+
+
+def capture_inputs(root, row, project, tag, commit, recipe):
+    from ci.publish.publication import published
+    info, directory = published(root, row)
+    required = dependencies(project, ROW_PROJECTS[row['id']])
+    sources = {p: info['sources'][p] for p in required if p in info.get('sources', {})}
+    inputs = dict(tag=tag, commit=commit, recipe=recipe, dependencies={p: release_identity(info, p) for p in required})
+    return info, directory, sources, hashlib.sha256(json.dumps(inputs, sort_keys=True).encode()).hexdigest()
 
 
 def prepare(published_root, bundle):
-    from ci.publish.publication import published
     archives = bundle / 'archives'
     archives.mkdir(parents=True)
     changed = os.environ.get('RELEASE_PROJECT', '')
@@ -391,57 +480,29 @@ def prepare(published_root, bundle):
         raise ValueError('Unknown release project')
     state = json.loads((published_root / 'status.json').read_text())
     revisions = state['allocations'][os.environ['GITHUB_RUN_ID']]
-    selected_projects = set().union(*(set(affected(changed, graph)) for graph in ROW_PROJECTS.values()))
+    selected_projects = {changed}
     if set(revisions) != selected_projects:
         raise RuntimeError('Reserved revisions do not match the release project')
-    context = dict(contract=3, projects=PROJECTS, tag=tag, requested_at=os.environ.get('RELEASE_REQUESTED_AT', ''), captured_at=datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'), recipe_ref=os.environ.get('RECIPE_REF', 'main'),
-                   recipe_commit=run('git', '-C', str(ROOT), 'rev-parse', 'HEAD'),
-                   destination='SNodeC/Packages', packages_commit=run('git', '-C', str(published_root), 'rev-parse', 'HEAD'),
+    context = dict(contract=3, projects=PROJECTS, tag=tag, requested_at=os.environ.get('RELEASE_REQUESTED_AT', ''),
+                   captured_at=datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                   recipe_commit=recipe_commit(),
+                   destination=FEED, packages_commit=run('git', '-C', str(published_root), 'rev-parse', 'HEAD'),
                    release_project=changed, run_id=os.environ.get('GITHUB_RUN_ID', 'local'),
-                   run_url=f'https://github.com/{os.environ.get("GITHUB_REPOSITORY", "SNodeC/DistributionPackages")}/actions/runs/{os.environ.get("GITHUB_RUN_ID", "local")}')
-    profiles, captured = {}, {}
-    target_rows = rows(PROJECTS[changed])
+                   run_url=f'https://github.com/{COORDINATOR}/actions/runs/{os.environ.get("GITHUB_RUN_ID", "local")}')
+    release_version, refs, archive = archive_source(changed, PROJECTS[changed], tag, archives)
+    profiles = {}
+    parent = json.loads(os.environ.get('RELEASE_PARENT') or '{}')
+    context.update(cascade=parent.get('root', context['run_id']), cause=os.environ.get('RELEASE_CAUSE', 'release'))
+    target_rows = [r for r in rows(PROJECTS[changed]) if not parent or r['id'] == parent['target']]
+    if not target_rows:
+        raise ValueError('Highest version does not support requested cascade target')
     for row in target_rows:
-        baseline, directory = published(published_root, row)
-        if (baseline and any(int(value) <= project_revision(baseline, repo) for repo, value in revisions.items())
-                and baseline.get('context', {}).get('run_id') != context['run_id']):
-            raise RuntimeError('Package revision must exceed the published revision; check the reserved project revisions')
-        choices = {n: dependent_source(n, row, baseline, state.get('requests', {})) for n in REPOSITORIES if n != changed}
-        projects = {changed: ROW_PROJECTS[row['id']][changed]} | {n: c for n, (c, _) in choices.items() if c is not None}
-        errors = {n: reason for n, (_, reason) in choices.items() if reason}
-        projects = isolate(projects, errors)
-        selected = set(affected(changed, projects)) & revisions.keys()
-        tags = {changed: tag}
-        for repo in selected:
-            if repo != changed and repo not in errors and supports(repo, row, projects) and (projects[repo]['_commit'] == source_commit(baseline.get('sources', {}).get(repo)) or projects[repo].get('_tag')):
-                refs = baseline.get('sources', {}).get(repo, {})
-                tags[repo] = projects[repo].get('_tag') or next(key.removeprefix('refs/tags/') for key in refs if not key.endswith('^{}'))
-        tags = {repo: value for repo, value in tags.items() if supports(repo, row, projects)}
-        required = {dependency for project in tags for dependency in dependencies(project, projects)} - tags.keys()
-        for dependency in required:
-            dependency_tag = baseline.get('context', {}).get('source_tags', {}).get(dependency)
-            if dependency_tag:
-                tags[dependency] = dependency_tag
-        profile = dict(context={k: v for k, v in context.items() if k != 'projects'} | dict(source_tags=tags, versions={}), sources={}, archives={},
-                       baseline=baseline, directory=directory, projects=projects, errors=errors)
-        for repo, source_tag in tags.items():
-            if repo not in revisions:
-                profile['sources'][repo] = baseline['sources'][repo]
-            else:
-                key = (repo, projects[repo]['_commit'])
-                try:
-                    if key not in captured:
-                        captured[key] = archive_source(repo, projects[repo], source_tag, archives)
-                    version, refs, archive = captured[key]
-                    profile['context']['versions'][repo] = version
-                    profile['sources'][repo] = refs
-                    profile['archives'][repo] = archive
-                except (RuntimeError, ValueError, OSError, subprocess.SubprocessError) as error:
-                    if repo == changed:
-                        raise
-                    errors[repo] = 'Dependent capture unavailable: ' + str(error)
-        profiles[row['id']] = profile
-    context['projects'] = {n: c for profile in profiles.values() for n, c in profile['projects'].items() if n in profile['sources']}
+        baseline, directory, profile_sources, _ = capture_inputs(
+            published_root, row, changed, tag, PROJECTS[changed]['_commit'], context['recipe_commit'])
+        projects = dict(ROW_PROJECTS[row['id']])
+        profiles[row['id']] = dict(context={k: v for k, v in context.items() if k != 'projects'} |
+            dict(source_tags={changed: tag}, versions={changed: release_version}), sources=profile_sources | {changed: refs},
+            archives={changed: archive}, baseline=baseline, directory=directory, projects=projects, errors={})
     for name, data in [('profiles', profiles), ('sources', {target: profile['sources'] for target, profile in profiles.items()}), ('context', context),
                        ('targets', target_rows), ('revisions', revisions)]:
         (bundle / f'{name}.json').write_text(json.dumps(data, indent=2) + '\n')
@@ -492,18 +553,19 @@ def reuse(bundle, target, destination):
     owners = ownership(info)
     others = dependencies(json.loads((bundle / 'context.json').read_text())['build_project'])
     destination.mkdir(parents=True, exist_ok=True)
-    for name, checksum in info.get('files', {}).items():
+    files = {name: checksum for p in others for name, checksum in dependency_identity(info, p)['files'].items()}
+    for name, checksum in files.items():
         filename = Path(name).name
         if any(project_file(filename, project, owners) for project in others):
             directory = f'{row["distribution"]}/pool/{row["suite"]}' if filename.endswith('.deb') else profile['directory']
             path = destination / filename
             ref = os.environ.get('PUBLISHED_REF') or profile['context']['packages_commit']
-            fetch(f'https://raw.githubusercontent.com/SNodeC/Packages/{ref}/{directory}/{name}', path)
+            fetch(f'https://raw.githubusercontent.com/{FEED}/{ref}/{directory}/{name}', path)
             if digest(path) != checksum:
                 raise RuntimeError(f'Published dependency checksum mismatch: {name}')
     if row['family'] != 'openwrt':
         for project in others:
-            names = [name for name in info.get('packages', []) if package_owner(name, owners) == project]
+            names = [name for name in release_view(info, project).get('packages', []) if package_owner(name, owners) == project]
             if names:
                 (destination / (owners[project]['package'] + '.packages')).write_text('\n'.join(names) + '\n')
     return None
@@ -579,7 +641,7 @@ def download_sdk(row, destination):
 def stage(sdk, bundle, output):
     """Stage project packages and unsigned indexes; official feeds supply other dependencies."""
     info = json.loads((sdk / 'ci-sdk.json').read_text())
-    feed = sdk / 'bin/packages' / info['arch'] / 'snodec'
+    feed = sdk / 'bin/packages' / info['arch'] / 'package_ci'
     extension = '.ipk' if info['series'] == '24.10' else '.apk'
     packages = sorted(feed.glob('*' + extension))
     destination = output / 'openwrt' / info['series'] / info['arch']
@@ -598,6 +660,13 @@ def stage(sdk, bundle, output):
     baseline = json.loads((bundle / 'baseline.json').read_text())
     info['versions'].update({project: version for project, version in baseline.get('versions', {}).items()
                              if project != info['context']['build_project']})
+    owners = ownership(info)
+    names = set()
+    for path in packages:
+        fields = package_metadata(path)
+        validate_package(owners, info['versions'], path.name, fields, info)
+        names.add(fields['name'])
+    info['packages'] = sorted(names)
     (destination / 'build.json').write_text(json.dumps(info, indent=2) + '\n')
     return None
 
@@ -609,7 +678,8 @@ def sdk_dependency(sdk, bundle, archives):
     owners = ownership(baseline)
     for dependency in dependencies(json.loads((bundle / 'context.json').read_text())['build_project']):
         prefix = owners[dependency]['package'] + '-openwrt-build-deps-'
-        names = [name for name in baseline.get('files', {}) if name.startswith(prefix) and name.endswith('.tar.zst')]
+        names = [name for name in dependency_identity(baseline, dependency)['files']
+                 if name.startswith(prefix) and name.endswith('.tar.zst')]
         if len(names) != 1 or any(baseline[key] != info[key] for key in ('release', 'target', 'arch', 'sha256')):
             raise RuntimeError('Missing or incompatible published development export: ' + dependency)
         archive = archives / names[0]
@@ -663,40 +733,52 @@ def package_version(row, version, revision):
     raise ValueError('Unknown package distribution')
 
 
-def project_revision(info, project, projects=None):
-    versions = info.get('versions', {})
-    version = versions.get(project, versions.get((PROJECTS if projects is None else projects).get(project, {}).get('package')))
-    if version is None:
-        result = int(info['revision']) if info.get('context', {}).get('build_project') == project else 0
-    else:
-        match = re.search(r'-r?(\d+)(?:[.~]|$)', version)
+def project_revision(info, project):
+    selected = release_view(info, project)
+    value = selected.get('versions', {}).get(project)
+    # Feed entries record revisions; unsigned artifacts also carry reused package versions.
+    if 'releases' in info or selected.get('context', {}).get('build_project') == project:
+        result = int(selected.get('revision', 0))
+    elif value is not None:
+        match = re.search(r'-r?(\d+)(?:[.~]|$)', value)
         if not match:
-            raise RuntimeError(f'Invalid package revision: {version}')
+            raise RuntimeError(f'Invalid package revision: {value}')
         result = int(match[1])
+    else:
+        result = 0
     return result
 
 
-def dependency_identity(info, project, projects=None):
+def release_identity(info, project):
+    info = release_view(info, project)
+    return dict(source=info.get('sources', {}).get(project), revision=project_revision(info, project))
+
+
+def dependency_identity(info, project):
+    info = release_view(info, project)
     projects = ownership(info)
-    return dict(source=info.get('sources', {}).get(project), revision=project_revision(info, project, projects),
-                files={name: checksum for name, checksum in info.get('files', {}).items() if project_file(name, project, projects)})
+    return release_identity(info, project) | dict(
+        files={name: checksum for name, checksum in info.get('files', {}).items() if project_file(name, project, projects)})
 
 
-def binding(info, required, projects=None):
-    return hashlib.sha256(json.dumps({p: dependency_identity(info, p, projects) for p in required}, sort_keys=True).encode()).hexdigest()
+def binding(info, required):
+    return hashlib.sha256(json.dumps({p: dependency_identity(info, p) for p in required}, sort_keys=True).encode()).hexdigest()
 
 
 def publication_needed(previous, incoming):
     needed = True
     if not isinstance(previous, Path) or previous.exists():
         previous = json.loads(previous.read_text()) if isinstance(previous, Path) else previous
-        old = project_revision(previous, incoming['context']['build_project'], ownership(previous) if previous.get('sources') else None)
+        project = incoming['context']['build_project']
+        tag = source_tag(incoming, project)
+        previous, incoming = release_view(previous, project, tag), release_view(incoming, project, tag)
+        old = project_revision(previous, project)
         new = int(incoming['revision'])
         if old > new:
             raise RuntimeError('Superseded publication: a newer project revision is already published')
         if old == new:
             if not (all(previous.get(key) == incoming.get(key) for key in ('sources', 'context'))
-                    and previous.get('unsigned_files', previous.get('files')) == incoming.get('files')):
+                    and previous.get('unsigned_files') == incoming.get('files')):
                 raise RuntimeError('Different package content under the same publication revision')
             needed = False
     return needed
@@ -728,7 +810,12 @@ def publish(incoming, checkout, bundle):
 
 if __name__ == '__main__':
     command, *args = sys.argv[1:]
-    if command == 'package-version':
+    if command == 'deployment':
+        print('\n'.join(f'{k}={v}' for k, v in dict(owner=OWNER, coordinator=COORDINATOR,
+            name=COORDINATOR_NAME, feed=FEED, feed_name=CONFIG['feed']['repository'], branch=FEED_BRANCH,
+            repositories=','.join([*REPOSITORIES, COORDINATOR_NAME]),
+            readers=','.join(dict.fromkeys([*REPOSITORIES, COORDINATOR_NAME, CONFIG['feed']['repository']]))).items()))
+    elif command == 'package-version':
         print(package_version(dict(distribution=args[0], suite=args[1]), args[2], args[3]))
     elif command == 'matrix':
         print(json.dumps({'include': matrix()}))
@@ -745,4 +832,4 @@ if __name__ == '__main__':
     else:
         {'prepare': prepare, 'check': unchanged, 'stage': stage, 'publish': publish,
          'sdk-dependency': sdk_dependency, 'sdk-export': sdk_export}[command](
-            *(Path(arg).resolve() for arg in args))
+            *(Path(arg).resolve() if command != 'sdk-export' or index < 2 else Path(arg) for index, arg in enumerate(args)))

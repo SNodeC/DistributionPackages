@@ -2,6 +2,8 @@ name: Notify package coordinator
 on:
   workflow_call:
     secrets:
+      PACKAGE_CAPTURE_APP_PRIVATE_KEY:
+        required: true
       PACKAGE_NOTIFY_APP_PRIVATE_KEY:
         required: true
 permissions:
@@ -10,23 +12,37 @@ jobs:
   notify:
     runs-on: ubuntu-24.04
     steps:
+      - id: location
+        env:
+          REPOSITORY: ${{ job.workflow_repository }}
+        run: echo "name=${REPOSITORY#*/}" >> "$GITHUB_OUTPUT"
+      - uses: actions/create-github-app-token@v3
+        id: capture
+        with:
+          client-id: ${{ vars.PACKAGE_CAPTURE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.PACKAGE_CAPTURE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ steps.location.outputs.name }}
+          permission-actions: read
+          permission-contents: read
       - uses: actions/checkout@v6
         with:
           path: source
           persist-credentials: false
       - uses: actions/checkout@v6
         with:
-          repository: SNodeC/DistributionPackages
-          ref: main
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
           path: feed
+          token: ${{ steps.capture.outputs.token }}
           persist-credentials: false
       - uses: actions/create-github-app-token@v3
         id: coordinator
         with:
           client-id: ${{ vars.PACKAGE_NOTIFY_APP_CLIENT_ID }}
           private-key: ${{ secrets.PACKAGE_NOTIFY_APP_PRIVATE_KEY }}
-          owner: SNodeC
-          repositories: DistributionPackages
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ steps.location.outputs.name }}
           permission-actions: write
       - name: Notify exact tag commit
         env:

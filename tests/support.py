@@ -1,5 +1,7 @@
 """Single-target coordinator fixtures with real local Git transactions."""
 import base64
+import io
+import tarfile
 import copy
 import json
 import os
@@ -11,8 +13,35 @@ from datetime import datetime, timezone
 from unittest.mock import patch
 from urllib.parse import urlsplit, parse_qs
 
+import offline
+
 from ci import dispatch, repository
 from ci.publish import publication
+
+
+def feed_manifest(info, graph=None):
+    """Construct the canonical version-addressed publication shape for fixtures."""
+    graph = repository.PROJECTS if graph is None else graph
+    value = copy.deepcopy(info)
+    value['releases'] = {}
+    for project, refs in value.get('sources', {}).items():
+        tag = repository.source_tag(value, project)
+        names = [n for n in value.get('packages', []) if repository.package_owner(n, graph) == project]
+        files = {n: checksum for n, checksum in value.get('files', {}).items()
+                 if repository.project_file(n, project, graph)}
+        versions = {project: v for k, v in value.get('versions', {}).items() if k in {project, graph[project]['package']}}
+        context = dict(value.get('context', {}))
+        context.update(build_project=project, source_tags={project: tag}, versions={project: tag[1:]})
+        receipt = value.get('publications', {}).get(project, {})
+        release = next(iter(versions.values()), '')
+        import re
+        match = re.search(r'-r?(\d+)(?:[.~]|$)', release)
+        revision = str(receipt.get('revision', value.get('revision', int(match[1]) if match else 0)))
+        value['releases'][project] = {tag: dict(sources={project: refs}, revision=revision, context=context,
+            versions=versions, files=files, unsigned_files=files, packages=names,
+            publications={project: receipt}, published_at=(receipt.get('published_at') or value.get('published_at')
+                if value.get('context', {}).get('build_project') == project else receipt.get('published_at')))}
+    return value
 
 
 class PinnedJsonCase(unittest.TestCase):
@@ -28,6 +57,12 @@ class PinnedJsonCase(unittest.TestCase):
                                if not k.startswith('_')}).encode()
 
         context = patch.object(repository, 'content', side_effect=content)
+        context.start()
+        self.addCleanup(context.stop)
+        receipt = dict(capture='100', source=dict(run=42, attempt=1), job=43,
+                       artifact=dict(id=44, digest='sha256:' + 'a' * 64),
+                       job_url='https://github.com/SNodeC/snode.c/actions/runs/42/job/43')
+        context = patch.dict(os.environ, BUILD_RECEIPT=json.dumps(receipt))
         context.start()
         self.addCleanup(context.stop)
         return None
@@ -49,12 +84,17 @@ class CoordinatorCase(unittest.TestCase):
         self.sources = {p: {'refs/tags/v1.0.0': chr(97+i)*40} for i,p in enumerate(self.graph)}
         for project, config in self.graph.items():
             config['_commit'] = repository.source_commit(self.sources[project])
+        self.bundles = {'100': self.bundle}
         self.context = dict(contract=3, projects={p: c for p, c in self.graph.items() if p in self.sources},
-                            release_project='snode.c', run_id='100', run_url='capture', destination='SNodeC/Packages',
+                            tag='v1.0.0', release_project='snode.c', run_id='100', run_url='capture', destination='SNodeC/Packages',
                             captured_at='2026-10-20T00:00:00Z', recipe_commit=self.git('rev-parse', 'HEAD', cwd=repository.ROOT))
-        for name, value in dict(context=self.context, sources={self.row['id']:self.sources}, targets=[self.row], revisions=dict.fromkeys(self.graph, '2'), profiles={self.row['id']:dict(projects=self.graph, sources=self.sources, baseline={}, directory='debian/dists/trixie')}, checksums={}).items():
+        for name, value in dict(context=self.context, sources={self.row['id']:self.sources}, targets=[self.row],
+            revisions={'snode.c': '2'}, profiles={self.row['id']:dict(projects=self.graph, sources=self.sources, baseline={},
+            directory='debian/dists/trixie')}, checksums={}).items():
             publication.write(self.bundle / (name+'.json'), value)
-        self.state = dict(repository='SNodeC/Packages', branch='main', counters={}, runs={})
+        self.state = dict(repository='SNodeC/Packages', branch='main', counters={}, runs={},
+            requests={p: {'v1.0.0': dict(definition=c, sha=c['_commit'], tag='v1.0.0', capture='100', revision='2')}
+                      for p, c in self.graph.items()})
         publication.record_run(self.bundle, self.state, self.context)
         self.save()
         self.runs, self.jobs, self.artifacts, self.posts = {}, {}, {}, []
@@ -92,12 +132,29 @@ class CoordinatorCase(unittest.TestCase):
         return self.state['runs'][capture].get('nodes',{}).get(self.row['id']+'/'+project,{})
 
     def tick(self, bundles=None):
-        return dispatch.tick(self.root, bundles or {'100':self.bundle})
+        return dispatch.tick(self.root, self.bundles | (bundles or {}))
+
+    def add_capture(self, project, capture, revision='2', cause='release', cascade=None):
+        """One canonical generation contains one selected project, as prepare() emits."""
+        self.state = publication.read(self.root / 'status.json')
+        directory = self.base / ('fixture-capture-' + capture)
+        context = self.context | dict(run_id=capture, release_project=project, cause=cause,
+                                      cascade=cascade or capture)
+        info, path = publication.published(self.root, self.row)
+        sources = copy.deepcopy(info.get('sources', {})) | {project: self.sources[project]}
+        profile = dict(projects=self.graph, sources=sources, baseline=info, directory=path)
+        for name, value in dict(context=context, targets=[self.row], sources={self.row['id']: sources},
+                                revisions={project: revision}, profiles={self.row['id']: profile}, checksums={}).items():
+            publication.write(directory / (name + '.json'), value)
+        publication.record_run(directory, self.state, context)
+        self.bundles[capture] = directory
+        self.save()
+        return directory
 
     def feed(self, projects, capture='100', revision='2'):
         info = dict(versions={self.graph[p]['package']:'1.0.0-'+revision+'~trixie' for p in projects}, sources={p:self.sources[p] for p in projects},
                     publications={p:dict(capture=capture, revision=revision, job_url='job-'+p, published_at='2026-10-20T00:00:00Z') for p in projects})
-        publication.write(self.root/'debian/dists/trixie/build.json', {'targets':{'amd64':info}})
+        publication.write(self.root/'debian/dists/trixie/build.json', {'targets':{'amd64':feed_manifest(info, self.graph)}})
         self.state = publication.read(self.root/'status.json')
         self.save()
         return None
@@ -120,11 +177,13 @@ class CoordinatorCase(unittest.TestCase):
             request = json.loads(payload['inputs']['request'])
             number = 500+len(self.posts)
             publisher = parts[-2] == 'sign-and-publish-packages.yml'
+            capturing = parts[-2] == 'orchestrate-packages.yml'
             value = dict(workflow_run_id=number)
             self.runs[repo,number] = dict(id=number,event='workflow_dispatch',path='.github/workflows/'+parts[-2],
-                display_title=('Publish · '+request['publish_intent']) if publisher else 'Packages · '+request['intent'],
+                display_title=('Publish · '+request['publish_intent']) if publisher else ('Capture · ' if capturing else 'Packages · ')+request['intent'],
                 created_at=datetime.now(timezone.utc).isoformat(),head_repository={'full_name':repo},actor={'login':'ci[bot]'},run_attempt=1,status='queued',conclusion=None)
-            self.jobs[repo,number] = [dict(id=number+1000,run_id=number,run_attempt=1,name='write' if publisher else 'build / '+request['target'],
+            self.jobs[repo,number] = [dict(id=number+1000,run_id=number,run_attempt=1,
+                name='write' if publisher else 'capture' if capturing else 'build / '+request['target'],
                 html_url=f'https://github.com/{repo}/actions/runs/{number}/job/{number+1000}',status='queued',runner_id=1,labels=['ubuntu-24.04'])]
         elif len(parts) == 3:
             value = dict(default_branch='main')
@@ -149,3 +208,17 @@ class CoordinatorCase(unittest.TestCase):
             if field in value:
                 value[field] = value[field][(page-1)*100:page*100]
         return copy.deepcopy(value)
+
+
+def ipk(path, name, version, arch='x86_64'):
+    control = f'Package: {name}\nVersion: {version}\nArchitecture: {arch}\nDescription: real structure fixture\n'
+    inner = io.BytesIO()
+    with tarfile.open(fileobj=inner, mode='w:gz') as archive:
+        entry = tarfile.TarInfo('./control')
+        entry.size = len(control.encode())
+        archive.addfile(entry, io.BytesIO(control.encode()))
+    with tarfile.open(path, mode='w:gz') as archive:
+        entry = tarfile.TarInfo('./control.tar.gz')
+        entry.size = len(inner.getvalue())
+        archive.addfile(entry, io.BytesIO(inner.getvalue()))
+    return control

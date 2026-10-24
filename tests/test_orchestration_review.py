@@ -41,9 +41,12 @@ class ReviewTest(CoordinatorCase):
         return None
 
     def test_finalizer_only_covers_its_requested_target(self):
-        self.tick();self.finish(artifact=False,conclusion='cancelled');self.tick()
+        self.add_capture('mqttsuite', '200')
+        self.tick()
+        before = copy.deepcopy(self.node('mqttsuite', '200'))
+        self.finish(artifact=False,conclusion='cancelled');self.tick()
         self.assertEqual(self.node()['status'],'cancelled')
-        self.assertNotEqual(self.node('mqttsuite')['status'],'cancelled')
+        self.assertEqual(self.node('mqttsuite', '200'), before)
         return None
 
     def test_event_type_and_canonical_run_ids_are_enforced(self):
@@ -55,9 +58,10 @@ class ReviewTest(CoordinatorCase):
         return None
 
     def test_newer_published_application_is_not_left_pending_by_older_generation(self):
+        self.add_capture('mqttsuite', '200')
         self.feed(['snode.c','mqttsuite'],capture='newer',revision='3')
         self.tick()
-        self.assertEqual(self.node('mqttsuite')['status'],'superseded')
+        self.assertEqual(self.node('mqttsuite', '200')['status'],'superseded')
         self.assertNotIn('mqttsuite',{json.loads(p['inputs']['request'])['project'] for _,p in self.posts})
         return None
 

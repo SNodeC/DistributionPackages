@@ -14,7 +14,7 @@ image=${fields[4]}
 mkdir -p packages output logs
 docker pull --platform "$platform" "$image"
 container=(docker run --rm --network host --platform "$platform" -v "$PWD:/work" -w /work
-    -e DISTRIBUTION -e SUITE -e ARCH -e PACKAGE_RELEASE -e BUILD_PROJECT)
+    -e DISTRIBUTION -e SUITE -e ARCH -e PACKAGE_RELEASE -e BUILD_PROJECT -e PACKAGE_COORDINATOR)
 "${container[@]}" "$image" bash /work/feed/ci/build/native.sh 2>&1 | tee logs/build.log
 sudo chown -R "$(id -u):$(id -g)" packages
 python3 -m ci.publish.linux stage "$row" packages bundle output

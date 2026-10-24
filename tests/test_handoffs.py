@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
-from support import PinnedJsonCase
+from support import PinnedJsonCase, ipk
 from unittest.mock import patch
 
 from ci import dispatch, repository
@@ -43,7 +43,8 @@ class HandoffTest(CoordinatorCase):
     def test_release_intake_matches_tag_commit_repository_and_workflow(self):
         payload=dict(project='snode.c',tag='v1.0.0',sha='a'*40,run='99',definition='{}')
         origin=dict(event='push',path='.github/workflows/build-distribution-packages.yml',head_repository={'full_name':'SNodeC/snode.c'},head_branch='v1.0.0',head_sha='a'*40,created_at='2026-10-20T00:00:00Z')
-        with patch.object(dispatch,'api',return_value=origin),patch.object(dispatch,'configure') as configure,patch.dict(os.environ,{'GITHUB_RUN_ID':''}):
+        with patch.object(dispatch,'api',return_value=origin),patch.object(dispatch,'configure') as configure, \
+            patch.object(dispatch,'content',return_value=b'1.0.0\n'),patch.dict(os.environ,{'GITHUB_RUN_ID':''}):
             self.assertEqual(dispatch.intake(payload)['sha'],'a'*40)
             configure.assert_called_once()
             for changes in [dict(project='unknown'),dict(tag='v01.2.3'),dict(tag='v1.2.3;touch injected'),dict(sha='main'),dict(run='../123')]:
@@ -61,9 +62,11 @@ class HandoffTest(CoordinatorCase):
         before=os.getcwd()
         try:
             os.chdir(self.base)
-            with patch.object(dispatch,'api',return_value=origin),patch.object(dispatch,'configure'),patch.object(dispatch,'run',side_effect=AssertionError('A failed/unverified workflow title is not admission state')),patch.dict(os.environ,GITHUB_RUN_ID='101'):
+            with patch.object(dispatch,'api',return_value=origin),patch.object(dispatch,'configure'),patch.object(dispatch,
+                'content',return_value=b'1.0.0\n'),patch.object(dispatch,'run',
+                side_effect=AssertionError('A failed/unverified workflow title is not admission state')),patch.dict(os.environ,GITHUB_RUN_ID='101'):
                 self.assertEqual(dispatch.intake(payload)['duplicate'],'false')
-                publication.write(state,dict(requests={'snode.c':dict(run='99',capture='100',at=origin['created_at'])}))
+                publication.write(state,dict(requests={'snode.c':{'v1.0.0':dict(run='99',capture='100',at=origin['created_at'])}}))
                 self.assertEqual(dispatch.intake(payload)['duplicate'],'true')
                 with patch.dict(os.environ,GITHUB_RUN_ID='100'):
                     self.assertEqual(dispatch.intake(payload)['duplicate'],'false')
@@ -124,13 +127,15 @@ class HandoffTest(CoordinatorCase):
         dispatch.apply_report(self.root,self.payload,self.bundle)
         dispatch.apply_report(self.root,self.payload,self.bundle)
         self.assertEqual(self.node()['source']['attempt'],1)
-        self.assertEqual(self.node('mqttsuite')['attempt'],0)
+        self.assertNotIn('request', self.node('mqttsuite'))
         self.assertEqual(self.node('mqttsuite'), before)
         return None
 
     def test_dependency_retry_does_not_consume_application_attempt_numbers(self):
-        generation=self.state['runs']['100']
+        generation=copy.deepcopy(self.state['runs']['100'])
+        generation['revisions']['mqttsuite'] = '2'
         state=copy.deepcopy(self.state)
+        state['runs']['100'] = generation
         publication.update(state, self.row, generation,'mqttsuite','pending',0)
         publication.update(state, self.row, generation,'snode.c','failed',2)
         publication.update(state, self.row, generation,'mqttsuite','running',1)
@@ -201,24 +206,28 @@ class OpenWrtSigningTest(unittest.TestCase):
             keys.mkdir()
             private = root / 'private'
             private.mkdir()
-            repository.run('usign', '-G', '-s', str(private / 'usign'), '-p', str(keys / 'snodec-opkg.pub'))
+            repository.run('usign', '-G', '-s', str(private / 'usign'), '-p', str(keys / 'opkg.pub'))
             repository.run('openssl', 'genpkey', '-algorithm', 'RSA', '-pkeyopt', 'rsa_keygen_bits:2048', '-out', str(private / 'apk'), stderr=subprocess.DEVNULL)
-            repository.run('openssl', 'pkey', '-in', str(private / 'apk'), '-pubout', '-out', str(keys / 'snodec-apk.pem'))
+            repository.run('openssl', 'pkey', '-in', str(private / 'apk'), '-pubout', '-out', str(keys / 'apk.pem'))
             env = {'OPENWRT_USIGN_KEY': (private / 'usign').read_text(), 'OPENWRT_APK_KEY': (private / 'apk').read_text()}
             for series in ['24.10', '25.12']:
                 with self.subTest(series=series):
                     feed = root / series
                     feed.mkdir()
                     if series == '24.10':
-                        (feed / 'Packages').write_text('Package: test\nVersion: 1\n\n')
+                        ipk(feed / 'test_1-r1_x86_64.ipk', 'test', '1-r1')
                     else:
                         payload = root / 'payload'
                         payload.mkdir()
                         (payload / 'test').write_text('test package')
                         repository.run('apk', 'mkpkg', '--info', 'name:test', '--info', 'version:1-r1', '--info', 'arch:x86_64', '--files', str(payload), '--output', str(feed / 'test.apk'))
-                        repository.run('apk', 'mkndx', '--allow-untrusted', '--output', str(feed / 'packages.adb'), str(feed / 'test.apk'))
+                    packages = sorted(feed.glob('*.ipk' if series == '24.10' else '*.apk'))
+                    info = dict(series=series, files={p.name: repository.digest(p) for p in packages})
+                    openwrt.reindex(feed, info, {p.name: repository.package_metadata(p) for p in packages})
+                    if series == '24.10':
+                        self.assertIn('Filename: test_1-r1_x86_64.ipk', (feed / 'Packages').read_text())
                     before = {path.name: repository.digest(path) for path in feed.iterdir()}
-                    info = dict(series=series, files=before.copy())
+                    info['files'] = before.copy()
                     with patch.object(openwrt, 'ROOT', root), patch.dict(os.environ, env):
                         openwrt.sign(feed, info)
                     self.assertEqual(info['unsigned_files'], before)
@@ -258,7 +267,8 @@ printf fixture > %{buildroot}/usr/share/snodec-fixture/data
             bundle, output, checkout = root / 'bundle', root / 'output', root / 'checkout'
             row = next(row for row in repository.linux_matrix() if row['distribution'] == 'rocky' and row['suite'] == '10' and row['arch'] == 'x86_64')
             publication.write(bundle / 'sources.json', {'snode.c': {'refs/tags/v2.0.0': 'a' * 40}})
-            publication.write(bundle / 'context.json', dict(build_project='snode.c'))
+            publication.write(bundle / 'context.json', dict(build_project='snode.c', versions={'snode.c':'2.0.0'}))
+            publication.write(bundle / 'baseline.json', {})
             # stage must succeed with no private key or signer available.
             with patch.object(rpm, 'unchanged'), patch.dict(os.environ, {'PACKAGE_RELEASE': '1'}), patch.object(rpm, 'signer', side_effect=AssertionError('build must not sign')):
                 rpm.stage(row, packages, bundle, output)
@@ -270,7 +280,7 @@ printf fixture > %{buildroot}/usr/share/snodec-fixture/data
             keys.mkdir()
             repository.run('gpg', '--homedir', str(home), '--batch', '--pinentry-mode', 'loopback', '--passphrase', '', '--quick-generate-key', 'Package test <test@example.invalid>', 'rsa2048', 'sign', '1d', stderr=subprocess.DEVNULL)
             key = repository.run('gpg', '--homedir', str(home), '--batch', '--armor', '--export-secret-keys')
-            (keys / 'snodec-apt.asc').write_text(repository.run('gpg', '--homedir', str(home), '--batch', '--armor', '--export'))
+            (keys / 'apt.asc').write_text(repository.run('gpg', '--homedir', str(home), '--batch', '--armor', '--export'))
             with patch.object(rpm, 'unchanged'), patch.object(rpm, 'ROOT', root), patch.dict(os.environ, {'APT_SIGNING_KEY': key}):
                 rpm.publish([row], output, checkout, bundle)
             final = publication.read(checkout / 'rocky/10/x86_64/build.json')

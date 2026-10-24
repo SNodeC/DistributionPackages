@@ -4,51 +4,104 @@
 <p><a href="README.md#banner" title="Up to Documentation"><picture><source media="(prefers-color-scheme: dark)" srcset="media/nav/up-documentation-dark.svg"><img src="media/nav/up-documentation-light.svg" alt="Up to Documentation" title="Up to Documentation" width="160" height="28"></picture></a><a href="https://github.com/VolkerChristian#banner" title="Volker Christian account"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="media/nav/account-icon-dark.svg"><source media="(max-width: 640px)" srcset="media/nav/account-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="media/nav/account-dark.svg"><img align="right" src="media/nav/account-light.svg" alt="Volker Christian account" title="Volker Christian account"></picture></a><a href="https://github.com/SNodeC#banner" title="SNode.C organization"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="media/nav/organization-icon-dark.svg"><source media="(max-width: 640px)" srcset="media/nav/organization-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="media/nav/organization-dark.svg"><img align="right" src="media/nav/organization-light.svg" alt="SNode.C organization" title="SNode.C organization"></picture></a><a href="../README.md#banner" title="DistributionPackages repository"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="media/nav/repository-icon-dark.svg"><source media="(max-width: 640px)" srcset="media/nav/repository-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="media/nav/repository-dark.svg"><img align="right" src="media/nav/repository-light.svg" alt="DistributionPackages repository" title="DistributionPackages repository"></picture></a><br clear="all"></p>
 <!-- snodec:end page-header -->
 
-# CI setup and activation
+# CI setup
 
-## Separate credential authorities
+This is the first deployment of the canonical CI on an empty feed. It does not import earlier packages, runs, revisions or receipts. Product integration belongs to each selected version tag. No old-CI release or intermediate trigger is required.
 
-These are operator instructions, not an activation performed by this change. Provisioning, scope widening, rotation and revocation each require separate authorization. An App private key has installation-wide authority regardless of narrower tokens minted by steps; never share the coordinator key with a source repository.
+## Credentials
 
-| Location | Variable or secret | Authority |
+Provisioning and rotation are operator stages, separate from code changes. Verify the actual installation access; a 403 is unknown, not proof that a secret or installation is absent.
+
+| Authority | Installation / token use |
+| --- | --- |
+| Coordinator App (`PACKAGES_APP_CLIENT_ID`, `PACKAGES_APP_PRIVATE_KEY`) | Installed on the coordinator, allowed sources and feed. The private key has the installation's full authority and stays in the coordinator. Capture/publisher readers request Actions:read and Contents:read; control requests Actions:write and Contents:read only for coordinator/sources. Separate feed-only tokens request Contents:write. |
+| Source notify App (`PACKAGE_NOTIFY_APP_CLIENT_ID`, `PACKAGE_NOTIFY_APP_PRIVATE_KEY`) | Actions:write on the coordinator only; no feed or sibling access. It can still cancel coordinator runs or delete their artifacts. |
+| Source capture reader (`PACKAGE_CAPTURE_APP_CLIENT_ID`, `PACKAGE_CAPTURE_APP_PRIVATE_KEY`) | Actions:read and Contents:read on the coordinator only. Used by both notification and build wrappers, including private-coordinator checkout. |
+| Observer (`PACKAGES_OBSERVER_TOKEN`) | Read organization metadata/plan and Actions in **every** organization repository, including private repositories. No source or feed write authority. API/listing failures and known count mismatches fail closed; optional private-repository counts are not required. |
+| Source workflow `GITHUB_TOKEN` | Own-repository contents/actions reads as needed. No Packages write or signing keys. |
+
+Source wrappers forward the notify and capture-reader secrets separately. Coordinator signing secrets are `APT_SIGNING_KEY`, `OPENWRT_USIGN_KEY` and `OPENWRT_APK_KEY`. Per-step narrowing does not narrow the authority of anyone holding an App private key. The coordinator key is broad; never distribute it to sources. No installation or credential change is performed by local tests.
+
+## Repository configuration destinations
+
+Use repository-level Actions variables and secrets, not environment entries. Store the complete PEM text for App keys. Never put secret values in version-controlled files. Keep a protected local backup when generating a credential; GitHub does not return existing Actions secret contents.
+
+| Repository | Variables | Secrets |
 | --- | --- | --- |
-| DP | `PACKAGES_APP_CLIENT_ID`, `PACKAGES_APP_PRIVATE_KEY` | Coordinator App: Actions read/write and Contents read/write; installed only on registered sources, DP and Packages |
-| DP | `PACKAGES_OBSERVER_TOKEN` | Separate read-only observer: organization details/plan and complete repo inventory, Actions read on **all** org repos, including private repos |
-| Each source | `PACKAGE_NOTIFY_APP_CLIENT_ID`, `PACKAGE_NOTIFY_APP_PRIVATE_KEY` | Separate notify App: Actions write on DP only; no Packages or product-repo installation |
-| Each source | `PACKAGE_CAPTURE_APP_CLIENT_ID`, `PACKAGE_CAPTURE_APP_PRIVATE_KEY` | Separate capture-reader App: Actions read and Contents read on DP only |
-| DP only | `APT_SIGNING_KEY`, `OPENWRT_USIGN_KEY`, `OPENWRT_APK_KEY` | Existing signing secrets; never pass to source builds |
+| DistributionPackages | `PACKAGES_APP_CLIENT_ID` (coordinator App Client ID) | `PACKAGES_APP_PRIVATE_KEY`, `PACKAGES_OBSERVER_TOKEN`, existing `APT_SIGNING_KEY`, `OPENWRT_USIGN_KEY`, `OPENWRT_APK_KEY` |
+| snode.c, mqttsuite, snode.c-idp | `PACKAGE_CAPTURE_APP_CLIENT_ID` (reader App Client ID), `PACKAGE_NOTIFY_APP_CLIENT_ID` (notify App Client ID) | `PACKAGE_CAPTURE_APP_PRIVATE_KEY`, `PACKAGE_NOTIFY_APP_PRIVATE_KEY` |
 
-The coordinator needs Actions **write**, correcting the old setup's read-only claim: it dispatches source and publication workflows. Capture and publication readers request Actions read and Contents read. Control requests Actions write and Contents read on registered sources and DP; its separate Packages token provides Contents write for the ledger. Publication uses a separate Contents-write token scoped only to Packages. Notify credentials dispatch workflows in DP; GitHub cannot restrict that permission to one workflow. Publication explicitly checks the coordinator App actor, and operator retry requires the actual triggering actor to be a human DP collaborator with write access, including on reruns. A coordinator publication rerun may be initiated by that App or an authorized human. Notify Actions-write still permits cancelling runs and deleting artifacts; these denial-of-service capabilities remain. source `GITHUB_TOKEN` reads its own artifacts. Capture credentials only download DP captures. Sources never receive a credential that can write Packages or another product repository. Packages has no workflow or signing credentials.
+Each of the three sources uses the same reader App values and the same notify App values. The coordinator App private key stays only in DistributionPackages. Use the Client ID from the App settings, not the numeric App ID. All three Apps may use `https://github.com/SNodeC/DistributionPackages` as their homepage; disable webhooks and user OAuth authorization for this installation-token-only integration.
 
-Organization inventory/plan visibility must be tested read-only with the proposed observer credential. A selected-repository App that cannot see private repositories is insufficient. The single observer credential must expose complete inventory/count metadata and Actions read across the organization. Use an organization-wide read-only App token only if read-only API validation proves those fields are available; otherwise use a suitably authorized read-only owner credential. Organization policy determines which is provisioned. The implementation does not combine two observer credentials. Do not infer that a public-only listing is complete. If the plan cannot be read, configure a documented explicit capacity; that does not waive complete job visibility. No observer credential has been created or widened by this refactor.
+The coordinator App has repository Actions and Contents read/write permissions, installed only on DistributionPackages, the three sources and Packages. The capture-reader App has Actions and Contents read permissions on DistributionPackages only. The notify App has Actions write permission on DistributionPackages only. Metadata read is mandatory. No organization permissions are needed for these Apps.
+
+Create the fine-grained observer PAT with resource owner SNodeC, **All repositories**, repository Actions read-only and organization Plan read-only (Metadata read is automatic). The observer must see every organization repository, not only package products. With selected-repository access, private repositories outside that selection are invisible; the coordinator cannot infer missing private repositories when optional counters are absent. Record its expiry and renewal owner. Do not grant write permissions merely to obtain optional private-repository counts.
+
+The independent `Book-*` verification workflow in snode.c uses `BOOK_COMPANION_APP_CLIENT_ID` and `BOOK_COMPANION_APP_PRIVATE_KEY`. Preserve that separate integration when retiring package-CI credentials; do not distribute the new coordinator private key for it. Verify remaining consumers before removing any old App installation or secret.
 
 ## Add a repository
 
-1. Add its name to DP `ci/projects.json`. This is the intended coordinator configuration edit; do not add a central matrix, graph, recipe or workflow branch.
-2. Add source `ci/packages.json` with unique `title`/`package`, registered `depends_on`, a complete `matrix` and safe relative `build` hook paths. Copy an existing source definition as a syntax example and change its source-owned rows and prerequisites. Native rows specify distribution, suite, image and architectures; Raspberry Pi rows specify official image URL and SHA256; OpenWrt rows specify full releases and architecture-to-target mapping. Supported signers cover APT, RPM, OpenWrt 24.10 opkg and 25.12 APK. Unsupported platforms need a separately reviewed capability change.
-3. Implement native/OpenWrt hooks in that repository. The native hook receives source, package, prerequisite and generic `package`/`install_packages` helpers. The OpenWrt hook stages its recipe and defines `compile`; generic tooling imports registered prerequisite SDK exports and indexes the feed. Product libraries, feature switches, tests and commands stay in these hooks.
-4. Copy a thin `build-distribution-packages.yml` wrapper. It has tag-push notification and coordinator `workflow_dispatch` build entry points, forwarding only notify/capture secrets. Reusable workflow refs remain DP main.
-5. Authorize access and provision the separated credentials above. Validate the pinned JSON graph/cycles, target capability and prerequisite row coverage. A missing prerequisite publication makes only that row unsatisfiable; a never-published dependent is skipped by ordinary cascades.
-6. Run local suites, wrapper validation and actionlint. Explicitly authorize any sandbox/live validation and the first config-containing release separately. Registration itself grants no signing rights and never creates a tag.
+1. Add its basename to `ci/projects.json`. This permits it; it does not activate it.
+2. In the source, commit `ci/packages.json`, root `VERSION`, packaging/build hooks and the thin `build-distribution-packages.yml` wrapper. Copy the wrapper interface from an existing source and point its reusable-workflow literal to this deployment's coordinator/ref. No coordinator production code, workflow or central target-list change is needed for supported platforms.
+3. The JSON contains `title`, unique `package` namespace, `depends_on`, `matrix`, and `build` hook paths. Use existing source JSONs as complete examples. Dependencies reference allowed repository basenames. Definitions are validated for cycles, capabilities, safe hooks and row coverage. The source selects its distro/release/architecture rows; DP has only generic capabilities.
+4. Hooks run from the captured tag archive. A native hook runs in the target environment with `BUILD_PROJECT`, `DISTRIBUTION`, `SUITE` and `PACKAGE_RELEASE`, writes `packages/`, and emits `<package>.packages` listing component names. It may use the optional CPack helper or its own build system. Debian/RPM metadata must match the pinned namespace, target and tag/revision version. OpenWrt hooks supply their SDK recipe and may use the generic SDK export/import contract. Signing never runs in source hooks.
+5. Grant the separated reader/notify access and validate the actual wrapper, JSON and hook contracts locally.
+6. The user creates or moves a strict `vMAJOR.MINOR.PATCH` tag, with no leading zeros, whose commit contains this integration and matching `VERSION`. The wrapper transmits the full JSON and exact source identity. Verified intake durably records activation and the pinned definition before building. A failed first build **keeps** activation.
 
-A new product using existing capabilities requires no coordinator production-code change, workflow edit or central target inventory. An existing dependent's matrix changes take effect from its selected pinned source definition. Ordinary cascades use the last-published source per row; publish a config-containing explicit release to introduce a new row/version.
+OpenWrt hooks must not replace imported prerequisites during compilation. Suppress imported prerequisite compile targets
+(`package/feeds/package_ci/<dependency>/compile`) when supplying the hook's `make` command. The coordinator repeats the
+existing import conflict check after compilation: changed bytes or links fail; missing ordinary files are restored.
+This is a cooperating-hook integrity check, not proof that no byte-identical rebuild occurred.
 
-## Proposed compatible cutover from deployed A
+Until step 6, the product contributes no graph or target rows and is not discovered merely because tags exist. Never substitute a default branch for a missing tag. A direct application release with missing matching published prerequisites closes those rows with a clear reason; other rows proceed. A later prerequisite publication can cascade to that now-active product at its highest semantic tag. Each application's own first notification is required.
 
-No running CI is changed by local implementation. A and PR #30 are evidence, not automatic migration bases; PR #31's separate link task is preserved in its canonical checkout.
+## Deploy for another organization
 
-Before any activation, review the local changes and test evidence, provision and validate least-privilege credentials under separate approvals, and agree a coordinated source-wrapper/DP cutover. The selected exact source commit must contain its JSON. A default-branch definition is only a fallback for a repository with no selected source; unavailable or invalid unrelated fallback definitions do not prevent another release. Old feed records/counters are read without resetting revisions. Existing captures retain their old tooling and callbacks: do not activate a controller that overlaps incompatible old captures. Inspect and finish or explicitly disposition outstanding A work before enabling the new protocol; a freeze/drain/merge sequence has not been approved.
+Use the identical coordinator production code. Configure allowed source basenames and optional `feed.repository`/`feed.branch` in `ci/projects.json` (defaults `Packages`/`main`). Supported settings are `capacity` (`plan` or an integer), `headroom` (default 2), and `rebuild_overlap` (default true). Unknown keys fail; `dependent_version` is removed because cascades always select the highest semantic tag.
 
-Historical published commits without `ci/packages.json` remain available in the rolling feed, but cannot supply pinned ownership facts. Every shared row in the recorded A feed has this bootstrap limitation: no product can publish on such a shared row through the new protocol until retained ownership is usable. This is safe fail-closed publication, not a successful bootstrap or merely a skipped cascade. Historical matrices, build hooks and dependency graphs must not be validated just to recover ownership; the required contract is the pinned `package` namespace.
+Coordinator identity is derived from its own checkout/workflow identity; called workflows use `job.workflow_repository` and `job.workflow_sha`, rather than the caller's repository. Token repository lists, URLs and workflow guards derive from that identity and the master config. Change only deployment configuration, `site/` and installer content, public keys, credentials and the GitHub-required reusable-workflow literals in source wrappers. Build hooks can be non-CMake.
 
-The bootstrap decision is unapproved and does not block local implementation. Compatible options are:
+The supported model is one GitHub.com organization with coordinator, sources and a public feed under that owner. Cross-owner sources, personal-account plan observation, GitHub Enterprise Server and private-feed download authorization are not implemented. The repository has not been extracted into a separate CI project.
 
-- **A-first bootstrap:** stage JSON/hook-containing commits with the old wrappers and publish them through deployed A before switching protocols. New tags or moved tags can select those commits; a new VERSION number is not required solely to carry JSON. Each tag action needs separate authorization and creates a new capture/revision. An existing commit cannot acquire JSON retroactively. Publish prerequisites and explicit dependents, then verify ownership on every retained row.
-- **Reviewed one-time ownership migration:** design and review it separately; none is implemented or approved.
-- **Defer cutover:** leave A active while deciding.
+## First-deployment rollout
 
-Manually inspect each row's `build.json` sources, resolve every recorded commit, and verify that its JSON supplies a usable package namespace. No preflight command was added. Every later publication still needs retained sources' minimal ownership facts to remain readable; a change to this contract can block rows. Deregistering a product or losing repository access blocks rows retaining its files. No offboarding policy or full historical schema freeze is adopted.
+This is a runbook, not authorization to perform these operations.
 
-After a separately approved bootstrap, coordinate DP reusable `@main` interfaces, source wrappers and renamed secrets, validate token installations, and disposition in-flight A captures. Old A captures are incompatible with the new protocol. No freeze/drain/merge sequence or live migration is approved.
+1. Review the locally verified diffs. Commit/push/update the existing task PRs under the user's stage authorization.
+2. Provision and verify separated credentials as a separate operator stage.
+3. Stop old writers: confirm no old runs, schedules or old-protocol wrappers can write the feed. Dispose of in-flight old captures; they are not reusable by this protocol.
+4. Initialize the fresh feed in one reviewed **normal commit**, as a separate destructive stage. From a local feed checkout at the live HEAD, `git ls-files -z` gives the concrete delete list. Remove every tracked old-feed path, then create only `status.json` with the exact JSON below. `.git/` is never removed. `retention.json`, keys, indexes, guides and status pages are created by canonical publication/rendering. Review `git diff --stat`, `git diff --name-status` and the new file before committing. Do not force-push or rewrite history for this initialization.
+5. Merge DP after initialization, because its schedule and workflow-completion wakes become active on merge. Then merge all source integrations. Confirm their reusable references and secret names agree.
+6. The user tags/moves `snode.c` first, then each application's own tag to activate it. The agent performs no tag operation or manual workflow dispatch.
 
-Commit, push, PR actions, tag actions, workflow dispatch, credential operations, sandbox validation and activation are distinct authorization stages. Recheck open runs, installations and current default branches at that point. No live publication, deployment or credential change is performed here.
+For this deployment, initial `status.json` is:
+
+```json
+{"repository":"SNodeC/Packages","branch":"main","counters":{},"allocations":{},"requests":{},"runs":{}}
+```
+
+For another deployment, substitute its configured feed identity/branch. A scheduled control pass with this content is a safe no-op. To generate the concrete fresh-feed diff locally, after reviewing the tracked delete list:
+
+```sh
+git ls-files -z | xargs -0 -r git rm --
+printf '%s\n' '{"repository":"SNodeC/Packages","branch":"main","counters":{},"allocations":{},"requests":{},"runs":{}}' > status.json
+git add status.json
+git diff --cached --stat
+git diff --cached --name-status
+```
+
+Revision allocation restarts at r1. Installations from the old feed may consider a same-version package with a lower revision a downgrade; there is no compatibility or migration mitigation. Canonical feed publication retains its existing parentless snapshot/CAS writer behavior; the initialization itself is a normal parented commit.
+
+Cascade captures never activate a repository or overwrite its direct notification. Activation after a framework publication yields the requested application build, without a second unsolicited cascade. Older-version framework bug fixes publish normally and initiate no dependent work. An app that failed for missing prerequisites recovers through one highest-tag cascade after the prerequisite publishes. A failed selected diamond arm must be repaired/retried before the join can proceed; inspect its ledger reason.
+
+The observer PAT must use **All repositories** for the organization, including
+current and future private repositories. **Only select repositories** hides any
+private repository not explicitly selected, including its running jobs. That
+would cause capacity undercounting and extra admission/queueing. The product
+allowlist is unrelated to this organization-wide observer scope. GitHub may
+omit private-repository counts; successful complete pagination is accepted
+under this operator-verified scope requirement. Counts are cross-checked when
+provided. Changing the token's repository selection requires rechecking this
+requirement. No write permissions are needed for observation.
+
+Public signing keys are deployed through the coordinator default-branch overlay; the captured key for the signing family must match. Follow the [key authority and operating limits](ci-orchestration.md#public-key-authority-and-operating-limits) for authorized rotation and fresh captures. Do not remove an allowlisted repository with requests; offboarding is not implemented.

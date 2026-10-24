@@ -139,7 +139,7 @@ class ControllerTest(CoordinatorCase):
         publication.write(self.bundle/'profiles.json',profiles)
         self.state['runs']['100']['profiles_hash']=repository.digest(self.bundle/'profiles.json')
         later=self.base/'later'
-        context=self.context|dict(run_id='200',release_project='mqttsuite',captured_at='2026-10-20T00:00:01Z')
+        context=self.context|dict(run_id='200',tag='v2.0.0',release_project='mqttsuite',captured_at='2026-10-20T00:00:01Z')
         source=copy.deepcopy(self.sources);source['mqttsuite']={'refs/tags/v2.0.0':'e'*40}
         profile=copy.deepcopy(profiles[self.row['id']]);profile['sources']=source
         profile['projects']['mqttsuite']['_commit']='e'*40
@@ -147,10 +147,18 @@ class ControllerTest(CoordinatorCase):
             publication.write(later/(name+'.json'),value)
         publication.record_run(later,self.state,context);self.save()
         self.tick({'100':self.bundle,'200':later})
-        self.assertEqual([json.loads(p['inputs']['request'])['project'] for _,p in self.posts],['snode.c'])
+        self.assertEqual([json.loads(p['inputs']['request'])['project'] for _,p in self.posts],['snode.c','mqttsuite'])
+        self.assertEqual(self.node('mqttsuite', '200')['source']['run'], 502)
+        self.runs['SNodeC/mqttsuite', 502].update(status='completed', conclusion='success')
+        self.jobs['SNodeC/mqttsuite', 502][0].update(status='completed', conclusion='success')
+        self.artifacts['SNodeC/mqttsuite', 502] = [dict(id=2900, name='packages-mqttsuite-' + self.row['id'] + '-1',
+            digest='sha256:' + 'f' * 64, expired=False)]
         self.feed(['snode.c'],revision='2')
         self.tick({'100':self.bundle,'200':later})
-        self.assertEqual(self.node('mqttsuite')['status'],'superseded')
+        self.assertNotIn('request', self.node('mqttsuite'))
+        self.assertEqual([json.loads(payload['inputs']['request'])['kind'] for _, payload in self.posts
+                          if json.loads(payload['inputs']['request'])['project'] == 'mqttsuite'], ['build', 'build'])
+        self.assertEqual(self.node('mqttsuite', '200')['request']['kind'], 'build')
         self.assertEqual(self.node('mqttsuite','200')['cause'],'dependent')
         self.assertEqual(self.state['runs']['200']['sources'][self.row['id']]['mqttsuite'],{'refs/tags/v2.0.0':'e'*40})
         return None
@@ -179,10 +187,11 @@ class ControllerTest(CoordinatorCase):
 
     def test_delayed_control_snapshot_cannot_erase_a_publication_event(self):
         self.tick()
-        node=self.node()
+        node=copy.deepcopy(self.node())
+        base=copy.deepcopy(self.state)
         self.state['runs']['100']['nodes'][self.row['id']+'/snode.c']['status']='published'
         self.save()
-        dispatch.transaction(self.root,dict(nodes=[('100',self.row['id']+'/snode.c',node)]))
+        dispatch.transaction(self.root,dict(nodes=[('100',self.row['id']+'/snode.c',node)],base=base))
         self.assertEqual(self.node()['status'],'published')
         return None
 
@@ -247,8 +256,13 @@ class ControllerTest(CoordinatorCase):
     def priority_fixture(self):
         self.feed(['snode.c'])
         info=publication.published(self.root,self.row)[0]
-        request=dict(capture='100',project='mqttsuite',target=self.row['id'],runner=self.row['runner'],publication=self.git('rev-parse','HEAD',cwd=self.root),intent='built',actor='ci[bot]',created='2026-10-20T00:00:00+00:00')
-        self.state['runs']['100'].setdefault('nodes',{})[self.row['id']+'/mqttsuite']=dict(status='publishing',attempt=1,request=request,source={'run':900,'attempt':1},job=1900,artifact={'id':2900,'digest':'sha256:'+'f'*64},requires=['snode.c'],dependencies=repository.binding(info,['snode.c']))
+        self.add_capture('mqttsuite', '150', cause='dependent', cascade='100')
+        self.state['runs']['100'].setdefault('nodes', {})[self.row['id'] + '/mqttsuite'] = dict(status='superseded', category='excluded')
+        request=dict(capture='150',project='mqttsuite',target=self.row['id'],runner=self.row['runner'],
+            publication=self.git('rev-parse','HEAD',cwd=self.root),intent='built',actor='ci[bot]',created='2026-10-20T00:00:00+00:00')
+        self.state['runs']['150'].setdefault('nodes',{})[self.row['id']+'/mqttsuite']=dict(status='publishing',attempt=1,
+            request=request,source={'run':900,'attempt':1},job=1900,artifact={'id':2900,'digest':'sha256:'+'f'*64},
+            requires=['snode.c'],dependencies=repository.binding(info,['snode.c']))
         self.runs['SNodeC/mqttsuite',900]=dict(id=900,status='completed',conclusion='success',run_attempt=1)
         self.jobs['SNodeC/mqttsuite',900]=[dict(id=1900,run_id=900,run_attempt=1,name='build / '+self.row['id'],status='completed',runner_id=1,html_url='https://github.com/SNodeC/mqttsuite/actions/runs/900/job/1900')]
         self.artifacts['SNodeC/mqttsuite',900] = [dict(id=2900,expired=False)]
@@ -277,10 +291,14 @@ class ControllerTest(CoordinatorCase):
             self.tick({'100':self.bundle,'200':later})
         self.assertEqual([json.loads(p['inputs']['request'])['project'] for _,p in self.posts],['mqttsuite'])
         info = publication.published(self.root,self.row)[0]
-        request = dict(self.node('mqttsuite')['request'],project='snode.c-idp',intent='second-built')
-        self.state['runs']['100']['nodes'][self.row['id']+'/snode.c-idp'] = dict(status='publishing',request=request,source={'run':901,'attempt':1},job=1901,artifact={'id':2901,'digest':'sha256:'+'e'*64},requires=['snode.c'],dependencies=repository.binding(info,['snode.c']))
+        self.add_capture('snode.c-idp', '160', cause='dependent', cascade='100')
+        request = dict(self.node('mqttsuite', '150')['request'],capture='160',project='snode.c-idp',intent='second-built')
+        self.state['runs']['160']['nodes'] = {self.row['id']+'/snode.c-idp': dict(status='publishing',request=request,
+            source={'run':901,'attempt':1},job=1901,artifact={'id':2901,'digest':'sha256:'+'e'*64},requires=['snode.c'],
+            dependencies=repository.binding(info,['snode.c']))}
         self.artifacts['SNodeC/snode.c-idp',901] = [dict(id=2901,expired=False)]
         self.runs['SNodeC/snode.c-idp',901] = dict(id=901,status='completed',conclusion='success',run_attempt=1)
+        self.state['runs']['100']['nodes'][self.row['id'] + '/snode.c-idp'] = dict(status='superseded', category='excluded')
         self.save()
         with patch.object(repository,'REPOSITORIES',tuple(graph)), patch.object(dispatch,'capacity',return_value=(20,{})):
             self.tick({'100':self.bundle,'200':later})

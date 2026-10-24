@@ -1,3 +1,7 @@
+> Historical design/handover. Current publisher metadata checks, control-derived indexes, CAS graph validation and key authority are documented in [CI orchestration](ci-orchestration.md). Earlier capture-pinned feed-key copying is superseded.
+
+> Historical design/evidence. Superseded by the canonical first-deployment agreement; current operations are in [setup](setup.md) and [orchestration](ci-orchestration.md).
+
 # Repository-owned package CI: design and research
 
 > The initial implementation below was independently reviewed and corrected. See [the correction handover](package-ci-corrections.md) for the current state, final tests and accounting; original evidence is preserved under `/tmp/codex/build/snodec/package-ci`.
@@ -23,6 +27,7 @@ The root-first rolling feed is preserved. Per-row cascades use the exact last-pu
 | Unique build/publication dispatch intent, pinned dependency publication commit | Existing node; required after a transport response is lost, before GitHub run binding is known |
 | Source run/attempt/job, artifact ID/digest and separate source/publication dispatch counters | Existing node; reconcile execution via GitHub, retaining the admitted identity and independent bounded retry history |
 | Dependency binding fingerprint and required names | Node; records the exact admitted prerequisite identities/revisions/files, including same-source package rebuilds |
+| Held cascade source inputs digest (current approved correction) | Written only by CAS reserve; coarse tag/SHA/tooling/prerequisite release provenance for conditional cross-row revision sharing, never a checksum permit. Existing workflow serialization protects valid registration claims. |
 | Last observer failure/category/backoff deadline | Existing ledger; GitHub cannot reconstruct this observer's failed observation or retry history; not a capacity authority |
 | Publication receipt, source/revision/file manifests | Signed feed transaction; authoritative publication facts, including replay identity and retained sibling bytes |
 | Target/timeline status pages | Derived from generations and feed facts; no separately persisted status reducer or permit authority |
@@ -50,7 +55,7 @@ These were included in the approved growth estimate. Costs below are attributabl
 | Capacity | Plan mapping / explicit integer | ~3 lines plus shared setting validation |
 | Headroom | 2 / positive integer | ~1 threshold reference plus shared validation |
 | Dependent source | Last-published / max-semver tag from A | ~8 selection lines; same capture path |
-| Overlap | Automatic / off requiring explicit re-request | ~4 conditional references around shared readiness/rebinding |
+| Overlap | Automatic / off for pinned re-admission; fresh captures on new prerequisite events remain enabled (current clarification) | ~4 conditional references around shared readiness/rebinding |
 | Shared master loading/validation | Reject unknown fields, matrices, graphs and commands | ~18 lines supporting all settings |
 
 No diamond-bypass override was retained: A/C do not establish an approved contrasted alternative. Priority, per-target flow and work-conserving behavior get no flag. Throughput remains the provisional no-batching/no-time-target interpretation. Backward tag moves retain new captures/revisions without a new policy.

@@ -58,11 +58,12 @@ class CorrectiveRevision2Test(CoordinatorCase):
         return None
 
     def test_malformed_capture_observation_does_not_abort_independent_admission(self):
-        self.state['requests'] = {'mqttsuite': dict(capture='200', sha='f' * 40, tag='v2.0.0', revision='3', eligible=True)}
+        self.state['requests'] = {'mqttsuite': {'v2.0.0': dict(definition=copy.deepcopy(self.graph['mqttsuite']),
+            **dict(capture='200', sha='f' * 40, tag='v2.0.0', revision='3', eligible=True))}}
         self.save()
         self.runs[dispatch.COORDINATOR, 200] = {}
         self.tick()
-        request = publication.read(self.root / 'status.json')['requests']['mqttsuite']
+        request = publication.read(self.root / 'status.json')['requests']['mqttsuite']['v2.0.0']
         self.assertTrue(request['eligible'])
         self.assertEqual(request['sha'], 'f' * 40)
         self.assertEqual(request['observation']['category'], 'configuration')
@@ -81,190 +82,57 @@ class CorrectiveRevision2Test(CoordinatorCase):
         return None
 
     def test_presentation_revision_decoder_does_not_need_source_repository_access(self):
-        info = dict(sources=self.sources, versions={'snodec': '1.0.0-2~trixie'})
+        info = dict(sources=self.sources, revision='2', context=dict(build_project='snode.c'), versions={'snode.c': '1.0.0-2~trixie'})
         with patch.object(repository, 'definition', side_effect=AssertionError('Presentation must not fetch source JSON')):
             self.assertEqual(repository.project_revision(info, 'snode.c'), 2)
         return None
 
     def test_chain_and_diamond_replacements_compare_each_prerequisites_own_counter(self):
+        from support import feed_manifest
         names = ('framework', 'first', 'second', 'join', 'tail')
         edges = dict(framework=[], first=['framework'], second=['framework'], join=['first', 'second'], tail=['join'])
         graph = {p: copy.deepcopy(self.graph['snode.c']) | dict(
             package=p, title=p, depends_on=edges[p], _commit=chr(97 + i) * 40) for i, p in enumerate(names)}
+        self.graph = graph
+        self.sources = {p: {'refs/tags/v1.0.0': c['_commit']} for p, c in graph.items()}
         for project, config in graph.items():
-            for commit in (config['_commit'], 'f' * 40):
-                self.contents['SNodeC/' + project, commit, 'ci/packages.json'] = json.dumps(
-                    {k: v for k, v in config.items() if not k.startswith('_')}).encode()
-        sources = {p: {'refs/tags/v1.0.0': graph[p]['_commit']} for p in names}
-        context = self.context | dict(projects=graph, release_project='framework')
-        profile = dict(projects=graph, sources=sources, baseline={}, directory='debian/dists/trixie')
-        for name, value in dict(context=context, sources={self.row['id']: sources}, targets=[self.row],
-                                revisions=dict.fromkeys(names, '2'), profiles={self.row['id']: profile}).items():
-            publication.write(self.bundle / (name + '.json'), value)
+            self.contents['SNodeC/' + project, config['_commit'], 'ci/packages.json'] = json.dumps(
+                {k: v for k, v in config.items() if not k.startswith('_')}).encode()
+        self.state['requests'] = {p: {'v1.0.0': dict(definition=c, sha=c['_commit'], capture='100', revision='2')}
+                                  for p, c in graph.items()}
         self.state['runs'] = {}
-        publication.record_run(self.bundle, self.state, context)
-        for capture, first_revision, tail_revision in [('200', '3', '999'), ('300', '4', '2')]:
-            self.state['runs'][capture] = dict(
-                context=context | dict(release_project='first'), revisions={'first': first_revision, 'tail': tail_revision},
-                sources={self.row['id']: {'first': {'refs/tags/v1.0.0': 'f' * 40}}}, targets=[self.row],
-                nodes={self.row['id'] + '/' + p: dict(status='superseded', category='excluded') for p in ('first', 'tail')})
-        info = dict(sources={p: sources[p] for p in ('framework', 'first', 'second')},
+        self.context.update(projects=graph, release_project='framework')
+        for name, value in dict(context=self.context, revisions={'framework': '2'},
+                                sources={self.row['id']: self.sources}, profiles={self.row['id']: dict(
+                                    projects=graph, sources=self.sources, baseline={})}).items():
+            publication.write(self.bundle / (name + '.json'), value)
+        publication.record_run(self.bundle, self.state, self.context)
+        for capture, project, revision in [('200', 'first', '3'), ('300', 'first', '4'),
+                                            ('400', 'second', '2'), ('500', 'tail', '999')]:
+            self.state['runs'][capture] = dict(run_id=capture, context=self.context | dict(
+                release_project=project, cascade='100', cause='dependent'), revisions={project: revision},
+                targets=[self.row], sources={self.row['id']: {project: self.sources[project]}},
+                nodes={self.row['id'] + '/' + project: dict(status='superseded', category='excluded')})
+        self.state['runs']['100']['nodes'] = {self.row['id'] + '/' + p: dict(status='superseded', category='excluded')
+                                             for p in ('first', 'second')}
+        info = dict(sources={p: self.sources[p] for p in ('framework', 'first', 'second')},
                     versions={p: '1.0.0-' + ('4' if p == 'first' else '2') + '~trixie'
-                              for p in ('framework', 'first', 'second')})
-        info['sources']['first'] = {'refs/tags/v1.0.0': 'f' * 40}
-        info['publications'] = {p: dict(capture='300' if p == 'first' else '100',
-                                       revision='4' if p == 'first' else '2', job_url='source-' + p, published_at='now')
-                                for p in ('framework', 'first', 'second')}
-        publication.write(self.root / 'debian/dists/trixie/build.json', {'targets': {'amd64': info}})
+                              for p in ('framework', 'first', 'second')},
+                    publications={p: dict(capture=c, revision=r) for p, c, r in
+                                  [('framework', '100', '2'), ('first', '300', '4'), ('second', '400', '2')]})
+        publication.write(self.root / 'debian/dists/trixie/build.json', {'targets': {'amd64': feed_manifest(info, graph)}})
         self.save()
-        expected = []
-        original = dispatch.ready
-
-        def ready(profile, revisions, project, info, projects=None):
-            if project == 'join':
-                expected.append(copy.deepcopy(revisions))
-            return original(profile, revisions, project, info, projects)
-
         with patch.object(repository, 'REPOSITORIES', names), patch.object(dispatch, 'REPOSITORIES', names), \
-                patch.object(publication, 'REPOSITORIES', names), patch.dict(repository.PROJECTS, graph, clear=True), \
-                patch.object(repository, 'definition', side_effect=lambda p, c: graph[p] | dict(_commit=c)), \
-                patch.dict(repository.CONFIG['settings'], rebuild_overlap=False), patch.object(dispatch, 'ready', side_effect=ready):
+            patch.object(publication, 'REPOSITORIES', names), patch.dict(repository.PROJECTS, graph, clear=True),                  \
+            patch.dict(repository.CONFIG['settings'], rebuild_overlap=False):
             self.tick()
-            self.assertTrue(expected, self.node('join'))
-            self.assertEqual(expected[0]['first'], '4')
-            self.assertEqual(expected[0]['second'], '2')
             requests = [json.loads(p['inputs']['request']) for _, p in self.posts]
             self.assertEqual([r['project'] for r in requests], ['join'])
+            self.assertEqual(requests[0]['kind'], 'capture')
             self.assertEqual(self.node('join')['builds'], 1)
-            self.assertNotEqual(self.node('join')['status'], 'superseded')
             self.assertNotIn('request', self.node('tail'))
             self.tick()
             self.assertEqual(len(self.posts), 1)
-        return None
-
-    @contextmanager
-    def selection_fixture(self):
-        self.feed(list(self.graph), capture='older', revision='1')
-        info, _ = publication.published(self.root, self.row)
-        graph = copy.deepcopy(self.graph)
-        graph['snode.c'].update(matrix={'linux': [dict(distribution='debian', suite='trixie', image='debian:trixie',
-                                                     architectures=['amd64', 'arm64'])]}, build={'native': 'ci/package/native.sh'})
-        request = dict(sha='f' * 40, tag='v2.0.0', revision='3', capture='200', eligible=True)
-        self.state.update(requests={'mqttsuite': request}, counters=dict.fromkeys(graph, 3), allocations={})
-        self.save()
-        controls = dict(error=None, omit=False, directory=Path(tempfile.mkdtemp(dir=self.base)))
-
-        def definition(project, commit):
-            config = copy.deepcopy(graph[project])
-            if project == 'mqttsuite' and commit in ('e' * 40, 'f' * 40):
-                if controls['error'] is not None:
-                    raise controls['error']
-                if controls['omit']:
-                    config.update(matrix={'linux': [dict(distribution='debian', suite='trixie', image='debian:trixie',
-                                                         architectures=['arm64'])]}, build={'native': 'ci/package/native.sh'})
-            return config | dict(_commit=commit, _digest='d' * 64)
-
-        def archive(project, config, tag, directory):
-            name = project + '-' + config['_commit'] + '.tar.gz'
-            (directory / name).write_bytes(project.encode())
-            return tag[1:], {'refs/tags/' + tag: config['_commit']}, name
-
-        with patch.object(repository, 'definition', side_effect=definition), \
-                patch.object(repository, 'archive_source', side_effect=archive), \
-                patch.object(repository, 'DEFINITIONS', self.base / 'selection-runtime.json'), \
-                patch.object(publication, 'published', return_value=(info, 'debian/dists/trixie')), \
-                patch.dict(repository.PROJECTS, graph, clear=True), \
-                patch.dict(repository.ROW_PROJECTS, {}, clear=True), \
-                patch.dict(os.environ, RELEASE_PROJECT='snode.c', RELEASE_TAG='v1.0.0', RELEASE_REQUESTED_AT='', GITHUB_RUN_ID='201'):
-            controls['claimed'] = {k: v for k, v in graph['snode.c'].items() if not k.startswith('_')}
-            yield controls, request
-        return None
-
-    def test_verified_omission_and_ineligibility_share_selection_before_and_after_reservation(self):
-        with self.selection_fixture() as (controls, request):
-            controls['omit'] = True
-            repository.configure(self.root, 'snode.c', 'a' * 40, controls['claimed'])
-            self.assertEqual(repository.ROW_PROJECTS[self.row['id']]['mqttsuite']['_commit'], 'b' * 40)
-            self.assertEqual(repository.ROW_PROJECTS['debian-trixie-arm64']['mqttsuite']['_commit'], 'f' * 40)
-            publication.reserve(self.root, 'snode.c', '201')
-            output = controls['directory'] / 'captured-201'
-            repository.prepare(self.root, output)
-            profiles = publication.read(output / 'profiles.json')
-            self.assertEqual(profiles[self.row['id']]['projects']['mqttsuite']['_commit'], 'b' * 40)
-            self.assertEqual(profiles[self.row['id']]['sources']['mqttsuite'], {'refs/tags/v1.0.0': 'b' * 40})
-            self.assertEqual(profiles['debian-trixie-arm64']['projects']['mqttsuite']['_commit'], 'f' * 40)
-            state = publication.read(self.root / 'status.json')
-            state['requests']['mqttsuite']['eligible'] = False
-            publication.write(self.root / 'status.json', state)
-            repository.configure(self.root, 'snode.c', 'a' * 40, controls['claimed'])
-            self.assertTrue(all(g['mqttsuite']['_commit'] == 'b' * 40 for g in repository.ROW_PROJECTS.values()))
-        return None
-
-    def test_transient_selection_before_and_after_reservation_recovers_exact_request(self):
-        for after_reservation in (False, True):
-            for error in (dispatch.ApiError(503, 'unavailable'), dispatch.ApiError(429, 'rate limit'), subprocess.TimeoutExpired('gh', 120)):
-                with self.subTest(after_reservation=after_reservation, error=str(error)), self.selection_fixture() as (controls, request):
-                    controls['error'] = None if after_reservation else error
-                    repository.configure(self.root, 'snode.c', 'a' * 40, controls['claimed'])
-                    if not after_reservation:
-                        self.assertTrue(all('mqttsuite' not in g for g in repository.ROW_PROJECTS.values()))
-                    publication.reserve(self.root, 'snode.c', '201')
-                    controls['error'] = error
-                    output = controls['directory'] / ('deferred-' + str(after_reservation) + '-' + type(error).__name__)
-                    repository.prepare(self.root, output)
-                    profiles = publication.read(output / 'profiles.json')
-                    for profile in profiles.values():
-                        self.assertNotIn('mqttsuite', profile['sources'])
-                        self.assertNotIn('mqttsuite', profile['projects'])
-                        self.assertIn('temporarily', profile['errors']['mqttsuite'])
-                        self.assertIn('snode.c-idp', profile['sources'])
-                    self.assertEqual(publication.read(self.root / 'status.json')['requests']['mqttsuite'], request)
-                    controls['error'] = None
-                    repository.configure(self.root, 'snode.c', 'a' * 40, controls['claimed'])
-                    publication.reserve(self.root, 'snode.c', '202')
-                    recovered = controls['directory'] / ('recovered-' + str(after_reservation) + '-' + type(error).__name__)
-                    with patch.dict(os.environ, GITHUB_RUN_ID='202'):
-                        repository.prepare(self.root, recovered)
-                    for profile in publication.read(recovered / 'profiles.json').values():
-                        self.assertEqual(profile['projects']['mqttsuite']['_commit'], request['sha'])
-                        self.assertEqual(profile['sources']['mqttsuite'], {'refs/tags/v2.0.0': request['sha']})
-                    self.assertEqual(publication.read(self.root / 'status.json')['requests']['mqttsuite'], request)
-        return None
-
-    def test_deterministic_selection_excludes_without_changing_request_eligibility(self):
-        for error in (dispatch.ApiError(404, 'exact commit missing'), dispatch.ApiError(403, 'scope lost'), ValueError('invalid JSON')):
-            with self.subTest(error=str(error)), self.selection_fixture() as (controls, request):
-                controls['error'] = error
-                repository.configure(self.root, 'snode.c', 'a' * 40, controls['claimed'])
-                for selected in repository.ROW_PROJECTS.values():
-                    self.assertNotIn('mqttsuite', selected)
-                    self.assertIn('snode.c-idp', selected)
-                self.assertEqual(publication.read(self.root / 'status.json')['requests']['mqttsuite'], request)
-                errors = publication.read(self.base / 'selection-runtime.json')['errors']
-                self.assertTrue(all('excluded' in row['mqttsuite'] for row in errors.values()))
-        return None
-
-    def test_prepare_reselects_a_cas_fresh_explicit_request_or_defers_it(self):
-        for omitted, transient in ((False, False), (True, False), (False, True)):
-            with self.subTest(omitted=omitted, transient=transient), self.selection_fixture() as (controls, request):
-                repository.configure(self.root, 'snode.c', 'a' * 40, controls['claimed'])
-                publication.reserve(self.root, 'snode.c', '201')
-                with patch.dict(os.environ, RELEASE_PROJECT='mqttsuite', RELEASE_TAG='v3.0.0', RELEASE_SHA='e' * 40,
-                                RELEASE_RUN='999', RELEASE_REQUESTED_AT='2026-10-21T10:00:00Z'):
-                    publication.reserve(self.root, 'mqttsuite', '301')
-                controls.update(omit=omitted, error=dispatch.ApiError(503, 'newest source unavailable') if transient else None)
-                output = controls['directory'] / ('interleaved-' + str(omitted) + '-' + str(transient))
-                repository.prepare(self.root, output)
-                profiles = publication.read(output / 'profiles.json')
-                for target, profile in profiles.items():
-                    if transient:
-                        self.assertNotIn('mqttsuite', profile['sources'])
-                        self.assertIn('temporarily', profile['errors']['mqttsuite'])
-                    else:
-                        expected = 'b' * 40 if omitted and target == self.row['id'] else 'e' * 40
-                        self.assertEqual(profile['projects']['mqttsuite']['_commit'], expected)
-                        self.assertEqual(repository.source_commit(profile['sources']['mqttsuite']), expected)
-                self.assertEqual(publication.read(self.root / 'status.json')['requests']['mqttsuite']['sha'], 'e' * 40)
         return None
 
     def queued_terminal(self, publisher=False):
@@ -277,7 +145,11 @@ class CorrectiveRevision2Test(CoordinatorCase):
         if publisher:
             node.update(publisher=800, publisher_intent='old-publication', publish_created='2026-10-20T00:00:00Z')
         self.state['runs']['100']['nodes'] = {self.row['id'] + '/snode.c': node}
+        current = copy.deepcopy(self.state['runs']['100'])
+        current.update(run_id='600', context=self.context | dict(run_id='600'), nodes={}, revisions={'snode.c': '3'})
+        self.state['runs']['600'] = current
         self.save()
+        self.feed(['snode.c'], capture='600', revision='3')
         repo = dispatch.COORDINATOR if publisher else 'SNodeC/snode.c'
         self.runs[repo, 800] = dict(status='queued', run_attempt=1)
         self.jobs[repo, 800] = [dict(id=1800, name='write' if publisher else 'build / ' + self.row['id'],
@@ -510,6 +382,8 @@ class CorrectiveRevision2Test(CoordinatorCase):
         info, directory = publication.published(self.root, self.row)
         info['files'] = {'snodec_1_amd64.deb': '1' * 64,
                          'snodec-idp_1_amd64.deb': '2' * 64}
+        from support import feed_manifest
+        info = feed_manifest(info, self.graph)
         publication.write(self.root / directory / 'build.json', {'targets': {'amd64': info}})
         generation = self.state['runs']['100']
         generation['context']['release_project'] = 'mqttsuite'
@@ -522,7 +396,9 @@ class CorrectiveRevision2Test(CoordinatorCase):
         generation['profiles_hash'] = repository.digest(self.bundle / 'profiles.json')
         generation['nodes'] = {self.row['id'] + '/mqttsuite': node} if node else {}
         if node:
-            node.update(requires=['snode.c'], dependencies=repository.binding(info, ['snode.c'], self.graph))
+            node.update(requires=['snode.c'], dependencies=repository.binding(info, ['snode.c']),
+                        waiting=False, request=dict(intent='completed-attempt', actor='ci[bot]', created='2026-10-20T00:00:00Z'),
+                        source=dict(run=800, attempt=1))
         self.save()
         return info
 
@@ -555,9 +431,9 @@ class CorrectiveRevision2Test(CoordinatorCase):
                 self.assertEqual(self.posts, [])
         return None
 
-    def test_changed_dependency_digest_reopens_once_without_source_or_revision_change(self):
-        info = self.application_fixture(dict(status='failed', category='deterministic', reason='Old failure', builds=2, publications=1))
-        info['files']['snodec_1_amd64.deb'] = '3' * 64
+    def test_changed_dependency_digest_readmits_superseded_source_once_without_revision_change(self):
+        info = self.application_fixture(dict(status='superseded', reason='Superseded build: published dependency changed', builds=2, publications=1))
+        info['releases']['snode.c']['v1.0.0']['files']['snodec_1_amd64.deb'] = '3' * 64
         publication.write(self.root / 'debian/dists/trixie/build.json', {'targets': {'amd64': info}})
         self.save()
         self.tick()
@@ -573,14 +449,15 @@ class CorrectiveRevision2Test(CoordinatorCase):
 
     def test_changed_prerequisite_closes_application_only_capture_when_overlap_is_off(self):
         info = self.application_fixture(dict(status='failed', category='deterministic', reason='Old failure', builds=2, publications=1))
-        info['versions']['snodec'] = '1.0.0-2~trixie'
+        info['releases']['snode.c']['v1.0.0']['revision'] = '2'
         publication.write(self.root / 'debian/dists/trixie/build.json', {'targets': {'amd64': info}})
         self.save()
         with patch.dict(repository.CONFIG['settings'], rebuild_overlap=False):
             self.tick()
             self.tick()
-        self.assertEqual(self.node('mqttsuite')['status'], 'superseded')
-        self.assertIn('re-request required', self.node('mqttsuite')['reason'])
+        self.assertEqual(self.node('mqttsuite')['status'], 'failed')
+        self.assertEqual(self.node('mqttsuite')['reason'], 'Old failure')
+        self.assertEqual((self.node('mqttsuite')['builds'], self.node('mqttsuite')['publications']), (2, 1))
         self.assertEqual(self.posts, [])
         return None
 
@@ -643,7 +520,11 @@ class CorrectiveRevision2Test(CoordinatorCase):
                     request=dict(intent='old-intent', created=created, actor='ci[bot]'),
                     source=dict(run=800, attempt=1))
         self.state['runs']['100']['nodes'] = {self.row['id'] + '/snode.c': node}
+        current = copy.deepcopy(self.state['runs']['100'])
+        current.update(run_id='600', context=self.context | dict(run_id='600'), nodes={}, revisions={'snode.c': '3'})
+        self.state['runs']['600'] = current
         self.save()
+        self.feed(['snode.c'], capture='600', revision='3')
         self.runs['SNodeC/snode.c', 800] = dict(status='queued', run_attempt=1)
         self.jobs['SNodeC/snode.c', 800] = [dict(
             id=1800, name='build / ' + self.row['id'], run_attempt=1,
@@ -655,34 +536,4 @@ class CorrectiveRevision2Test(CoordinatorCase):
         self.assertEqual(observed['status'], 'superseded')
         self.assertEqual((observed['builds'], observed['publications']), (1, 0))
         self.assertEqual(self.posts, [], '3 free - 1 queued commitment - 2 headroom leaves no build admission')
-        return None
-
-    def test_transient_explicit_definition_read_never_selects_old_source(self):
-        self.feed(['snode.c', 'mqttsuite'], capture='older', revision='1')
-        request = dict(sha='f' * 40, tag='v2.0.0', revision='3', capture='200', eligible=True)
-        self.state['requests'] = {'mqttsuite': request}
-        self.save()
-        graph = copy.deepcopy(self.graph)
-        claimed = {k: v for k, v in graph['snode.c'].items() if not k.startswith('_')}
-
-        def definition(project, commit):
-            if project == 'mqttsuite' and commit == request['sha']:
-                raise dispatch.ApiError(503, 'Selected explicit definition temporarily unavailable')
-            return graph[project] | dict(_commit=commit)
-
-        def api(path, *args, **kwargs):
-            return dict(object={'sha': 'c' * 40}) if '/git/' in path else dict(default_branch='main')
-
-        with patch.object(repository, 'definition', side_effect=definition), \
-                patch.object(dispatch, 'api', side_effect=api), \
-                patch.object(repository, 'DEFINITIONS', self.base / 'selection.json'), \
-                patch.dict(repository.ROW_PROJECTS, {}, clear=True), \
-                patch.dict(repository.PROJECTS, graph, clear=True):
-            repository.configure(self.root, 'snode.c', 'a' * 40, claimed)
-            selection = publication.read(self.base / 'selection.json')
-            self.assertNotIn('mqttsuite', selection['targets'][self.row['id']])
-            self.assertIn('temporarily', selection['errors'][self.row['id']]['mqttsuite'])
-            self.assertIn('snode.c-idp', selection['targets'][self.row['id']])
-        self.assertEqual(publication.read(self.root / 'status.json')['requests']['mqttsuite'], request)
-        self.assertEqual(self.posts, [])
         return None

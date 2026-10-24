@@ -132,6 +132,7 @@ class RecoveryTest(CoordinatorCase):
         return None
 
     def test_structural_skip_never_reloads_capture_and_overlap_off_closes(self):
+        self.state['runs']['100']['revisions'] = {'snode.c-idp': '2'}
         profiles = publication.read(self.bundle/'profiles.json')
         profiles[self.row['id']]['sources'].pop('snode.c-idp')
         publication.write(self.bundle/'profiles.json', profiles)
@@ -141,8 +142,7 @@ class RecoveryTest(CoordinatorCase):
         with patch.dict(repository.CONFIG['settings'], rebuild_overlap=False):
             self.tick()
             self.assertEqual(self.node('snode.c-idp')['category'], 'excluded')
-            self.assertEqual(self.node('mqttsuite')['status'], 'superseded')
-            self.assertIn('re-request', self.node('mqttsuite')['reason'])
+            self.assertNotIn('request', self.node('mqttsuite'))
             with patch.object(dispatch, 'run', wraps=dispatch.run) as calls:
                 dispatch.tick(self.root, {})
         self.assertFalse(any(c.args[:3] == ('gh', 'run', 'download') for c in calls.call_args_list))
@@ -150,6 +150,9 @@ class RecoveryTest(CoordinatorCase):
 
     def test_bound_graph_controls_dispatch_and_unchanged_binding_does_not_reset(self):
         self.feed(['snode.c', 'mqttsuite'])
+        self.state['runs']['100']['revisions'] = {'snode.c-idp': '2'}
+        self.state['runs']['100']['context']['release_project'] = 'snode.c-idp'
+        self.save()
         graph = copy.deepcopy(self.graph)
         graph['snode.c']['depends_on'] = ['mqttsuite']
         graph['mqttsuite']['depends_on'] = []
@@ -167,104 +170,29 @@ class RecoveryTest(CoordinatorCase):
 
     def test_capture_registration_is_durable_in_local_bare_remote(self):
         self.state['runs'] = {}
-        self.state['requests'] = {'snode.c':dict(capture='100',eligible=False)}
+        self.state['requests'] = {'snode.c': {'v1.0.0': dict(definition=copy.deepcopy(self.graph['snode.c']), **dict(capture='100',eligible=False))}}
         self.save()
         # Assert the pushed transaction; a parent-process renderer mock cannot constrain this subprocess.
         dispatch.run('bash', str(repository.ROOT/'ci/publish/status.sh'), str(self.root), 'status', str(self.bundle), '-', '-', 'pending')
         remote = json.loads(self.git('show', 'main:status.json', cwd=self.remote))
         self.assertIn('100', remote['runs'])
-        self.assertTrue(remote['requests']['snode.c']['eligible'])
+        self.assertTrue(remote['requests']['snode.c']['v1.0.0']['eligible'])
         self.assertEqual(remote['runs']['100']['nodes'][self.row['id']+'/snode.c']['status'], 'pending')
         return None
 
     def test_failed_capture_intent_is_no_longer_selected(self):
-        self.state['requests'] = {'mqttsuite':dict(capture='200', sha='f'*40, tag='v2.0.0', revision='3')}
+        self.state['requests'] = {'mqttsuite': {'v2.0.0': dict(definition=copy.deepcopy(self.graph['mqttsuite']),
+            **dict(capture='200', sha='f'*40, tag='v2.0.0', revision='3'))}}
         self.save()
         self.runs[dispatch.COORDINATOR,200] = dict(event='workflow_dispatch',path='.github/workflows/orchestrate-packages.yml',head_repository={'full_name':dispatch.COORDINATOR},status='completed',conclusion='timed_out')
         self.tick()
-        request = publication.read(self.root/'status.json')['requests']['mqttsuite']
+        request = publication.read(self.root/'status.json')['requests']['mqttsuite']['v2.0.0']
         self.assertFalse(request['eligible'])
-        self.assertIn('without a durable generation', request['reason'])
+        self.assertIn('Capture failed', request['reason'])
         return None
 
-    def test_pinned_row_definitions_ignore_bad_heads_and_failed_requests(self):
-        graph = copy.deepcopy(self.graph)
-        graph['snode.c']['matrix'] = {'linux':[dict(distribution='debian',suite='trixie',image='debian:trixie',architectures=['amd64'])]}
-        graph['snode.c']['build'] = {'native':'ci/package/native.sh'}
-        claimed = {k:v for k,v in graph['snode.c'].items() if not k.startswith('_')}
-        self.feed(['mqttsuite'], revision='1')
-        self.state['requests'] = {'mqttsuite':dict(sha='e'*40,tag='v2.0.0',revision='3',eligible=False)}
-        self.save()
-        seen = []
-        def definition(project, commit):
-            seen.append((project,commit))
-            if project == 'snode.c-idp':
-                raise dispatch.ApiError(404, 'unpublished head has no definition')
-            return copy.deepcopy(graph[project]) | dict(_commit=commit)
-        def api(path, payload=None, token=None):
-            self.assertNotIn('/mqttsuite', path)
-            return dict(default_branch='main') if '/git/' not in path else dict(object={'sha':'d'*40})
-        with patch.object(repository, 'definition', side_effect=definition), patch.object(dispatch, 'api', side_effect=api), patch.object(repository, 'DEFINITIONS', self.base/'runtime.json'), patch.dict(repository.PROJECTS, graph), patch.dict(repository.ROW_PROJECTS, {}, clear=True):
-            repository.configure(self.root, 'snode.c', 'a'*40, claimed)
-            self.assertEqual(repository.ROW_PROJECTS[self.row['id']]['mqttsuite']['_commit'], 'b'*40)
-            self.assertNotIn(('mqttsuite','e'*40), seen)
-            self.assertIn('snode.c-idp', publication.read(self.base/'runtime.json')['errors'][self.row['id']])
-        return None
 
-    def test_latest_override_selects_semver_and_never_published_untagged_peer_does_not_abort(self):
-        graph = copy.deepcopy(self.graph)
-        graph['snode.c']['matrix'] = {'linux':[dict(distribution='debian',suite='trixie',image='debian:trixie',architectures=['amd64'])]}
-        graph['snode.c']['build'] = {'native':'ci/package/native.sh'}
-        claimed = {k:v for k,v in graph['snode.c'].items() if not k.startswith('_')}
-        self.feed(['mqttsuite'],revision='1')
-        def definition(project, commit):
-            return copy.deepcopy(graph[project]) | dict(_commit=commit)
-        def api(path, payload=None, token=None):
-            return dict(default_branch='main') if '/git/' not in path else dict(object={'sha':'d'*40})
-        def tags(*args, **kwargs):
-            return 'a'*40+' refs/tags/v1.0.0\n'+'e'*40+' refs/tags/v2.0.0' if 'https://github.com/SNodeC/mqttsuite.git' in args else ''
-        with patch.dict(repository.CONFIG['settings'],dependent_version='latest'),patch.object(repository,'run',side_effect=tags),patch.object(repository,'sources',return_value={'mqttsuite':{'refs/tags/v2.0.0':'e'*40}}),patch.object(repository,'definition',side_effect=definition),patch.object(dispatch,'api',side_effect=api),patch.object(repository,'DEFINITIONS',self.base/'runtime.json'),patch.dict(repository.PROJECTS,graph),patch.dict(repository.ROW_PROJECTS,{},clear=True):
-            repository.configure(self.root,'snode.c','a'*40,claimed)
-            selected = repository.ROW_PROJECTS[self.row['id']]
-            self.assertEqual(selected['mqttsuite']['_commit'],'e'*40)
-            self.assertEqual(selected['mqttsuite']['_tag'],'v2.0.0')
-            self.assertNotIn('_tag',selected['snode.c-idp'])
-        return None
 
-    def test_dependent_capture_mismatch_is_a_row_error_not_a_framework_failure(self):
-        graph = {n:copy.deepcopy(self.graph[n]) for n in ['snode.c','mqttsuite']}
-        sources = {}
-        for name, config in graph.items():
-            config['matrix'] = {'linux':[dict(distribution='debian',suite='trixie',image='debian:trixie',architectures=['amd64'])]}
-            config['build'] = {'native':'ci/package/native.sh'}
-            source = self.base/('source-'+name)
-            source.mkdir()
-            self.git('init','-q',str(source))
-            publication.write(source/'ci/packages.json', {k:v for k,v in config.items() if not k.startswith('_')})
-            (source/'VERSION').write_text('1.0.0')
-            self.git('add','.',cwd=source)
-            self.git('-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-qm','source',cwd=source)
-            config.update(_commit=self.git('rev-parse','HEAD',cwd=source),_digest=repository.digest(source/'ci/packages.json'))
-            sources['https://github.com/SNodeC/'+name+'.git'] = str(source)
-        graph['mqttsuite']['_tag'] = 'v2.0.0'
-        publication.write(self.root/'status.json',dict(repository='SNodeC/Packages',branch='main',runs={},allocations={'700':dict.fromkeys(graph,'7')},requests={'mqttsuite':dict(sha=graph['mqttsuite']['_commit'],tag='v2.0.0',revision='6')}))
-        original = repository.run
-        def local(*args, **kwargs):
-            return original(*(sources.get(arg,arg) for arg in args), **kwargs)
-        output = self.base/'capture'
-        with patch.dict(os.environ, RELEASE_PROJECT='snode.c', RELEASE_TAG='v1.0.0', GITHUB_RUN_ID='700'), patch.object(repository,'REPOSITORIES',tuple(graph)), patch.dict(repository.PROJECTS,graph,clear=True), patch.dict(repository.ROW_PROJECTS,{self.row['id']:graph},clear=True), patch.object(repository,'DEFINITIONS',self.base/'missing-runtime.json'), patch.object(repository,'definition',side_effect=lambda name,ref:copy.deepcopy(graph[name])), patch.object(repository,'run',side_effect=local), patch.object(publication,'published',return_value=({},'feed')):
-            repository.prepare(self.root, output)
-            profile = publication.read(output/'profiles.json')[self.row['id']]
-            self.assertIn('snode.c',profile['sources'])
-            self.assertNotIn('mqttsuite',profile['sources'])
-            self.assertIn('VERSION disagree',profile['errors']['mqttsuite'])
-            with patch('sys.argv',['publication','status',str(self.root),str(output),'-','-','pending']):
-                publication.main()
-        state = publication.read(self.root/'status.json')['runs']['700']['nodes']
-        self.assertEqual(state[self.row['id']+'/snode.c']['status'],'pending')
-        self.assertEqual(state[self.row['id']+'/mqttsuite']['status'],'unsatisfiable')
-        self.assertIn('VERSION disagree',state[self.row['id']+'/mqttsuite']['reason'])
-        return None
 
     def test_receipt_replay_through_feed_and_git_writer_never_signs_or_writes_feed(self):
         self.tick()
@@ -336,19 +264,20 @@ class RecoveryTest(CoordinatorCase):
         self.assertEqual(json.loads(self.posts[0][1]['inputs']['request'])['target'],row['id'])
         return None
 
-    def test_pending_prerequisite_reservation_blocks_later_application_before_capture_exists(self):
+    def test_direct_release_uses_published_prerequisite_despite_new_reservation(self):
         self.feed(['snode.c'],capture='prior',revision='1')
         generation = self.state['runs']['100']
         generation['context']['release_project'] = 'mqttsuite'
         generation['revisions'] = {'mqttsuite':'3'}
         generation['nodes'] = {}
         self.runs[dispatch.COORDINATOR,200] = dict(event='workflow_dispatch',path='.github/workflows/orchestrate-packages.yml',head_repository={'full_name':dispatch.COORDINATOR},status='in_progress')
-        self.state['requests'] = {'snode.c':dict(capture='200',sha='a'*40,revision='2',eligible=True)}
+        self.state['requests'] = {'snode.c': {'v1.0.0': dict(definition=copy.deepcopy(self.graph['snode.c']),
+            **dict(capture='200',sha='a'*40,revision='2',eligible=True))}}
         self.save()
         self.tick()
-        self.assertEqual(self.posts,[])
-        self.assertEqual(self.node('mqttsuite')['status'],'pending')
-        self.state['requests']['snode.c']['eligible'] = False
+        self.assertEqual([json.loads(p['inputs']['request'])['project'] for _,p in self.posts], ['mqttsuite'])
+        self.assertEqual(self.node('mqttsuite')['requires'], ['snode.c'])
+        self.state['requests']['snode.c']['v1.0.0']['eligible'] = False
         self.save()
         self.tick()
         self.assertEqual([json.loads(p['inputs']['request'])['project'] for _,p in self.posts],['mqttsuite'])
@@ -419,7 +348,8 @@ class RecoveryTest(CoordinatorCase):
             publication.reserve(root,'mqttsuite','701')
             with patch.dict(os.environ,GITHUB_RUN_ATTEMPT='2'):
                 second = publication.reserve(root,'snode.c','700')
-                self.assertGreater(int(second['mqttsuite']),int(first['mqttsuite']))
+                self.assertGreater(int(second['snode.c']),int(first['snode.c']))
+                self.assertEqual(set(second), {'snode.c'})
                 self.assertEqual(publication.reserve(root,'snode.c','700'),second)
                 state = publication.read(root/'status.json')
                 state['runs']['700'] = {'immutable':'capture already saved'}
@@ -464,8 +394,9 @@ class RecoveryTest(CoordinatorCase):
             repository.configure(self.root,'snode.c','a'*40,claimed)
         selected = publication.read(destination)
         self.assertIn('snode.c',selected['targets'][self.row['id']])
-        self.assertNotIn('mqttsuite',selected['targets'][self.row['id']])
-        self.assertIn('Invalid repository definition: mqttsuite',selected['errors'][self.row['id']]['mqttsuite'])
+        self.assertEqual(selected['projects']['mqttsuite']['_commit'], self.graph['mqttsuite']['_commit'])
+        self.assertEqual(selected['projects']['mqttsuite']['build'], self.graph['mqttsuite']['build'])
+        self.assertNotIn('errors', selected)
         return None
 
     def test_actual_triggering_actor_controls_operator_rerun(self):
