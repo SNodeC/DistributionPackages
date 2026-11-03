@@ -126,13 +126,15 @@ jobs:
   publish:
     name: Publish ${{ fromJSON(inputs.assignment).label }}
     needs: [validate, tools]
-    if: >-
-      !cancelled() && (needs.validate.result == 'success' ||
-       (fromJSON(inputs.assignment).kind == 'retention' && needs.validate.result == 'skipped')) &&
-      ((fromJSON(inputs.assignment).target.family == 'openwrt' && (needs.tools.result == 'success' ||
-        (fromJSON(inputs.assignment).kind == 'retention' && needs.tools.result == 'skipped' &&
-         !contains(join(fromJSON(inputs.assignment).objects.*.path, ' '), 'openwrt/')))) ||
-       (fromJSON(inputs.assignment).target.family == 'native' && needs.tools.result == 'skipped'))
+    if: ${{ !cancelled() }}
+    env:
+      PUBLICATION_INPUTS_OK: >-
+        ${{ (needs.validate.result == 'success' ||
+         (fromJSON(inputs.assignment).kind == 'retention' && needs.validate.result == 'skipped')) &&
+        ((fromJSON(inputs.assignment).target.family == 'openwrt' && (needs.tools.result == 'success' ||
+          (fromJSON(inputs.assignment).kind == 'retention' && needs.tools.result == 'skipped' &&
+           !contains(join(fromJSON(inputs.assignment).objects.*.path, ' '), 'openwrt/')))) ||
+         (fromJSON(inputs.assignment).target.family == 'native' && needs.tools.result == 'skipped')) }}
     concurrency:
       group: core-ci-feed-${{ vars.FEED_REPOSITORY }}-${{ vars.FEED_BRANCH }}
       cancel-in-progress: false
@@ -144,6 +146,11 @@ jobs:
     timeout-minutes: 25
     environment: package-publication
     steps:
+      - name: Require validated publication inputs
+        if: env.PUBLICATION_INPUTS_OK != 'true'
+        run: |
+          echo '::error::Publication inputs failed validation; no feed mutation attempted'
+          exit 1
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ env.CORE_CI_TOOLING_SHA }}
