@@ -1,0 +1,10 @@
+{
+  "bookworm": {
+    "url": "https://downloads.raspberrypi.com/raspios_oldstable_lite_arm64/images/raspios_oldstable_lite_arm64-2026-09-15/2026-09-15-raspios-bookworm-arm64-lite.img.xz",
+    "sha256": "bcaefdf9c40dbed31dcaeb3b8494e498b4f1e3078c2604b0d9f5f595f8f6fd91"
+  },
+  "trixie": {
+    "url": "https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2026-09-15/2026-09-15-raspios-trixie-arm64-lite.img.xz",
+    "sha256": "cdf4f3bfac35ae947b46e4e767f935453810549779ac3290e05a6754aee627e5"
+  }
+}
