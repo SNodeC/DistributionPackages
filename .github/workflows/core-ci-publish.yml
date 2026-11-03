@@ -22,7 +22,7 @@ permissions:
   contents: read
   actions: read
 env:
-  CORE_CI_TOOLING_SHA: "f59e9ea15428d7667613d2388b1109ca7f5fa2f5"
+  CORE_CI_TOOLING_SHA: "8b2c2fe63b4094ecfea286fca95ed6c02bcd077c"
   CONTROLLER_APP_BOT_ID: ${{ vars.CONTROLLER_APP_BOT_ID }}
   FEED_REPOSITORY: ${{ vars.FEED_REPOSITORY }}
   FEED_REPOSITORY_ID: ${{ vars.FEED_REPOSITORY_ID }}
