@@ -1,0 +1,61 @@
+name: core-ci public status
+run-name: Refresh package status from committed core-ci presentation facts
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: [core-ci trusted publication]
+    types: [requested, completed]
+permissions:
+  contents: read
+concurrency:
+  group: core-ci-status-${{ vars.FEED_REPOSITORY }}-${{ vars.FEED_BRANCH }}
+  cancel-in-progress: false
+jobs:
+  status:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.path == '.github/workflows/core-ci-publish.yml' &&
+       github.event.workflow_run.head_repository.id == github.repository_id &&
+       github.event.workflow_run.actor.id == fromJSON(vars.CONTROLLER_APP_BOT_ID))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: package-publication
+    concurrency:
+      group: core-ci-feed-${{ vars.FEED_REPOSITORY }}-${{ vars.FEED_BRANCH }}
+      cancel-in-progress: false
+      queue: max
+    env:
+      CORE_CI_TOOLING_SHA: "9653b9aae57002a8b87c548b37f39f756726dbba"
+      CORE_CI_STATUS_URL: ${{ vars.CORE_CI_STATUS_URL }}
+      CONTROLLER_APP_BOT_ID: ${{ vars.CONTROLLER_APP_BOT_ID }}
+      STATUS_NOTIFY_BOT_ID: ${{ vars.STATUS_NOTIFY_BOT_ID }}
+      STATUS_OWNER_ID: ${{ vars.STATUS_OWNER_ID }}
+      FEED_REPOSITORY: ${{ vars.FEED_REPOSITORY }}
+      FEED_REPOSITORY_ID: ${{ vars.FEED_REPOSITORY_ID }}
+      FEED_BRANCH: ${{ vars.FEED_BRANCH }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ env.CORE_CI_TOOLING_SHA }}
+          path: tooling
+          persist-credentials: false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: ${{ vars.FEED_REPOSITORY }}
+          ref: ${{ vars.FEED_BRANCH }}
+          path: feed
+          persist-credentials: false
+      - name: Install pinned template dependencies
+        run: |
+          python3 -m venv --without-pip "$RUNNER_TEMP/core-ci-status-python"
+          python3 -m pip --python "$RUNNER_TEMP/core-ci-status-python/bin/python" install -r tooling/status-templates/requirements.txt
+      - name: Prepare public status
+        env:
+          CORE_CI_RENDER_PYTHON: ${{ runner.temp }}/core-ci-status-python/bin/python
+        run: python3 tooling/core_ci/status_update.py --phase prepare --feed "$GITHUB_WORKSPACE/feed"
+      - name: Publish checked status update
+        env:
+          PACKAGES_APP_PRIVATE_KEY: ${{ secrets.PACKAGES_APP_PRIVATE_KEY }}
+          FEED_WRITER_APP_ID: ${{ vars.FEED_WRITER_APP_ID }}
+          FEED_WRITER_INSTALLATION_ID: ${{ vars.FEED_WRITER_INSTALLATION_ID }}
+        run: python3 tooling/core_ci/status_update.py --phase push --feed "$GITHUB_WORKSPACE/feed"
