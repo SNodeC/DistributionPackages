@@ -1,0 +1,6 @@
+<a id="banner"></a>
+<h1>{{ site.title }} package status</h1>
+<table><thead><tr><th>Project</th><th>Latest release</th><th>Status</th></tr></thead><tbody>
+{% for item in projects %}<tr><td><a href="https://github.com/{{ item.repository }}">{{ item.title }}</a></td>
+<td>{{ item.versions|first|default('—') }}</td><td><a href="{{ item.status_path|replace('status/', '', 1) }}#banner">Package status</a></td></tr>{% endfor %}
+</tbody></table>

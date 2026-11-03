@@ -1,0 +1,60 @@
+{% if output_path.endswith('.md') and site.parameters.get('style') == 'snodec' -%}
+{% include 'project-snodec.md.j2' %}
+{% else %}
+{% set html = output_path.endswith('.html') %}
+{% set root = '../' * (project.status_path.count('/') - 1) %}
+{% if html %}<!doctype html><html lang="en"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width"><title>{{ project.title }} package status</title><body>{% endif %}
+<a id="banner"></a>
+{% set latest = project.versions|first|default(none) %}
+<h1>{{ project.title }} package status · latest release {{ latest or '—' }}</h1>
+<p>{% for label, url in project.parameters.get('navigation', {}).items() %}
+<a href="{{ url }}">{{ label }}</a> · {% endfor %}<a href="{{ root }}{{ 'index.html' if html else 'README.md' }}#banner">All projects</a></p>
+<h2 id="distributions">Distributions</h2>
+<p>{% for distribution in project.targets|groupby('coordinates.distribution') %}{% for suite in distribution.list|groupby('coordinates.suite') %}
+<a href="#{{ distribution.grouper }}-{{ suite.grouper|replace('.', '') }}">{{ distribution.grouper }} {{ suite.grouper }}</a> ·
+{% endfor %}{% endfor %}</p>
+{% for distribution in project.targets|groupby('coordinates.distribution') %}{% for suite in distribution.list|groupby('coordinates.suite') %}
+<h2 id="{{ distribution.grouper }}-{{ suite.grouper|replace('.', '') }}">{{ distribution.grouper }} {{ suite.grouper }}</h2>
+<table><thead><tr><th>Architecture</th><th>Available</th><th>Published (UTC)</th><th>In build</th><th>Links</th></tr></thead><tbody>
+{% for target in suite.list %}
+{% set available = target.publications|selectattr('source')
+|selectattr('source.tag', 'equalto', latest)|sort(attribute='revision', reverse=true)|first|default(none) %}
+{% set work = target.executions|selectattr('tag', 'equalto', latest)|first|default(none) %}
+{% set active = work if work and work.state != 'published' else none %}
+<tr><td>{% for execution in target.executions %}<a id="{{ execution.id }}"></a>{% endfor %}<code>{{ target.coordinates.arch }}</code></td>
+<td>{% if available %}<code>{{ available.version }}</code>{% else %}—{% endif %}</td>
+<td>{{ available.published_utc[:16]|replace('T', ' ') if available and available.published_utc else '—' }}</td>
+<td>{% if active %}
+{{ 'Superseded' if active.superseded_by else active.activity }} · {{ active.tag }} · revision {{ active.revision }}
+{% if active.failure %}<br>{{ active.failure }}{% endif %}
+{% if active.blockers %}<br>Waiting for:
+{% for id in active.prerequisites %}{% set prerequisite = controller.executions|selectattr('id', 'equalto', id)|first %}
+{% set page = projects|selectattr('repository', 'equalto', prerequisite.repository)|first %}
+{% set link = page.status_path.removeprefix('status/') %}
+<a href="{{ root }}{{ link.removesuffix('.md') ~ '.html' if html else link }}#{{ id }}">
+{{ prerequisite.repository }} {{ prerequisite.tag }}</a>{% if not loop.last %}, {% endif %}
+{% endfor %}{% endif %}
+{% else %}—{% endif %}</td><td>
+{% set log = active.build_job_url if active else (available.build_job.html_url if available and available.build_job else none) %}
+{% if log %}<a href="{{ log }}">Build log</a> · {% endif %}
+{% if available %}<a href="{{ (available.feed_tree_url if html else root ~ '../') ~ available.package_directory }}">Packages</a>{% else %}—{% endif %}
+</td></tr>
+{% if available and available.summary %}<tr><td colspan="5"><details><summary>Hook-reported build summary</summary>
+{% for compiler in available.summary.get('compilers', []) %}{{ compiler.name }} {{ compiler.version }}; {% endfor %}
+{% if available.summary.get('tests') %}{{ available.summary.tests.passed }} passed, {{ available.summary.tests.failed }} failed,
+{{ available.summary.tests.skipped }} skipped
+{% if available.summary.tests.get('coverage_percent') is not none %} · coverage {{ available.summary.tests.coverage_percent }}%{% endif %}
+{% if available.summary.tests.get('report_url') %} · <a href="{{ available.summary.tests.report_url }}">Test report</a>{% endif %}{% endif %}
+{% if available.build_duration_seconds is not none %} · Build duration {{ available.build_duration_seconds }} s{% endif %}
+</details></td></tr>{% endif %}
+{% endfor %}</tbody></table><p><a href="#distributions">↑ Distributions</a></p>
+{% endfor %}{% endfor %}
+{% if site.parameters.get('show_history', false) %}<h2>Retained publications</h2>
+{% set publications = project.publications %}{% include 'table.html.j2' %}{% endif %}
+<p>Waiting: prerequisites are not all published. Building: assigned source work. Publishing: assigned feed work.
+Failed: explicit retry required. Superseded: retained waiting work replaced by a newer automatic selection.
+—: no recorded value. Publication times are the controller's first successful verification in UTC.</p>
+
+{% if html %}</body></html>{% endif %}
+{% endif %}

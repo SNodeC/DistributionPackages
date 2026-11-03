@@ -1,0 +1,8 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>{{ site.title }}</title>
+<meta name="viewport" content="width=device-width"><body>
+<h1>{{ site.title }} package status</h1>
+{% for item in projects %}<p>
+{% set link = item.status_path.removeprefix('status/').removesuffix('.md') ~ '.html' %}
+<a href="{{ 'status/' if output_path == 'index.html' else '' }}{{ link }}">{{ item.title }}</a>
+· latest release {{ item.versions|first|default('—') }}</p>{% endfor %}
+{% if site.parameters.get('show_history', false) %}{% include 'table.html.j2' %}{% endif %}</body></html>

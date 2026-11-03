@@ -1,7 +1,9 @@
-# Package CI tooling
+# Trusted core-ci workers
 
-DP owns capture, revision allocation, admission and central signing/publication. Source repositories own `ci/packages.json`, dependency declarations, matrices and product hooks. Do not reintroduce a central product/target authority or use public status pages/CDN data as execution permits. Admission and publication separately check the same dependency identity policy. Keep signing secrets confined here and preserve CAS publication, receipts, sibling packages and retention.
+MariaDB and the separate core-ci controller are the sole selection, revision and readiness authority. This repository validates frozen assignments and performs GitHub builds/signing/publication only. Do not add a coordinator, scheduler or dependency-selection implementation here.
 
-Python/shell/JSON/workflows are the applicable tooling; C++/CMake formatting settings are not applicable to this repository. Source formatting baselines are self-contained in each CMake source repository. Validate Python/shell syntax, the complete package suites, actual source wrappers and actionlint with the narrowly documented schema exclusions in `docs/ci-orchestration.md`.
+Source repositories own their schema-1 definitions and hooks. Prepare dependencies in the disposable image before running source hooks as the existing isolated unprivileged user. Do not pass signing or feed-writing credentials to hooks. Source artifact access uses the read-only App; publication and status writers share the existing feed concurrency group.
 
-This authorized task uses `/tmp/codex/checkouts/DistributionPackages/repository-owned-package-ci` on `refactor/repository-owned-package-ci` to preserve the occupied canonical checkout. Retain this worktree until its uncommitted work is integrated or otherwise preserved; never silently discard it. Temporary checks/logs use `/tmp/codex/build/snodec/package-ci`. Persistent repository-local `build/` and `checkouts/` are ignored. No commit, push, tag, PR mutation, live workflow, credential operation or publication is authorized by local verification.
+Preserve exact artifact/run/job/assignment bindings, explicit public receipt confirmation and immutable workflow/tooling pins. Status rendering is presentation only and consumes the existing compact initial SSE snapshot. It never authorizes a build or package publication.
+
+Preserve signing-key bytes and unrelated local work. Do not create or move source release tags or trigger the package chain until the owner's explicit build checkpoint approval. Python/shell/JSON/YAML apply here; controller C++ belongs in core-ci.
