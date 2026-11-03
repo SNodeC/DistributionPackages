@@ -14,6 +14,7 @@ def main():
     parser.add_argument("--assignment-sha256", required=True)
     parser.add_argument("--environment", required=True)
     parser.add_argument("--source", required=True)
+    parser.add_argument("--definition", required=True)
     parser.add_argument("--output", required=True)
     arguments = parser.parse_args()
     selected = assignment(arguments.assignment, arguments.assignment_sha256)

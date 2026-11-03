@@ -105,14 +105,16 @@ def execute_hook(selected, target, package_format, expected):
         require(actual == package["version"], "package manager substituted a prerequisite version")
     source = Path("/work/source")
     shutil.copytree("/source", source, symlinks=True)
-    hook = (source / selected["source"]["build"]["native"]).resolve()
-    require(hook.is_relative_to(source) and hook.is_file(), "hook escapes selected source checkout")
+    ci = Path("/definition")
+    hook = (ci / selected["source"]["build"]["native"]).resolve()
+    require(hook.is_relative_to(ci) and hook.is_file(), "hook escapes selected source checkout")
     encoded = versions(selected["source"]["tag"], selected["revision"], package_format)
     environment = {
         "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
         "HOME": "/tmp",
         "LANG": "C.UTF-8",
         "SOURCE_DIR": str(source),
+        "CI_DIR": str(ci),
         "TARGET_JSON": "/target.json",
         "SOURCE_VERSION": selected["source"]["tag"],
         "SOURCE_COMMIT": selected["source"]["commit"],

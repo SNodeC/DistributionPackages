@@ -61,7 +61,12 @@ def build(arguments):
         == selected["source"]["deployment"]["worker"]["tooling_sha"],
         "tooling checkout mismatch",
     )
-    definition = source / "ci/packages.json"
+    ci = Path(arguments.definition).resolve()
+    require(
+        output(["git", "-C", str(ci), "rev-parse", "HEAD"]) == selected["source"]["definition_revision"],
+        "checkout is not the selected CI revision",
+    )
+    definition = ci / "ci/packages.json"
     blob = output(["git", "hash-object", str(definition)])
     require(blob == selected["source"]["definition_blob_sha"], "checkout definition does not match selection")
     document = read_json(definition)
@@ -69,8 +74,8 @@ def build(arguments):
     for key in ("package", "title", "depends_on", "build"):
         require(document[key] == selected["source"][key], "committed definition differs from assignment")
     family = selected["target"]["family"]
-    hook = (source / selected["source"]["build"][family]).resolve()
-    require(hook.is_relative_to(source) and hook.is_file(), "hook escapes selected source checkout")
+    hook = (ci / selected["source"]["build"][family]).resolve()
+    require(hook.is_relative_to(ci) and hook.is_file(), "hook escapes selected CI checkout")
     resolved = read_json(arguments.environment, 16384)
     require(resolved["assignment_sha256"] == arguments.assignment_sha256, "environment belongs to another assignment")
     environment = resolved["environment"]
@@ -93,8 +98,9 @@ def build(arguments):
         write_json(work / "target.json", selected["target"])
         write_json(work / "environment.json", environment)
         prepare_dependencies(selected, work / "prerequisites", environment)
-        # Only this copied tree enters the hook container. No .git credentials or host workspace.
+        # Copied input trees enter the hook container without .git credentials or host workspace.
         shutil.copytree(source, work / "source", ignore=shutil.ignore_patterns(".git"), symlinks=True)
+        shutil.copytree(ci, work / "definition", ignore=shutil.ignore_patterns(".git"), symlinks=True)
         shutil.copytree(tooling / "core_ci", work / "core_ci")
         install = "RUN python3 /tool/native_container.py --install\n"
         tools = TOOLS.get(
@@ -201,6 +207,8 @@ def build(arguments):
                     "/work:rw,exec,size=4g,mode=1777",
                     "--mount",
                     "type=bind,source=" + str(work / "source") + ",target=/source,readonly",
+                    "--mount",
+                    "type=bind,source=" + str(work / "definition") + ",target=/definition,readonly",
                     "--mount",
                     "type=bind,source=" + str(destination) + ",target=/output",
                     tag,

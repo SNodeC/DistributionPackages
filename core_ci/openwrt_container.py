@@ -68,13 +68,15 @@ def main():
             shutil.copytree(directory / "development", staging / "usr", dirs_exist_ok=True)
     source = Path("/work/source")
     shutil.copytree("/source", source, symlinks=True)
-    hook = (source / selected["source"]["build"]["openwrt"]).resolve()
-    require(hook.is_relative_to(source) and hook.is_file(), "OpenWrt hook escapes selected checkout")
+    ci = Path("/definition")
+    hook = (ci / selected["source"]["build"]["openwrt"]).resolve()
+    require(hook.is_relative_to(ci) and hook.is_file(), "OpenWrt hook escapes selected checkout")
     encoded = versions(selected["source"]["tag"], selected["revision"], target["build"]["format"])
     values = {
         "PATH": os.environ["PATH"],
         "HOME": "/work",
         "SOURCE_DIR": str(source),
+        "CI_DIR": str(ci),
         "SDK_DIR": str(root),
         "SDK_STAGING_DIR": str(staging),
         "TARGET_JSON": "/target.json",
