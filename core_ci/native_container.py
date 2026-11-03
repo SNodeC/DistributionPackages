@@ -107,7 +107,7 @@ def execute_hook(selected, target, package_format, expected):
     shutil.copytree("/source", source, symlinks=True)
     ci = Path("/definition")
     hook = (ci / selected["source"]["build"]["native"]).resolve()
-    require(hook.is_relative_to(ci) and hook.is_file(), "hook escapes selected source checkout")
+    require(hook.is_relative_to(ci) and hook.is_file(), "hook escapes selected CI checkout")
     encoded = versions(selected["source"]["tag"], selected["revision"], package_format)
     environment = {
         "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",

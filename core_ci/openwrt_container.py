@@ -70,7 +70,7 @@ def main():
     shutil.copytree("/source", source, symlinks=True)
     ci = Path("/definition")
     hook = (ci / selected["source"]["build"]["openwrt"]).resolve()
-    require(hook.is_relative_to(ci) and hook.is_file(), "OpenWrt hook escapes selected checkout")
+    require(hook.is_relative_to(ci) and hook.is_file(), "OpenWrt hook escapes selected CI checkout")
     encoded = versions(selected["source"]["tag"], selected["revision"], target["build"]["format"])
     values = {
         "PATH": os.environ["PATH"],
