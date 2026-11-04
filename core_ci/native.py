@@ -155,7 +155,8 @@ def build(arguments):
             + tools
             + "\nCOPY core_ci /tool\nCOPY prerequisites /prerequisites\n"
             + "COPY assignment.json /assignment.json\n"
-            + install + "RUN mkdir -p /work && chmod 1777 /work\n"
+            + install + "RUN mkdir -p /work && chmod 1777 /work && "
+            + "(getent passwd 1000 >/dev/null || useradd -u 1000 -U -M -d /tmp builder)\n"
         )
         try:
             subprocess.run(["docker", "pull", "--platform", platform, image], check=True, timeout=600)
@@ -187,6 +188,7 @@ def build(arguments):
                 "docker",
                 "run",
                 "--rm",
+                "--init",
                 "--user=1000:1000",
                 "--platform",
                 platform,

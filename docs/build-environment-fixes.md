@@ -18,3 +18,13 @@ This corrects observed OpenWrt SDK ENOSPC without exposing host inputs for write
 
 Production delta: native.py 0, native_container.py +3, explicitly owner-approved.
 No application tag or non-CI application file changes.
+
+The hook process does not reap orphaned SDK helpers itself. Docker --init supplies
+the runtime's init process while retaining the256-process limit. A numeric Docker
+UID alone also has no passwd entry in several base images; create the build
+account when UID1000 is absent, retaining existing accounts. This lets unchanged
+SNode.C initialization and tests resolve their user and primary group.
+The combined isolated fixture validates UID/GID, writable /work, read-only root,
+and400process trees with zero remaining zombies. This is not full-chain acceptance.
+Follow-up production delta: native.py +2; total worker change +5. Owner authorized
+necessary additional lines in advance, with accounting after successful acceptance.
