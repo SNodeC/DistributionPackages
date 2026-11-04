@@ -14,8 +14,8 @@ from contract import assignment, compatibility, download_feed, extract_archive, 
 
 
 TOOLS = {
-    "deb": "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential python3 pkg-config ca-certificates",
-    "rpm": "dnf install -y gcc gcc-c++ make rpm-build python3 pkgconf-pkg-config findutils tar gzip && dnf clean all",
+    "deb": "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential python3 pkg-config ca-certificates git",
+    "rpm": "dnf install -y gcc gcc-c++ make rpm-build python3 pkgconf-pkg-config findutils tar gzip git && dnf clean all",
 }
 
 
@@ -155,7 +155,7 @@ def build(arguments):
             + tools
             + "\nCOPY core_ci /tool\nCOPY prerequisites /prerequisites\n"
             + "COPY assignment.json /assignment.json\n"
-            + install
+            + install + "RUN mkdir -p /work && chmod 1777 /work\n"
         )
         try:
             subprocess.run(["docker", "pull", "--platform", platform, image], check=True, timeout=600)
@@ -203,8 +203,8 @@ def build(arguments):
                     "--read-only",
                     "--tmpfs",
                     "/tmp:rw,exec,size=2g,mode=1777",
-                    "--tmpfs",
-                    "/work:rw,exec,size=4g,mode=1777",
+                    "--volume",
+                    "/work",
                     "--mount",
                     "type=bind,source=" + str(work / "source") + ",target=/source,readonly",
                     "--mount",
