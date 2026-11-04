@@ -28,3 +28,16 @@ The combined isolated fixture validates UID/GID, writable /work, read-only root,
 and400process trees with zero remaining zombies. This is not full-chain acceptance.
 Follow-up production delta: native.py +2; total worker change +5. Owner authorized
 necessary additional lines in advance, with accounting after successful acceptance.
+
+CPack collection explicitly sets CPACK_OUTPUT_FILE_PREFIX as well as -B; a source
+configuration may otherwise override -B and produce valid packages outside the
+collector directory. The real DEB/RPM fixture now includes such an override.
+Install file in Debian build images for CPack's dependency inspection.
+
+Foreign-architecture compilation made steady progress but exceeded50minutes.
+Keep every source test enabled: allow5hours for the source hook,5h20 for its
+container,1hour for image preparation/CPack and6hours for the GitHub job. These
+are failure deadlines, not dispatch/readiness policy. Native resource limits stay.
+Current cumulative Python delta versus9102417: native.py+3, native_container.py+4,
+total+7; reusable build workflow line count unchanged. Further necessary growth
+was explicitly authorized by the owner, to be reported after successful acceptance.
