@@ -21,13 +21,14 @@ def package(build):
     arguments = [
         "cpack", "--config", str(Path(build).resolve() / "CPackConfig.cmake"),
         "-G", package_format.upper(), "-B", str(directory),
+        "-D", "CPACK_OUTPUT_FILE_PREFIX=" + str(directory),
         "-D", "CPACK_PACKAGE_VERSION=" + (encoded["full"] if package_format == "deb" else encoded["version"]),
         "-D", "CPACK_DEBIAN_PACKAGE_VERSION=" + encoded["full"],
         "-D", "CPACK_RPM_PACKAGE_RELEASE=" + encoded["release"],
         "-D", "CPACK_RPM_PACKAGE_RELEASE_DIST=OFF",
         "-D", "CPACK_PACKAGE_CONTACT=Volker Christian <me@vchrist.at>",
     ]
-    subprocess.run(arguments, cwd=build, check=True, timeout=600)
+    subprocess.run(arguments, cwd=build, check=True, timeout=3600)
     packages = []
     for path in sorted(directory.glob("*." + package_format)):
         metadata = package_metadata(path, package_format)
@@ -134,7 +135,7 @@ def execute_hook(selected, target, package_format, expected):
         cwd=source,
         env=environment,
         check=True,
-        timeout=3000,
+        timeout=18000,
     )
 
 

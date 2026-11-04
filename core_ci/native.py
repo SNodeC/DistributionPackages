@@ -14,7 +14,8 @@ from contract import assignment, compatibility, download_feed, extract_archive, 
 
 
 TOOLS = {
-    "deb": "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential python3 pkg-config ca-certificates git",
+    "deb": ("apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "
+            "build-essential python3 pkg-config ca-certificates git file"),
     "rpm": "dnf install -y gcc gcc-c++ make rpm-build python3 pkgconf-pkg-config findutils tar gzip git && dnf clean all",
 }
 
@@ -182,7 +183,7 @@ def build(arguments):
                     str(work),
                 ],
                 check=True,
-                timeout=1200,
+                timeout=3600,
             )
             common = [
                 "docker",
@@ -218,7 +219,7 @@ def build(arguments):
                     "/tool/native_container.py" if family == "native" else "/tool/openwrt_container.py",
                 ],
                 check=True,
-                timeout=3600,
+                timeout=19200,
             )
             # Hook container has exited. No source process can race the independent validation.
             result = subprocess.run(

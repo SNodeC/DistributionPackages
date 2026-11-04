@@ -93,6 +93,7 @@ class Worker(unittest.TestCase):
                 "set(CPACK_DEB_COMPONENT_INSTALL ON)\nset(CPACK_RPM_COMPONENT_INSTALL ON)\n"
                 "set(CPACK_COMPONENTS_GROUPING IGNORE)\nset(CPACK_DEBIAN_FULL_PACKAGE_NAME snodec)\n"
                 "set(CPACK_RPM_FULL_PACKAGE_NAME snodec)\n"
+                'set(CPACK_OUTPUT_FILE_PREFIX "${CMAKE_BINARY_DIR}/configured-output")\n'
                 'set(CPACK_PROJECT_CONFIG_FILE "${CMAKE_CURRENT_SOURCE_DIR}/PackageConfig.cmake")\ninclude(CPack)\n'
             )
             build = root / "build"
