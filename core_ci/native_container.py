@@ -59,8 +59,11 @@ def main():
     require(values.get("ID") == distribution, "image distribution differs from target")
     if target["distribution"] == "raspberrypios":
         require(Path("/etc/rpi-issue").is_file(), "target requires the official Raspberry Pi OS root filesystem")
+    series = values.get("VERSION_ID", "").split(".")[0] if distribution == "rocky" else values.get("VERSION_ID", "")
+    if distribution == "debian" and target["suite"] == "sid":
+        series = "sid" if "Suites: sid" in Path("/etc/apt/sources.list.d/debian.sources").read_text().splitlines() else series
     require(
-        target["suite"] in (values.get("VERSION_ID"), values.get("VERSION_CODENAME")),
+        target["suite"] in (series, values.get("VERSION_CODENAME")),
         "image series differs from target",
     )
     arch = (
