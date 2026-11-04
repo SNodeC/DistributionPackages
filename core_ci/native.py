@@ -14,7 +14,8 @@ from contract import assignment, compatibility, download_feed, extract_archive, 
 
 
 TOOLS = {
-    "deb": "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential python3 pkg-config ca-certificates git",
+    "deb": ("apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "
+            "build-essential python3 pkg-config ca-certificates git file"),
     "rpm": "dnf install -y gcc gcc-c++ make rpm-build python3 pkgconf-pkg-config findutils tar gzip git && dnf clean all",
 }
 
@@ -155,7 +156,8 @@ def build(arguments):
             + tools
             + "\nCOPY core_ci /tool\nCOPY prerequisites /prerequisites\n"
             + "COPY assignment.json /assignment.json\n"
-            + install + "RUN mkdir -p /work && chmod 1777 /work\n"
+            + install + "RUN mkdir -p /work && chmod 1777 /work && "
+            + "(getent passwd 1000 >/dev/null || useradd -u 1000 -U -M -d /tmp builder)\n"
         )
         try:
             subprocess.run(["docker", "pull", "--platform", platform, image], check=True, timeout=600)
@@ -181,12 +183,13 @@ def build(arguments):
                     str(work),
                 ],
                 check=True,
-                timeout=1200,
+                timeout=3600,
             )
             common = [
                 "docker",
                 "run",
                 "--rm",
+                "--init",
                 "--user=1000:1000",
                 "--platform",
                 platform,
@@ -216,7 +219,7 @@ def build(arguments):
                     "/tool/native_container.py" if family == "native" else "/tool/openwrt_container.py",
                 ],
                 check=True,
-                timeout=3600,
+                timeout=19200,
             )
             # Hook container has exited. No source process can race the independent validation.
             result = subprocess.run(
