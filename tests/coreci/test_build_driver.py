@@ -7,7 +7,7 @@ from coreci import build
 from contract import write_json
 
 
-def main():
+def probe(fmt):
     with tempfile.TemporaryDirectory() as temporary:
         root=Path(temporary)
         source=root/'source'
@@ -17,8 +17,8 @@ def main():
         (source/'.git/token').write_text('must not enter build image')
         (source/'payload').write_text('source')
         (recipe/'ci').mkdir(parents=True)
-        write_json(recipe/'ci/packages.json',dict(package='a',depends_on=[],matrix=[entry()],
-                   build=dict(native='ci/hook.sh'),build_dependencies={'deb':['cmake']}))
+        write_json(recipe/'ci/packages.json',dict(package='a',depends_on=[],matrix=[entry(fmt)],
+                   build=dict(native='ci/hook.sh'),build_dependencies={fmt:['cmake']}))
         calls=[]
         host=dict(image='example:stable',platform='linux/amd64',resolved_image='example@sha256:'+'0'*64)
         def command(args,**kwargs):
@@ -31,6 +31,11 @@ def main():
             if args[:2]==['docker','run']:
                 assert '--user=1000:1000' in args and '--read-only' in args and '--cap-drop=ALL' in args
                 assert '--env' not in args and '-e' not in args, 'no credentials forwarded to container'
+                scratch = {args[i+1].split(':',1)[0]: args[i+1].split(':',1)[1]
+                           for i, arg in enumerate(args) if arg == '--tmpfs'}
+                for directory in ('/tmp', '/var/tmp'):
+                    assert directory in scratch, 'compiler and RPM temporary directories must be writable'
+                    assert 'rw' in scratch[directory] and 'mode=1777' in scratch[directory]
                 assert any('target=/source,readonly' in s for s in args)
                 assert any('target=/definition,readonly' in s for s in args)
                 assert any('target=/core_ci,readonly' in s for s in args)
@@ -42,7 +47,13 @@ def main():
             build.build(source,recipe,root/'packages')
         assert [c[1] for c in calls]==['build','run','run','image']
         assert '--inspect' in calls[2]
-    print('build driver: disposable image, credential-free mounts, separate inspection and cleanup passed')
+    return 0
+
+
+def main():
+    probe('deb')
+    probe('rpm')
+    print('build driver: deb/rpm writable scratch, read-only root, credential-free mounts and cleanup passed')
     return 0
 
 
