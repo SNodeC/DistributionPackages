@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import subprocess
+import shlex
 import tempfile
 from support import build_inputs, entry, environment, registry_data, replace, rejects
 from coreci import build
@@ -17,10 +18,25 @@ def probe(fmt):
         (source/'.git/token').write_text('must not enter build image')
         (source/'payload').write_text('source')
         (recipe/'ci').mkdir(parents=True)
-        write_json(recipe/'ci/packages.json',dict(package='a',depends_on=[],matrix=[entry(fmt)],
-                   build=dict(native='ci/hook.sh'),build_dependencies={fmt:['cmake']}))
+        target=entry(fmt)
+        openwrt=fmt in ('ipk','apk')
+        if openwrt:
+            target.update(family='openwrt',distribution='openwrt')
+            target['build']=dict(format=fmt,target='x86/64',release='test')
+        write_json(recipe/'ci/packages.json',dict(package='a',depends_on=[],matrix=[target],
+                   build={target['family']:'ci/hook.sh'},build_dependencies={fmt:['cmake']}))
         calls=[]
         host=dict(image='example:stable',platform='linux/amd64',resolved_image='example@sha256:'+'0'*64)
+        def prepare(target,environment,destination):
+            sdk=destination/'extracted/test-sdk'
+            template=sdk/'staging_dir/host/lib/meson/openwrt-cross.txt.in'
+            template.parent.mkdir(parents=True)
+            template.write_text('private host-generated SDK template')
+            template.chmod(0o600)
+            (sdk/'template-link').symlink_to(template.relative_to(sdk))
+            (destination/'sdk.archive').write_bytes(b'archive must not enter build image')
+            (destination/'query.mk').write_text('preparation only')
+            return sdk,Path('staging_dir/target')
         def command(args,**kwargs):
             calls.append(args)
             if args[:2]==['docker','build']:
@@ -28,6 +44,17 @@ def probe(fmt):
                 assert not (context/'source/.git').exists()
                 dockerfile=(context/'Dockerfile').read_text()
                 assert 'cmake' in dockerfile and 'COPY prerequisites /inputs/prerequisites' in dockerfile
+                sdk_copies=[shlex.split(line) for line in dockerfile.splitlines()
+                            if line.startswith('COPY --chown=')]
+                if openwrt:
+                    assert sdk_copies==[['COPY','--chown=1000:1000','sdk/extracted/test-sdk','/sdk']]
+                    template=context/'sdk/extracted/test-sdk/staging_dir/host/lib/meson/openwrt-cross.txt.in'
+                    assert template.stat().st_mode & 0o777==0o600, 'host permissions must not be broadened'
+                    assert (context/'sdk/extracted/test-sdk/template-link').is_symlink()
+                    ignored=(context/'.dockerignore').read_text().splitlines()
+                    assert 'sdk' not in ignored and 'sdk/sdk.*' in ignored and 'sdk/query.mk' in ignored
+                else:
+                    assert not sdk_copies
             if args[:2]==['docker','run']:
                 assert '--user=1000:1000' in args and '--read-only' in args and '--cap-drop=ALL' in args
                 assert '--env' not in args and '-e' not in args, 'no credentials forwarded to container'
@@ -36,6 +63,7 @@ def probe(fmt):
                 for directory in ('/tmp', '/var/tmp'):
                     assert directory in scratch, 'compiler and RPM temporary directories must be writable'
                     assert 'rw' in scratch[directory] and 'mode=1777' in scratch[directory]
+                assert not any('target=/sdk' in s for s in args), 'host SDK ownership must not enter runtime'
                 assert any('target=/source,readonly' in s for s in args)
                 assert any('target=/definition,readonly' in s for s in args)
                 assert any('target=/core_ci,readonly' in s for s in args)
@@ -43,7 +71,8 @@ def probe(fmt):
                     assert '--network=none' in args
             return subprocess.CompletedProcess(args,0)
         with environment(dict(build_inputs(),RUNNER_TEMP=str(root))), replace(build,'registry',registry_data), \
-             replace(build,'native',lambda _:host), replace(build.subprocess,'run',command):
+             replace(build,'native',lambda _:host), replace(build,'sdk',lambda *args:{}), \
+             replace(build,'prepare',prepare), replace(build.subprocess,'run',command):
             build.build(source,recipe,root/'packages')
         assert [c[1] for c in calls]==['build','run','run','image']
         assert '--inspect' in calls[2]
@@ -53,7 +82,9 @@ def probe(fmt):
 def main():
     probe('deb')
     probe('rpm')
-    print('build driver: deb/rpm writable scratch, read-only root, credential-free mounts and cleanup passed')
+    probe('ipk')
+    probe('apk')
+    print('build driver: deb/rpm/ipk/apk isolation, SDK ownership, credential-free mounts and cleanup passed')
     return 0
 
 
