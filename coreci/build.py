@@ -107,13 +107,13 @@ def install_lines(target, instructions):
         base = item["feed"] + item["distribution"]
         if target["build"]["format"] == "deb":
             source = f'deb [signed-by={key}] {base} {item["suite"]} main\n'
-            lines += ["RUN printf %s " + shlex.quote(source) + f' > /etc/apt/sources.list.d/coreci-{index}.list',
+            lines += ["RUN printf '%s\\n' " + shlex.join(source.splitlines()) + f' > /etc/apt/sources.list.d/coreci-{index}.list',
                       "RUN apt-get update && apt-get install -y --no-install-recommends " +
                       " ".join(shlex.quote(p + "=" + item["full"]) for p in item["names"])]
         else:
             source = (f'[coreci-{index}]\nname=coreci\nbaseurl={base}/{item["suite"]}/{item["arch"]}/\n'
                       f'gpgcheck=1\nrepo_gpgcheck=1\ngpgkey=file://{key}\n')
-            lines += ["RUN printf %s " + shlex.quote(source) + f' > /etc/yum.repos.d/coreci-{index}.repo',
+            lines += ["RUN printf '%s\\n' " + shlex.join(source.splitlines()) + f' > /etc/yum.repos.d/coreci-{index}.repo',
                       "RUN dnf install -y " + " ".join(shlex.quote(p + "-" + item["full"]) for p in item["names"])]
         for package in item["names"]:
             query = (["dpkg-query", "--show", "--showformat=${Version}", package] if target["build"]["format"] == "deb"
