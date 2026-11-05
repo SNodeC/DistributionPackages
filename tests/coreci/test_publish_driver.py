@@ -24,7 +24,7 @@ def main():
                  INPUT_TARGET='t1',INPUT_CALLBACK_URL='',INPUT_BUILD_REPO='Example/Recipes',INPUT_BUILD_RUN_ID='1',
                  INPUT_ARTIFACT='coreci-'+manifest['build_id'],GITHUB_REPOSITORY='Example/Recipes',
                  GITHUB_WORKFLOW_REF='Example/Recipes/.github/workflows/coreci-publish.yml@refs/heads/test',
-                 RUNNER_TEMP=str(root),GITHUB_OUTPUT=str(root/'outputs'),FEED_PUSH_TOKEN='unit-test-only')
+                 RUNNER_TEMP=str(root),GITHUB_OUTPUT=str(root/'outputs'),GH_TOKEN='unit-test-only')
         events=[]
         def output(args):
             result='a'*40
@@ -40,7 +40,7 @@ def main():
             path=Path(work)/'private'
             path.write_text('must not be mounted')
             try:
-                yield {'GPG_PRIVATE_KEY':path}
+                yield {'APT_SIGNING_KEY':path}
             finally:
                 path.unlink()
         @contextmanager
@@ -65,6 +65,7 @@ def main():
             return 'a'*40
         def push(*args):
             events.append('push')
+            assert args[-2]=='unit-test-only'
             assert args[-1]=='a'*40
             return 'b'*40
         def availability(*args):

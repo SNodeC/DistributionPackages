@@ -42,7 +42,9 @@ def resolve(artifacts):
             workflow_identity(os.environ["GITHUB_WORKFLOW_REF"]) == workflow_identity(feed["publisher"]),
             "feed publisher mismatch")
     branch = metadata(feed["repository"])["default_branch"]
-    github_outputs(environment=feed["environment"], repository=feed["repository"], branch=branch)
+    owner, repository_name = feed["repository"].split("/")
+    github_outputs(environment=feed["environment"], repository=feed["repository"], branch=branch,
+                   owner=owner, repository_name=repository_name)
 
 
 def ledger(manifest):
@@ -122,7 +124,7 @@ def targets(manifest, artifacts):
 def secrets(work):
     files = {}
     try:
-        for name in ("GPG_PRIVATE_KEY", "GPG_PASSPHRASE", "USIGN_PRIVATE_KEY", "APK_PRIVATE_KEY"):
+        for name in ("APT_SIGNING_KEY", "PACKAGES_GPG_PASSPHRASE", "OPENWRT_USIGN_KEY", "OPENWRT_APK_KEY"):
             value = os.environ.get(name, "")
             if value:
                 path = Path(work) / name
@@ -204,7 +206,7 @@ def publish(artifacts, root):
             public = public_key(feed, "gpg", public_directory)
             key_home = work / "keyring"
             key_home.mkdir(mode=0o700)
-            with secrets(work) as private, signing_key(private["GPG_PRIVATE_KEY"], private.get("GPG_PASSPHRASE"), public,
+            with secrets(work) as private, signing_key(private["APT_SIGNING_KEY"], private.get("PACKAGES_GPG_PASSPHRASE"), public,
                     feed["keys"]["gpg"]["fingerprint"].upper(), str(key_home)) as (home, gpg, keyring):
                 for name, relative in paths.items():
                     destination = root / relative
@@ -216,7 +218,7 @@ def publish(artifacts, root):
                         subprocess.run(["rpmsign", "--define", "_gpg_name " + feed["keys"]["gpg"]["fingerprint"],
                             "--define", "_gpg_path " + str(home), "--define", "_openpgp_sign_id " +
                             feed["keys"]["gpg"]["fingerprint"], "--define", "_gpg_sign_cmd_extra_args " +
-                            shlex_passphrase(private.get("GPG_PASSPHRASE")), "--addsign", str(root / relative)], check=True)
+                            shlex_passphrase(private.get("PACKAGES_GPG_PASSPHRASE")), "--addsign", str(root / relative)], check=True)
                 if fmt in ("deb", "rpm"):
                     generator = apt_indexes if fmt == "deb" else rpm_indexes
                     indices = generator(root, entry["distribution"], entry["suite"], entry["arch"], gpg, keyring)
@@ -252,7 +254,7 @@ def publish(artifacts, root):
                 require(changed <= allowed, "publication changed unrelated feed files")
                 committed_base = prepare_commit(root, changed, orphan=True, removed=changed - after.keys())
                 require(committed_base == base, "feed checkout changed during publication")
-                commit = checked_push(root, branch, os.environ["FEED_PUSH_TOKEN"], base)
+                commit = checked_push(root, branch, os.environ["GH_TOKEN"], base)
                 availability(feed, [str(p.relative_to(root)) for p in indices], root)
                 github_outputs(feed_commit=commit)
 
@@ -274,7 +276,7 @@ def openwrt_indices(root, entry, feed, paths, sdk_root, private, work):
     key = feed["keys"][kind]
     public = work / "public" / Path(key["file"]).name
     download(feed["url"] + key["file"], public, 1024**2)
-    secret = private["USIGN_PRIVATE_KEY" if fmt == "ipk" else "APK_PRIVATE_KEY"]
+    secret = private["OPENWRT_USIGN_KEY" if fmt == "ipk" else "OPENWRT_APK_KEY"]
     tool = str(sdk_root / "staging_dir/host/bin" / ("usign" if fmt == "ipk" else "apk"))
     keys = work / "openwrt-keys"
     keys.mkdir()

@@ -14,9 +14,13 @@ prerequisites are installed before hooks; metadata is written per prerequisite.
 
 ## Publisher environment
 
-The feed's environment supplies `GPG_PRIVATE_KEY` (ASCII armored), optional
-`GPG_PASSPHRASE`, `USIGN_PRIVATE_KEY`, `APK_PRIVATE_KEY` and `FEED_PUSH_TOKEN`
-(contents-write permission for this feed repository only). Public keys and their
+The feed's environment supplies the existing `APT_SIGNING_KEY` (ASCII armored),
+optional `PACKAGES_GPG_PASSPHRASE`, `OPENWRT_USIGN_KEY`, `OPENWRT_APK_KEY` and
+`PACKAGES_APP_PRIVATE_KEY`, with `vars.FEED_WRITER_APP_ID`. The publisher uses
+`actions/create-github-app-token@v3` to mint a token scoped to the selected feed's
+owner and repository, with contents-write permission. Only that action receives
+the App private key; its temporary token reaches the push helper as `GH_TOKEN`.
+The action revokes the token when the job completes. Public keys and their
 trust anchors come from the registry. Private files are owner-readable temporary
 files and are never mounted into consumer-validation containers. Only report
 steps receive the organization secret `CORECI_CALLBACK_SECRET`.
@@ -70,7 +74,7 @@ implementations.
 | `coreci/publish.py:shlex_passphrase` | `core_ci/sign_native.py:update` | 7 |
 | `coreci/publish.py:openwrt_indices` | `core_ci/sign_openwrt.py:signing_tools/update` | 30 |
 
-Production: **1328** added physical lines: **290** conservatively
-classified adapted/copy lines and **1038** new lines. This includes all
+Production: **1341** added physical lines: **290** conservatively
+classified adapted/copy lines and **1051** new lines. This includes all
 Python, workflow and action lines (comments and blanks included). The approved
 ceiling is 2,600. Tests and this document are accounted separately.
