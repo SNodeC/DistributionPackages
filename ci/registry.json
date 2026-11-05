@@ -1,0 +1,31 @@
+{
+  "feeds": {
+    "packages-staging": {
+      "publisher": "SNodeC/DistributionPackages/.github/workflows/coreci-publish.yml",
+      "repository": "SNodeC/Packages-staging",
+      "url": "https://snodec.github.io/Packages-staging/",
+      "environment": "package-publication-staging",
+      "keys": {
+        "gpg": {
+          "file": "keys/apt.asc",
+          "fingerprint": "C185D820FF1ED660C594703CF9C594FB8CD94DC6"
+        },
+        "usign": {
+          "file": "keys/opkg.pub",
+          "key_id": "a199ac37239df11b"
+        },
+        "apk": {
+          "file": "keys/apk.pem",
+          "sha256": "e71ecb4bea03cb509bb234c2c1780b4abd403ec1ed7f9e955ac0ccf49b86a231"
+        }
+      }
+    }
+  },
+  "default_feed": "packages-staging",
+  "build": "SNodeC/DistributionPackages/.github/workflows/coreci-build.yml",
+  "repositories": [
+    "SNodeC/snode.c",
+    "SNodeC/mqttsuite"
+  ],
+  "badges": "https://core.vchrist.at/api/v1/badge"
+}
