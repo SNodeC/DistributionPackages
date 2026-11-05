@@ -166,10 +166,12 @@ def build(source, definition, destination):
             tools += " && " + ("dnf install -y " if fmt == "rpm" else "apt-get install -y ") + shlex.join(extra)
         lines = ["FROM " + host["resolved_image"], "RUN " + tools, "COPY prerequisites /inputs/prerequisites"]
         lines += install_lines(target, instructions)
+        if sdk_root:
+            lines.append("COPY --chown=1000:1000 " + str(sdk_root.relative_to(work)) + " /sdk")
         lines += ["RUN mkdir -p /work && chmod 1777 /work && "
                   "(getent passwd 1000 >/dev/null || useradd -u 1000 -U -M -d /tmp builder)"]
         (work / "Dockerfile").write_text("\n".join(lines) + "\n")
-        (work / ".dockerignore").write_text("sdk\nsource\ndefinition\ncore_ci\ncoreci\n")
+        (work / ".dockerignore").write_text("sdk/sdk.*\nsdk/query.mk\nsource\ndefinition\ncore_ci\ncoreci\n")
         image = "coreci-build:" + str(os.getpid())
         subprocess.run(["docker", "build", "--platform", host["platform"], "-t", image, str(work)], check=True, timeout=3600)
         mounts = []
@@ -179,8 +181,6 @@ def build(source, definition, destination):
                 (work / "target.json", "/target.json", True), (work / "environment.json", "/environment.json", True),
                 (destination, "/output", False)):
             mounts += ["--mount", f'type=bind,source={source_path},target={container_path}' + (",readonly" if readonly else "")]
-        if sdk_root:
-            mounts += ["--mount", f'type=bind,source={sdk_root},target=/sdk,readonly']
         common = ["docker", "run", "--rm", "--init", "--user=1000:1000", "--platform", host["platform"],
                   "--cap-drop=ALL", "--security-opt=no-new-privileges", "--read-only", "--pids-limit=256",
                   "--memory=4g", "--cpus=2", "--tmpfs", "/tmp:rw,exec,size=2g,mode=1777",
