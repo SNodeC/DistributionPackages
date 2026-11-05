@@ -1,0 +1,98 @@
+from contextlib import contextmanager
+from pathlib import Path
+from types import SimpleNamespace
+import tempfile
+from support import environment, registry_data, entry, replace, rejects
+from coreci import publish
+from contract import file_hash, write_json
+
+
+def main():
+    with tempfile.TemporaryDirectory() as temporary:
+        root=Path(temporary)
+        feed=root/'feed'
+        artifacts=root/'packages'
+        feed.mkdir()
+        artifacts.mkdir()
+        (feed/'README.md').write_bytes(b'Unrelated README\r\n')
+        (feed/'unrelated').write_bytes(b'preserve these bytes')
+        (artifacts/'a.deb').write_bytes(b'unsigned input')
+        manifest=dict(build_id='a~t1~1.0.0~r1',package='a',version='1.0.0',revision=1,
+                      target='t1',feed='test',entry=entry(),files={'a.deb':file_hash(artifacts/'a.deb')})
+        write_json(artifacts/'manifest.json',manifest)
+        env=dict(INPUT_BUILD_ID=manifest['build_id'],INPUT_PACKAGE='a',INPUT_VERSION='1.0.0',INPUT_REVISION='1',
+                 INPUT_TARGET='t1',INPUT_CALLBACK_URL='',INPUT_BUILD_REPO='Example/Recipes',INPUT_BUILD_RUN_ID='1',
+                 INPUT_ARTIFACT='coreci-'+manifest['build_id'],GITHUB_REPOSITORY='Example/Recipes',
+                 GITHUB_WORKFLOW_REF='Example/Recipes/.github/workflows/coreci-publish.yml@refs/heads/test',
+                 RUNNER_TEMP=str(root),GITHUB_OUTPUT=str(root/'outputs'),FEED_PUSH_TOKEN='unit-test-only')
+        events=[]
+        def output(args):
+            result='a'*40
+            if 'get-url' in args:
+                result='https://github.com/Example/Feed'
+            return result
+        def key(feed,kind,path):
+            result=path/'test.asc'
+            result.write_text('public test key')
+            return result
+        @contextmanager
+        def private(work):
+            path=Path(work)/'private'
+            path.write_text('must not be mounted')
+            try:
+                yield {'GPG_PRIVATE_KEY':path}
+            finally:
+                path.unlink()
+        @contextmanager
+        def signer(*args):
+            events.append('signing-boundary')
+            yield root,[],root/'trusted.gpg'
+        def indices(root,*args):
+            path=root/'debian/dists/stable/main/binary-amd64/Packages'
+            path.parent.mkdir(parents=True)
+            path.write_bytes(b'new index')
+            return [path]
+        def validate(root,entry,files,key,sdk):
+            events.append('validate')
+            assert key.parent.name=='public'
+            assert not (key.parent/'private').exists()
+            assert (root/files[0]).read_bytes()==b'unsigned input'
+        def commit(root,changes,**kwargs):
+            events.append('commit')
+            assert kwargs['orphan'] is True
+            assert 'unrelated' not in changes
+            assert (root/'README.md').read_bytes().startswith(b'Unrelated README\r\n')
+            return 'a'*40
+        def push(*args):
+            events.append('push')
+            assert args[-1]=='a'*40
+            return 'b'*40
+        def availability(*args):
+            events.append('availability')
+        from coreci import validate as validator
+        import contract
+        with environment(env), replace(publish,'registry',registry_data), \
+             replace(publish,'metadata',lambda _:dict(default_branch='main')), replace(publish,'output',output), \
+             replace(publish,'public_key',key), replace(publish,'secrets',private), replace(publish,'signing_key',signer), \
+             replace(publish,'apt_indexes',indices),replace(publish,'prepare_commit',commit),replace(publish,'checked_push',push), \
+             replace(publish,'availability',availability), replace(validator,'validate',validate), \
+             replace(publish,'declaration',lambda _:dict(package='a',matrix=[entry()])), \
+             replace(contract,'package_metadata',lambda *args:dict(name='a',version='1.0.0-1',arch='amd64')):
+            publish.publish(artifacts,feed)
+            assert events==['signing-boundary','validate','commit','push','availability']
+            assert (root/'outputs').read_text()=='feed_commit='+'b'*40+'\n'
+            events.clear()
+            publish.publish(artifacts,feed)
+            assert events==[], 'identical replay must not sign, validate, commit or push'
+            (artifacts/'a.deb').write_bytes(b'conflicting unsigned bytes')
+            manifest['files']['a.deb']=file_hash(artifacts/'a.deb')
+            write_json(artifacts/'manifest.json',manifest)
+            rejects(publish.publish,artifacts,feed,text='immutable')
+            assert events==[], 'conflict must fail before signing'
+        assert (feed/'unrelated').read_bytes()==b'preserve these bytes'
+    print('publisher driver: validate-before-push, credential isolation, unchanged bytes, no-op and immutable conflict passed')
+    return 0
+
+
+if __name__=='__main__':
+    raise SystemExit(main())
