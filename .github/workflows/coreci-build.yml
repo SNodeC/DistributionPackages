@@ -82,6 +82,7 @@ jobs:
           repository: ${{ needs.resolve.outputs.source }}
           ref: ${{ inputs.tag }}
           path: source
+          submodules: recursive
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
