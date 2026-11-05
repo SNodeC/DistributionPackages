@@ -1,0 +1,126 @@
+name: coreci publish
+on:
+  workflow_dispatch:
+    inputs:
+      build_id:
+        required: true
+        type: string
+      package:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+      revision:
+        required: true
+        type: string
+      target:
+        required: true
+        type: string
+      callback_url:
+        required: false
+        type: string
+      build_repo:
+        required: true
+        type: string
+      build_run_id:
+        required: true
+        type: string
+      artifact:
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+env:
+  INPUT_BUILD_ID: ${{ inputs.build_id }}
+  INPUT_PACKAGE: ${{ inputs.package }}
+  INPUT_VERSION: ${{ inputs.version }}
+  INPUT_REVISION: ${{ inputs.revision }}
+  INPUT_TARGET: ${{ inputs.target }}
+  INPUT_CALLBACK_URL: ${{ inputs.callback_url }}
+  INPUT_BUILD_REPO: ${{ inputs.build_repo }}
+  INPUT_BUILD_RUN_ID: ${{ inputs.build_run_id }}
+  INPUT_ARTIFACT: ${{ inputs.artifact }}
+jobs:
+  resolve:
+    runs-on: ubuntu-24.04
+    outputs:
+      environment: ${{ steps.resolve.outputs.environment }}
+      repository: ${{ steps.resolve.outputs.repository }}
+      branch: ${{ steps.resolve.outputs.branch }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check build provenance
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 -m coreci.publish check-run
+      - uses: actions/download-artifact@v4
+        with:
+          repository: ${{ inputs.build_repo }}
+          run-id: ${{ inputs.build_run_id }}
+          github-token: ${{ github.token }}
+          name: ${{ inputs.artifact }}
+          path: packages
+      - id: resolve
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 -m coreci.publish resolve
+  publish:
+    needs: resolve
+    environment: ${{ needs.resolve.outputs.environment }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    outputs:
+      commit: ${{ steps.publish.outputs.feed_commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.resolve.outputs.repository }}
+          ref: ${{ needs.resolve.outputs.branch }}
+          path: feed
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          repository: ${{ inputs.build_repo }}
+          run-id: ${{ inputs.build_run_id }}
+          github-token: ${{ github.token }}
+          name: ${{ inputs.artifact }}
+          path: packages
+      - uses: docker/setup-qemu-action@v3
+      - name: Install publication tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apt-utils dpkg-dev rpm createrepo-c gnupg curl zstd openssl
+      - id: publish
+        name: Sign, validate and publish
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          USIGN_PRIVATE_KEY: ${{ secrets.USIGN_PRIVATE_KEY }}
+          APK_PRIVATE_KEY: ${{ secrets.APK_PRIVATE_KEY }}
+          FEED_PUSH_TOKEN: ${{ secrets.FEED_PUSH_TOKEN }}
+        run: python3 -m coreci.publish run
+  report:
+    needs: [resolve, publish]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/coreci-report
+        env:
+          CORECI_CALLBACK_SECRET: ${{ secrets.CORECI_CALLBACK_SECRET }}
+        with:
+          callback_url: ${{ inputs.callback_url }}
+          phase: publish
+          status: ${{ needs.publish.result == 'success' && 'succeeded' || 'failed' }}
+          feed_commit: ${{ needs.publish.outputs.commit }}
+          reason: ${{ needs.publish.result != 'success' && format('resolve={0}; publish={1}', needs.resolve.result, needs.publish.result) || '' }}
