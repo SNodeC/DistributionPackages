@@ -139,7 +139,7 @@ def openwrt_script(entry, repo, files, sdk_root, key, work):
     # The caller supplies the OpenWrt public key, not the GPG development-export key.
     packages = " ".join(shlex.quote("/feed/" + p) for p in files if p.endswith("." + fmt))
     if fmt == "ipk":
-        script = (f'set -eu\nopkg-key add /key/{key.name}\nprintf %s '
+        script = (f'set -eu\nmkdir -p -m 1777 /var/lock\nopkg-key add /key/{key.name}\nprintf %s '
                   + shlex.quote("src/gz coreci " + repo + "\n") + " >> /etc/opkg/customfeeds.conf\n"
                   + "opkg update\nopkg install --noaction " + packages)
     else:
