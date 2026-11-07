@@ -106,7 +106,8 @@ def registry(path="ci/registry.json"):
             relative_path(key["file"])
             require(key["file"].startswith("keys/"), "public key must be under keys/")
             require(re.fullmatch(pattern, key[field]) is not None, "invalid key trust anchor")
-    https(result["badges"])
+    if "badges" in result:
+        https(result["badges"])
     return result
 
 

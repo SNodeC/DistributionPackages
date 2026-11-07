@@ -35,6 +35,28 @@ def main():
         data = registry_data()
         path.write_text(json.dumps(data))
         assert common.registry(path) == data
+        for presentation in (False, True):
+            changed = copy.deepcopy(data)
+            if presentation:
+                changed['feeds']['test']['presentation'] = 'Example/Recipes/.github/workflows/coreci-status.yml'
+                changed['status_url'] = 'https://controller.example/api/v1/status.json'
+            for badges in (False, True):
+                candidate = copy.deepcopy(changed)
+                if not badges:
+                    candidate.pop('badges')
+                path.write_text(json.dumps(candidate))
+                assert common.registry(path) == candidate
+            changed['badges'] = 'http://unsafe/'
+            path.write_text(json.dumps(changed))
+            rejects(common.registry, path, text='HTTPS')
+        changed = copy.deepcopy(data)
+        changed.pop('badges')
+        changed['feeds']['test']['presentation'] = 'Example/Recipes/.github/workflows/coreci-status.yml'
+        path.write_text(json.dumps(changed))
+        rejects(common.registry, path, text='status_url')
+        changed['status_url'] = 'http://unsafe/'
+        path.write_text(json.dumps(changed))
+        rejects(common.registry, path, text='HTTPS')
         for mutate in [lambda d: d['feeds']['test'].update(url='http://unsafe/'),
                        lambda d: d['feeds']['test']['keys']['gpg'].update(file='../key'),
                        lambda d: d.update(default_feed='missing')]:
