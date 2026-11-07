@@ -195,7 +195,8 @@ def build(source, definition, destination):
             manifest['source'] = dict(repository=values['source_repo'], tag=values['tag'], package=values['package'],
                                       commit=output(['git','-C',str(Path(source).resolve()),'rev-parse','HEAD']))
             manifest['prerequisites'] = prerequisites(values['prerequisites'])
-            write_json(destination / 'manifest.json', manifest)
+            write_json(destination / 'manifest.complete.json', manifest)
+            (destination / 'manifest.complete.json').replace(destination / 'manifest.json')
         finally:
             subprocess.run(["docker", "image", "rm", image], check=False, capture_output=True)
 
