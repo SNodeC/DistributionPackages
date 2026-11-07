@@ -392,6 +392,8 @@ def main():
             if changed and differences:
                 # Populate the index from the tree, retaining every package without fetching its blob.
                 subprocess.run(['git','-C',str(root),'read-tree','HEAD'],check=True)
+                subprocess.run(['git','-C',str(root),'update-index','--skip-worktree','-z','--stdin'],check=True,
+                    input=''.join(name+'\0' for name in files if not (root/name).exists()).encode())
                 prepare_commit(root, changed, 'Update public core-ci status', orphan=True)
                 checked_push(root, branch, os.environ['GH_TOKEN'], base)
             return None
