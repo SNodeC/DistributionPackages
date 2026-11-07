@@ -93,6 +93,9 @@ def registry(path="ci/registry.json"):
     for name, feed in result["feeds"].items():
         identifier(name)
         workflow(feed["publisher"])
+        if "presentation" in feed:
+            workflow(feed["presentation"])
+            https(result['status_url'])
         repository(feed["repository"])
         https(feed["url"])
         require(feed["url"].endswith("/"), "feed URL must end with slash")

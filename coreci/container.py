@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, "/core_ci")
-from contract import canonical, file_hash, package_metadata, read_json, regular_file, require, versions, write_json
+from contract import canonical, file_hash, package_metadata, read_json, regular_file, require, versions, write_json, build_summary
 
 
 def inspect(args, target, environment):
@@ -51,7 +51,8 @@ def inspect(args, target, environment):
     require({p.name for p in root.iterdir()} == set(files) | {"outputs.json"}, "unexpected output files")
     manifest = {"build_id": args.build_id, "package": args.package, "version": args.version,
                 "revision": int(args.revision), "target": target["id"], "feed": args.feed,
-                "entry": target, "files": files}
+                "entry": target, "files": files, "summary": build_summary(declared["summary"]) if declared.get("summary") is not None else None,
+                "environment": environment}
     if target["family"] == "openwrt":
         manifest["sdk"] = {"file": Path(environment["sdk"]["url"]).name, "sha256": environment["sdk"]["sha256"]}
     (root / "outputs.json").unlink()

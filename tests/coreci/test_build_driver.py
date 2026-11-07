@@ -5,7 +5,7 @@ import shlex
 import tempfile
 from support import build_inputs, entry, environment, registry_data, replace, rejects
 from coreci import build
-from contract import write_json
+from contract import write_json, read_json
 
 
 def probe(fmt):
@@ -69,11 +69,15 @@ def probe(fmt):
                 assert any('target=/core_ci,readonly' in s for s in args)
                 if '--inspect' in args:
                     assert '--network=none' in args
+                    destination=root/'packages'
+                    destination.mkdir(exist_ok=True)
+                    write_json(destination/'manifest.json',dict(files={},package='a'))
             return subprocess.CompletedProcess(args,0)
         with environment(dict(build_inputs(),RUNNER_TEMP=str(root))), replace(build,'registry',registry_data), \
              replace(build,'native',lambda _:host), replace(build,'sdk',lambda *args:{}), \
-             replace(build,'prepare',prepare), replace(build.subprocess,'run',command):
+             replace(build,'prepare',prepare), replace(build,'output',lambda _: 'a'*40), replace(build.subprocess,'run',command):
             build.build(source,recipe,root/'packages')
+        assert read_json(root/'packages/manifest.json')['source'] == dict(repository='Example/Source',tag='v1.2.3-alpha+test',package='a',commit='a'*40)
         assert [c[1] for c in calls]==['build','run','run','image']
         assert '--inspect' in calls[2]
     return 0

@@ -14,7 +14,8 @@ from .common import (checked_manifest, declaration, download, github_outputs, ht
                      public_key, registry, select, token, workflow, workflow_identity)
 from contract import canonical, file_hash, output, read_json, regular_file, require, versions
 from github import api
-from publish import checked_push, prepare_commit
+from publish import prepare_commit
+from .lease import push as checked_push, retry
 from sign_native import apt_indexes, rpm_indexes, signing_key, sign_file
 
 
@@ -169,6 +170,10 @@ def availability(feed, paths, root):
 
 
 def publish(artifacts, root):
+    return retry(root, lambda: publish_once(artifacts, root))
+
+
+def publish_once(artifacts, root):
     values = inputs("publish")
     settings = registry()
     manifest = checked_manifest(Path(artifacts), values)
@@ -234,10 +239,22 @@ def publish(artifacts, root):
                 ledger_file = root / ledger_path
                 ledger_file.parent.mkdir(parents=True, exist_ok=True)
                 ledger_file.write_text(ledger(manifest))
-                definitions = [declaration(repo) for repo in settings["repositories"]]
-                readme = root / "README.md"
-                contents = readme.read_bytes().decode("utf-8") if readme.exists() else ""
-                readme.write_bytes(badges(contents, settings, definitions).encode("utf-8"))
+                presentation_paths = set()
+                if 'presentation' in feed:
+                    from .presentation import receipt, refresh, status_fetch
+                    presentation_paths.add(receipt(root, manifest, values, feed, paths))
+                    try:
+                        status = status_fetch(settings['status_url'])
+                    except (OSError, ValueError):
+                        print('Presentation fetch failed; keeping current presentation')
+                    else:
+                        presentation_paths.update(refresh(root, settings, manifest['feed'], status=status))
+                elif 'badges' in settings:
+                    definitions = [declaration(repo) for repo in settings["repositories"]]
+                    readme = root / "README.md"
+                    contents = readme.read_bytes().decode("utf-8") if readme.exists() else ""
+                    readme.write_bytes(badges(contents, settings, definitions).encode("utf-8"))
+                    presentation_paths.add('README.md')
                 from .validate import validate
 
                 validation_key = public
@@ -246,7 +263,7 @@ def publish(artifacts, root):
                     validation_key = public_directory / Path(feed["keys"][kind]["file"]).name
                 validate(root, entry, list(paths.values()), validation_key, sdk_root)
                 after = snapshot(root)
-                allowed = set(paths.values()) | {ledger_path, "README.md"} | {str(p.relative_to(root)) for p in indices}
+                allowed = set(paths.values()) | {ledger_path} | presentation_paths | {str(p.relative_to(root)) for p in indices}
                 if fmt == "rpm":
                     prefix = f'{entry["distribution"]}/{entry["suite"]}/{entry["arch"]}/repodata/'
                     allowed |= {name for name in before if name.startswith(prefix)}

@@ -191,6 +191,11 @@ def build(source, definition, destination):
         try:
             subprocess.run(common + [image] + command, check=True, timeout=21600)
             subprocess.run(common + ["--network=none", image] + command + ["--inspect"], check=True, timeout=600)
+            manifest = read_json(destination / 'manifest.json')
+            manifest['source'] = dict(repository=values['source_repo'], tag=values['tag'], package=values['package'],
+                                      commit=output(['git','-C',str(Path(source).resolve()),'rev-parse','HEAD']))
+            manifest['prerequisites'] = prerequisites(values['prerequisites'])
+            write_json(destination / 'manifest.json', manifest)
         finally:
             subprocess.run(["docker", "image", "rm", image], check=False, capture_output=True)
 
