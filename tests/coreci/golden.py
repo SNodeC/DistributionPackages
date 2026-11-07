@@ -141,7 +141,7 @@ def g3(work):
     # A new run lives in the recipe repository, while its publication belongs to the source repository.
     values=dict(build_repo='SNodeC/DistributionPackages',build_run_id='123')
     manifest=dict(source=source,package=package,version=version,revision=revision,target=target_id,
-                  build_id=build_id,entry=target,files={})
+                  build_id=build_id,entry=target,files={},environment=sample['environment'])
     feed=dict(sample['feed'],url=sample['feed']['base_url'],environment='test')
     relative='test/new.deb';(root/'test').mkdir();(root/relative).write_bytes(b'unsigned fixture')
     info=dict(name=package+'-dev',version=version+'-9999',arch=target['arch'])
@@ -159,8 +159,11 @@ def g3(work):
     assert row['repository']==source['repository'] and row['revision']==9999 and row['version']==info['version']
     assert row['build_url']=='https://github.com/SNodeC/DistributionPackages/actions/runs/123'
     baseline=json.loads((DATA/'files/status.json').read_text())
-    old=next(row for row in baseline['publications'] if row['repository']==source['repository'])
+    old=next(row for row in baseline['publications'] if row['repository']==source['repository']
+             and row['coordinates']==sample['compatibility'])
     assert set(row)==set(old), 'new publication row must preserve the baseline renderer schema'
+    assert isinstance(row['environment'],dict) and isinstance(row['dependencies'],list)
+    assert row['coordinates']==old['coordinates'] and row['environment']==sample['environment']
     assert all(x['repository']!='SNodeC/DistributionPackages' for x in rendered['projects'])
     project=next(x for x in rendered['projects'] if x['repository']==source['repository'])
     page=(root/project['status_path']).read_text()

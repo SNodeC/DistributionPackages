@@ -10,7 +10,7 @@ from urllib.parse import quote, urlsplit
 from jinja2 import FileSystemLoader, StrictUndefined
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 
-from contract import canonical, read_json, regular_file, relative_path, require, write_json, file_hash, package_metadata, output
+from contract import canonical, read_json, regular_file, relative_path, require, write_json, file_hash, package_metadata, output, compatibility
 import os
 import subprocess
 import time
@@ -335,12 +335,13 @@ def receipt(root, manifest, values, feed, paths):
             info = package_metadata(Path(root) / relative, manifest['entry']['build']['format'])
             packages.append(dict(path=relative, name=info['name'], version=info['version'], sha256=file_hash(Path(root)/relative)))
     data = dict(schema=1, execution=execution, attempt=execution+':1', source=source, source_commit=source['commit'],
-        revision=manifest['revision'], compatibility=coordinates(manifest['entry']), target=manifest['entry'],
+        revision=manifest['revision'], compatibility=compatibility(dict(target=manifest['entry']),manifest['environment']), target=manifest['entry'],
         feed=dict(base_url=feed['url'], repository=feed['repository'], branch=metadata(feed['repository'])['default_branch']),
         build_result=dict(run=dict(html_url=f'https://github.com/{build_repo}/actions/runs/{run_id}')),
         run=dict(html_url=f'https://github.com/{os.environ["GITHUB_REPOSITORY"]}/actions/runs/{os.environ["GITHUB_RUN_ID"]}'),
-        build_job=builds[0], packages=packages, dependencies=manifest.get('prerequisites', {}),
-        summary=manifest.get('summary'), environment=feed['environment'], published_utc=utc(time.time()))
+        build_job=builds[0], packages=packages, dependencies=[dict(package=name,version=value[0],revision=value[1])
+            for name,value in sorted(manifest.get('prerequisites', {}).items())],
+        summary=manifest.get('summary'), environment=manifest['environment'], published_utc=utc(time.time()))
     if 'development.tar.gz' in paths:
         data['development_export'] = dict(path=paths['development.tar.gz'])
     relative = f'receipts/{manifest["build_id"]}/{manifest["revision"]}.json'
