@@ -3,7 +3,7 @@
     "packages": {
       "publisher": "SNodeC/DistributionPackages/.github/workflows/coreci-publish.yml",
       "repository": "SNodeC/Packages",
-      "url": "https://snodec.github.io/Packages/",
+      "url": "https://raw.githubusercontent.com/SNodeC/Packages/main/",
       "environment": "package-publication",
       "keys": {
         "gpg": {
@@ -18,14 +18,16 @@
           "file": "keys/apk.pem",
           "sha256": "7cae8895c8af1a543c72f1676865fbd8dbf12b3015f6064a4d288a9aa3fe8f26"
         }
-      }
+      },
+      "presentation": "SNodeC/DistributionPackages/.github/workflows/coreci-status.yml"
     }
   },
   "default_feed": "packages",
   "build": "SNodeC/DistributionPackages/.github/workflows/coreci-build.yml",
   "repositories": [
     "SNodeC/snode.c",
-    "SNodeC/mqttsuite"
+    "SNodeC/mqttsuite",
+    "SNodeC/snode.c-idp"
   ],
-  "badges": "https://core.vchrist.at/api/v1/badge"
+  "status_url": "https://core.vchrist.at:8443/api/v1/status.json"
 }
