@@ -99,6 +99,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y apt-utils dpkg-dev rpm createrepo-c gnupg curl zstd openssl
+          python3 -m pip install --user -r status-templates/requirements.txt
       - id: writer
         name: Mint feed-scoped writer token
         uses: actions/create-github-app-token@v3

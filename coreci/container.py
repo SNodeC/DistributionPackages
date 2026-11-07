@@ -51,7 +51,7 @@ def inspect(args, target, environment):
     require({p.name for p in root.iterdir()} == set(files) | {"outputs.json"}, "unexpected output files")
     manifest = {"build_id": args.build_id, "package": args.package, "version": args.version,
                 "revision": int(args.revision), "target": target["id"], "feed": args.feed,
-                "entry": target, "files": files}
+                "entry": target, "files": files, "summary": declared.get("summary")}
     if target["family"] == "openwrt":
         manifest["sdk"] = {"file": Path(environment["sdk"]["url"]).name, "sha256": environment["sdk"]["sha256"]}
     (root / "outputs.json").unlink()

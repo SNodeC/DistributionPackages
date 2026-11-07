@@ -78,3 +78,22 @@ Production: **1341** added physical lines: **290** conservatively
 classified adapted/copy lines and **1051** new lines. This includes all
 Python, workflow and action lines (comments and blanks included). The approved
 ceiling is 2,600. Tests and this document are accounted separately.
+
+## Presentation
+
+A feed's optional `presentation` workflow and the registry's `status_url` enable
+`coreci-status.yml`. The writer joins the controller's read-only snapshot with
+source declarations, uses the existing templates, and commits only presentation
+files plus `coreci/presentation.json`. Package existence comes from `git ls-tree`;
+package blobs are not checked out. The JSON state file guards generations and
+caches Actions job URLs by build run ID.
+
+Publications to these feeds write immutable receipts under
+`receipts/<build_id>/<revision>.json` and render the same presentation, without
+adding live badges. Both writers retry only a confirmed lease conflict, up to
+five attempts. An ambiguous push is inspected before any retry.
+
+Offline acceptance: `cmake -S tests/coreci -B build/codex/phase-4c2` followed by
+`ctest --test-dir build/codex/phase-4c2 --output-on-failure`. G2 writes the complete
+identifier replacement and execution-array ordering reports into that build
+directory. These workflows remain inert until explicitly dispatched.

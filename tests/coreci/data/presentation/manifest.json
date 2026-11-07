@@ -1,0 +1,1055 @@
+{
+  "commit": "f1271dd923e48dcbee04fe5b0eefbf240fad53b0",
+  "files": [
+    {
+      "path": "README.md",
+      "size": 6227,
+      "sha256": "261addb1f30f3a14eb516b0eff129ef0e4bb4f7427b11a9ec626272cb9e8e10a",
+      "git_blob": "7e9a5190e4b3190d48e322fc8e3b265434b045e3",
+      "writer": "site/README.md base plus populated packages:projects/platforms blocks; no current automatic writer found for those blocks",
+      "site_snapshot_equal": false,
+      "site_source": "site/README.md"
+    },
+    {
+      "path": "docs/README.md",
+      "size": 2432,
+      "sha256": "9031beed2d6e8b78c30048424eeca46a6e61b0f207559eae6d2e826de651f5c7",
+      "git_blob": "5d1c5156a6bd4e9f75454cbab905df0fe007aca2",
+      "writer": "site/docs/README.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/README.md"
+    },
+    {
+      "path": "docs/catalogs/README.md",
+      "size": 2413,
+      "sha256": "710a02fd9e79e8d04de07885ea0e62512c387dd701672e4693c9f1a062762769",
+      "git_blob": "ee114d4512376681d709fbcaf51512169c62cf0e",
+      "writer": "site/docs/catalogs/README.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/catalogs/README.md"
+    },
+    {
+      "path": "docs/catalogs/mqttsuite.md",
+      "size": 6282,
+      "sha256": "cc4856e78e739bd94fcd3158fd9ddd893d3141724289a576b0cf2b6e2c05cbd9",
+      "git_blob": "a33e4efa7c4c48193d455bf045bec79ed1627e92",
+      "writer": "site/docs/catalogs/mqttsuite.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/catalogs/mqttsuite.md"
+    },
+    {
+      "path": "docs/catalogs/snodec-idp.md",
+      "size": 3895,
+      "sha256": "9ef7a80f88b901b8af3e0c2828ecc479973a956121c3459b5934880028078443",
+      "git_blob": "a4e3f9d019acc07b69b78e17177856f8464a4467",
+      "writer": "site/docs/catalogs/snodec-idp.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/catalogs/snodec-idp.md"
+    },
+    {
+      "path": "docs/catalogs/snodec.md",
+      "size": 7255,
+      "sha256": "a8c5bc43a21a1cd351fccbd5c6991aa6aaef4edf4a20bcc4be8364bacf470e0e",
+      "git_blob": "34a50f6d47883fd634ecb5984d018c520b6e544e",
+      "writer": "site/docs/catalogs/snodec.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/catalogs/snodec.md"
+    },
+    {
+      "path": "docs/installation/README.md",
+      "size": 3561,
+      "sha256": "24d742c4510e7f4bba838c9a4686438a37c836311eb96f38437348ce04cb4ee6",
+      "git_blob": "81967d2abe18cb0dbf0b5a5b84b069c5f205ff18",
+      "writer": "site/docs/installation/README.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/README.md"
+    },
+    {
+      "path": "docs/installation/debian.md",
+      "size": 3424,
+      "sha256": "e54b37b10b44252bb7b92abafae2a942ececac3d06cc26ef1aa37c2060cf6ca8",
+      "git_blob": "ecbcd8d4689be9e2f3ece66c59100c80514530d8",
+      "writer": "site/docs/installation/debian.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/debian.md"
+    },
+    {
+      "path": "docs/installation/fedora.md",
+      "size": 3424,
+      "sha256": "955a9067ee19dcba1e4bdb380efccb4d723eddee8ce19cb1488120218c2ce878",
+      "git_blob": "61604d50f21ce71981f48c176bafd4f1beee03fd",
+      "writer": "site/docs/installation/fedora.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/fedora.md"
+    },
+    {
+      "path": "docs/installation/mqttsuite/README.md",
+      "size": 3304,
+      "sha256": "43a53e3ccfbdc5a6824e163274dfb972e20f4d980fb858dde9e9ff43b9786579",
+      "git_blob": "6bff66bbe48498b12979d30fcdd1e8ea9551f723",
+      "writer": "site/docs/installation/mqttsuite/README.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/mqttsuite/README.md"
+    },
+    {
+      "path": "docs/installation/mqttsuite/debian.md",
+      "size": 6111,
+      "sha256": "1d836fc896a38277f62890e89e859a74275735d4717ab0fc3c629f817d6893e9",
+      "git_blob": "b4b0d829aec4668edcb048673fb63fa09c676d4f",
+      "writer": "site/docs/installation/mqttsuite/debian.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/mqttsuite/debian.md"
+    },
+    {
+      "path": "docs/installation/mqttsuite/fedora.md",
+      "size": 5795,
+      "sha256": "2d7464c8e4cf8fe0efee14597dec3f21c246d7051f40d0bfbb098445898a448c",
+      "git_blob": "85d3b06d363bb3f2396a6b129c336aec671e489a",
+      "writer": "site/docs/installation/mqttsuite/fedora.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/mqttsuite/fedora.md"
+    },
+    {
+      "path": "docs/installation/mqttsuite/openwrt.md",
+      "size": 6604,
+      "sha256": "7755d38acd235b32c342a3357089eb28f6f9bdef20ddafc93bbac769f0062a1c",
+      "git_blob": "cdef81d61cf6c3652562a5eaa96379a92e3dfbcc",
+      "writer": "site/docs/installation/mqttsuite/openwrt.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/mqttsuite/openwrt.md"
+    },
+    {
+      "path": "docs/installation/mqttsuite/raspberry-pi-os.md",
+      "size": 5967,
+      "sha256": "f03f31c2a5ea2153b8437c6c7c83f38e4cb3d9c72e0f8f9cdee221c3381399f7",
+      "git_blob": "241b230dd621f756d45d9abc7ace4f4cfc35e911",
+      "writer": "site/docs/installation/mqttsuite/raspberry-pi-os.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/mqttsuite/raspberry-pi-os.md"
+    },
+    {
+      "path": "docs/installation/mqttsuite/rocky-linux.md",
+      "size": 5819,
+      "sha256": "175f68e3ef650dc08c10119ce0e1ce5c5ac3fad1fb258d563aad50edf67046ef",
+      "git_blob": "7f32a3ef4883ba1be56a3149d091b82424ca7026",
+      "writer": "site/docs/installation/mqttsuite/rocky-linux.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/mqttsuite/rocky-linux.md"
+    },
+    {
+      "path": "docs/installation/mqttsuite/ubuntu.md",
+      "size": 5921,
+      "sha256": "18f69fa994b21d3322cc9b4ea64b3ada9e1df6d7b4c9f65c5288c3f2a49d5407",
+      "git_blob": "41b5952fdf26239d24b4b461da0911a2c74e7ff1",
+      "writer": "site/docs/installation/mqttsuite/ubuntu.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/mqttsuite/ubuntu.md"
+    },
+    {
+      "path": "docs/installation/openwrt.md",
+      "size": 3665,
+      "sha256": "c69dd591453219e8ecab71fc6e6397154584a64d751682dcf6c12b82ae0e2ad6",
+      "git_blob": "ecf3d8447ae1c3f8d8a84971d0c5ea5a1c2d025f",
+      "writer": "site/docs/installation/openwrt.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/openwrt.md"
+    },
+    {
+      "path": "docs/installation/package-selection.md",
+      "size": 2739,
+      "sha256": "c4b302823fbee267aeb1b39ab40f156165a579a067f948d59ca4d0ca70866386",
+      "git_blob": "a84b3896a96f903f37bfa81a2b3fbdcfa5c2f64b",
+      "writer": "site/docs/installation/package-selection.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/package-selection.md"
+    },
+    {
+      "path": "docs/installation/raspberry-pi-os.md",
+      "size": 3514,
+      "sha256": "10f1e41c75f5966bd047ac16dcdb714af71bc5aa4d43732c0ed5c6d638e84726",
+      "git_blob": "1c5d69b45cbf83b251e81462d0e0c5938b511347",
+      "writer": "site/docs/installation/raspberry-pi-os.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/raspberry-pi-os.md"
+    },
+    {
+      "path": "docs/installation/rocky-linux.md",
+      "size": 3474,
+      "sha256": "45e9ae9cae6379c6646c5736b8a7e3287f8846b5cc45a7fd3b11bc64929128ad",
+      "git_blob": "9f4ae48a42cf489b1345d53d326d878d18e46482",
+      "writer": "site/docs/installation/rocky-linux.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/rocky-linux.md"
+    },
+    {
+      "path": "docs/installation/snodec-idp/README.md",
+      "size": 3216,
+      "sha256": "7919385edd482e34eb9d9c8e86f332f32d6074c485a5dffe4da79f4c6fa91108",
+      "git_blob": "083de6577b39e582a8fa3aec9477cdad69515782",
+      "writer": "site/docs/installation/snodec-idp/README.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/snodec-idp/README.md"
+    },
+    {
+      "path": "docs/installation/snodec-idp/debian.md",
+      "size": 5829,
+      "sha256": "e6d47cbac322bfccfe2a71a179b5f2fa06199b69fa29137a3f41f0473a6998b0",
+      "git_blob": "344cf6867715e4aec05abef71b48f8c9224c2e22",
+      "writer": "site/docs/installation/snodec-idp/debian.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/snodec-idp/debian.md"
+    },
+    {
+      "path": "docs/installation/snodec-idp/fedora.md",
+      "size": 5529,
+      "sha256": "37702a7336d899d82f8e936b188e1c74513abfadae0deb45a21ec8d842b7bb01",
+      "git_blob": "4cb79b8726ffbd2326010be41475c1f584c3ad4b",
+      "writer": "site/docs/installation/snodec-idp/fedora.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/snodec-idp/fedora.md"
+    },
+    {
+      "path": "docs/installation/snodec-idp/raspberry-pi-os.md",
+      "size": 5685,
+      "sha256": "0ffee1c33f9365bb4aab2d37bc2aab0b6d38d459cf033f6d19f8711f2a201306",
+      "git_blob": "147f179d4c80cfe4e170ed7db8389f3f5851aa82",
+      "writer": "site/docs/installation/snodec-idp/raspberry-pi-os.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/snodec-idp/raspberry-pi-os.md"
+    },
+    {
+      "path": "docs/installation/snodec-idp/rocky-linux.md",
+      "size": 5553,
+      "sha256": "c50754c9f7c75a095f2ee8c0b4f48638a4d55a4f5b0471adfcd141cc2319250e",
+      "git_blob": "9b09738eb199091efd57d26798d29bb34c350801",
+      "writer": "site/docs/installation/snodec-idp/rocky-linux.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/snodec-idp/rocky-linux.md"
+    },
+    {
+      "path": "docs/installation/snodec-idp/ubuntu.md",
+      "size": 5639,
+      "sha256": "ba639d2ecb012c375a2d533dace685307d108ae10a39b4468eef8c9679a25b17",
+      "git_blob": "e425f6014355a92089abb5d2902985d86d2e8bb9",
+      "writer": "site/docs/installation/snodec-idp/ubuntu.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/snodec-idp/ubuntu.md"
+    },
+    {
+      "path": "docs/installation/snodec/README.md",
+      "size": 3192,
+      "sha256": "f7012fc9630aa703142f7c06a09d49192cfd66018210e40189ed2d30051e7e29",
+      "git_blob": "52bf5f12f6c71a488c36a9c4d531d1725917b03d",
+      "writer": "site/docs/installation/snodec/README.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/snodec/README.md"
+    },
+    {
+      "path": "docs/installation/snodec/debian.md",
+      "size": 5890,
+      "sha256": "fd9b76fbf2f877ff3be4d72326b344e3fd32529222339f650ed7f7aa408421ee",
+      "git_blob": "c50504a44070c7a1d4aa3e1d730732749bdb000d",
+      "writer": "site/docs/installation/snodec/debian.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/snodec/debian.md"
+    },
+    {
+      "path": "docs/installation/snodec/fedora.md",
+      "size": 5586,
+      "sha256": "a0e7cf095122ee0505cea7c760e211d5089a9cbba18cd3f459f9a7a0680c10da",
+      "git_blob": "25c1167b23edce8d76c01f9ea3f12d2d42ab2bfa",
+      "writer": "site/docs/installation/snodec/fedora.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/snodec/fedora.md"
+    },
+    {
+      "path": "docs/installation/snodec/openwrt.md",
+      "size": 6213,
+      "sha256": "585720cbabc8048ab269601f79451a113be10adf8c9147e0333bd7e91ad72c9b",
+      "git_blob": "bc53d4f019b289d61ae8d6b52eb85820525644c2",
+      "writer": "site/docs/installation/snodec/openwrt.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/snodec/openwrt.md"
+    },
+    {
+      "path": "docs/installation/snodec/raspberry-pi-os.md",
+      "size": 5746,
+      "sha256": "52a2b5a5a90e9509a18920fae5b259985532b8434cb31f6a60f46489caead08c",
+      "git_blob": "ef7b41f8df6f05d7bbc38b6895a213efcda72c81",
+      "writer": "site/docs/installation/snodec/raspberry-pi-os.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/snodec/raspberry-pi-os.md"
+    },
+    {
+      "path": "docs/installation/snodec/rocky-linux.md",
+      "size": 5610,
+      "sha256": "25213d6bde210bdca0203a0563b0cc9dca74540a20adb56936ff28c9a3460fa8",
+      "git_blob": "c9c2009ddc7dcd2b54b208aaa402899052e212d9",
+      "writer": "site/docs/installation/snodec/rocky-linux.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/snodec/rocky-linux.md"
+    },
+    {
+      "path": "docs/installation/snodec/ubuntu.md",
+      "size": 5700,
+      "sha256": "046a4a0bee5b561b4aa86c01d79faf3ccbd723f07617d2daba198b525de4f7d6",
+      "git_blob": "135ff6dc4cea6b0409d9d938408c8cf21e48248d",
+      "writer": "site/docs/installation/snodec/ubuntu.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/snodec/ubuntu.md"
+    },
+    {
+      "path": "docs/installation/ubuntu.md",
+      "size": 3424,
+      "sha256": "38bbfd566ece1b8ad6ab0eae3162f3aabffb317cc587455df843fdaac08c390b",
+      "git_blob": "3cf9f359645dcc333c5051137c8d8c48da73df1a",
+      "writer": "site/docs/installation/ubuntu.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/installation/ubuntu.md"
+    },
+    {
+      "path": "docs/media/banner.svg",
+      "size": 1596,
+      "sha256": "098e21c8662436734fa174fc4c42d11c5dc3e2f733bf0dce3db4533677170297",
+      "git_blob": "a534e5e055f76fb864a992faa0f898f3e1845d9a",
+      "writer": "site/docs/media/banner.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/banner.svg"
+    },
+    {
+      "path": "docs/media/hero-mobile.svg",
+      "size": 1739,
+      "sha256": "579a0c24f26338f906d114e7a27c27062c9af5e4aaa50977021416af1565a77e",
+      "git_blob": "d96a192cadf6e7a7c0034a5a9e33040ee28ee020",
+      "writer": "site/docs/media/hero-mobile.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/hero-mobile.svg"
+    },
+    {
+      "path": "docs/media/menu/architecture.svg",
+      "size": 451,
+      "sha256": "229ba57666651d372f23a7d3e43e44eb0fa1518e1e912b05f0caacd5755d3969",
+      "git_blob": "7abca2a5ae4ac2a7dc5efd8e0362dcf3d8678611",
+      "writer": "site/docs/media/menu/architecture.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/menu/architecture.svg"
+    },
+    {
+      "path": "docs/media/menu/catalog.svg",
+      "size": 436,
+      "sha256": "19f621f43330ea57975f574bc74bec8c24993f409d16077d4e47ce4c38256eb3",
+      "git_blob": "14ec38bc8df5dcbedb86c7d82b85787af375cdde",
+      "writer": "site/docs/media/menu/catalog.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/menu/catalog.svg"
+    },
+    {
+      "path": "docs/media/menu/contribute.svg",
+      "size": 445,
+      "sha256": "def72c67db9c535aea4c5de12b030c97bc523aad61240cb8aef9c9c74e47c346",
+      "git_blob": "18c830ffa736a7deac116085e882448f9fc7aec6",
+      "writer": "site/docs/media/menu/contribute.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/menu/contribute.svg"
+    },
+    {
+      "path": "docs/media/menu/details.svg",
+      "size": 436,
+      "sha256": "5721ec87d36fb6293613008654bc6b5d3b05dc2760d660d455b23c5b7cde4661",
+      "git_blob": "b582881369a81d5c774fbbc2db523e4ca3af1efb",
+      "writer": "site/docs/media/menu/details.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/menu/details.svg"
+    },
+    {
+      "path": "docs/media/menu/install.svg",
+      "size": 436,
+      "sha256": "d1134fb7e393b8794b5455df9e97377e03cb42f495d95e7c3b5f9ef9dab2b375",
+      "git_blob": "9d5b60d05dfc97fc5dc18a97e3ae36306328b818",
+      "writer": "site/docs/media/menu/install.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/menu/install.svg"
+    },
+    {
+      "path": "docs/media/menu/keys.svg",
+      "size": 475,
+      "sha256": "31523bfbe01257233246915105d9332332b88a36207ee1641923c6ebde251499",
+      "git_blob": "3385960f52968fec7085f742431cee6a63b8b4aa",
+      "writer": "site/docs/media/menu/keys.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/menu/keys.svg"
+    },
+    {
+      "path": "docs/media/menu/manual.svg",
+      "size": 451,
+      "sha256": "cc423de2fa3d97635a2ed3544ff1fa161ddc7d7bb6aaea33abfaacd5613b3a19",
+      "git_blob": "bfdf73dd6bf8b5e0022a53cd9e04fdcf58d7d3b3",
+      "writer": "site/docs/media/menu/manual.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/menu/manual.svg"
+    },
+    {
+      "path": "docs/media/menu/menu-custom-install.svg",
+      "size": 457,
+      "sha256": "3d1cbd44ac02cdb6a1ff8e9143817349f0ee954297b9aed0d8e8e4f9ff5b98a9",
+      "git_blob": "8bb0870d9fbe6801cd48407f27f06f337ffd6064",
+      "writer": "site/docs/media/menu/menu-custom-install.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/menu/menu-custom-install.svg"
+    },
+    {
+      "path": "docs/media/menu/menu-quick-install.svg",
+      "size": 454,
+      "sha256": "8ff94952a052f5172c3a8a5b629cfca0d3d74370dff176b9bc9a811b5c990d65",
+      "git_blob": "3f86bf9fa886d0564422ffa7891761f8e72c79fa",
+      "writer": "site/docs/media/menu/menu-quick-install.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/menu/menu-quick-install.svg"
+    },
+    {
+      "path": "docs/media/menu/query.svg",
+      "size": 430,
+      "sha256": "ffbf462c0409c3dd320caa30ba73afc27561a27260a1bb49a02ed98ae1289a9d",
+      "git_blob": "3e4e49cbe220e5f85153694407a31c0f1b2b008d",
+      "writer": "site/docs/media/menu/query.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/menu/query.svg"
+    },
+    {
+      "path": "docs/media/menu/requirements.svg",
+      "size": 451,
+      "sha256": "743d57ec6bcd66048f3b28809704c1752618bd7c2a3a67d6e332b475c0543560",
+      "git_blob": "89931974900967a4a9720a6be005f574a608bf7e",
+      "writer": "site/docs/media/menu/requirements.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/menu/requirements.svg"
+    },
+    {
+      "path": "docs/media/menu/start.svg",
+      "size": 430,
+      "sha256": "fb117ea42030d817ee8c3ed5136b269b8163e42fba594a7b768bcc956992a18f",
+      "git_blob": "976982d2e9104b6dbd660bffe819200534382af8",
+      "writer": "site/docs/media/menu/start.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/menu/start.svg"
+    },
+    {
+      "path": "docs/media/menu/status.svg",
+      "size": 433,
+      "sha256": "84b05201b4b06bed127b3f34ab1c7b1b4aa760be805ec2865ad16c32b7c5c221",
+      "git_blob": "0efd8d1815829a8e8716328c2c57178f401b4e25",
+      "writer": "site/docs/media/menu/status.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/menu/status.svg"
+    },
+    {
+      "path": "docs/media/menu/terms.svg",
+      "size": 430,
+      "sha256": "a528592e1513f823b182cec0aae3a898940b7a77ab32a643990d53a45dac693e",
+      "git_blob": "870ba3c9bd7b4f0b0c55518c8fa3eb9b956fd607",
+      "writer": "site/docs/media/menu/terms.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/menu/terms.svg"
+    },
+    {
+      "path": "docs/media/menu/troubleshoot.svg",
+      "size": 451,
+      "sha256": "68b568e4885e6e40d3cadab22ca1ffce6920420cd2644961382d398808c263e4",
+      "git_blob": "4370940156fb9aa679a444fbeea5e6d21f67116b",
+      "writer": "site/docs/media/menu/troubleshoot.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/menu/troubleshoot.svg"
+    },
+    {
+      "path": "docs/media/menu/updates.svg",
+      "size": 436,
+      "sha256": "80c1dc4c05d44d3691374e87abf6419a39f282726d5b343a994312aed030b7d3",
+      "git_blob": "deee837e63c440f418f648fc8793289298e5c542",
+      "writer": "site/docs/media/menu/updates.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/menu/updates.svg"
+    },
+    {
+      "path": "docs/media/menu/use.svg",
+      "size": 424,
+      "sha256": "4c7c7ab616dc1cf686f3f760cdf2d6d1d693364d7f092d70f9fb683a16f4e548",
+      "git_blob": "4b4843e494ea816e349b5cc4d90dee5dddc104ec",
+      "writer": "site/docs/media/menu/use.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/menu/use.svg"
+    },
+    {
+      "path": "docs/media/menu/verify.svg",
+      "size": 433,
+      "sha256": "c8d57673731a6403a50effd6a87c6bc4b4e65a5123a2c9e425f901da082d3e7f",
+      "git_blob": "9258e6e06d9ff6d81e8dc9ef6c3240c76bcace3d",
+      "writer": "site/docs/media/menu/verify.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/menu/verify.svg"
+    },
+    {
+      "path": "docs/media/nav/account-dark.svg",
+      "size": 1842,
+      "sha256": "c7cbdc1135b75c5243df9acc36b7d09a8ffbfca6ca6c7f5b8fb6eeef41194aea",
+      "git_blob": "3ae0841d359bf221b370a5e0566cca71f6ceef44",
+      "writer": "site/docs/media/nav/account-dark.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/account-dark.svg"
+    },
+    {
+      "path": "docs/media/nav/account-icon-dark.svg",
+      "size": 1645,
+      "sha256": "0ef5c0adfe46021dbc386ded9d5fa9f63c94cda06a6664edebb90da44767dae0",
+      "git_blob": "a86e189b17eee9f22e13260b42e1a40e00150bcb",
+      "writer": "site/docs/media/nav/account-icon-dark.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/account-icon-dark.svg"
+    },
+    {
+      "path": "docs/media/nav/account-icon-light.svg",
+      "size": 1645,
+      "sha256": "e65d5290820397466a5c923598e900beb75f1a49f8ad47abfb7cd4c2f9fe17fe",
+      "git_blob": "87f623050630897a90c6003b66ac82589f8925bc",
+      "writer": "site/docs/media/nav/account-icon-light.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/account-icon-light.svg"
+    },
+    {
+      "path": "docs/media/nav/account-light.svg",
+      "size": 1842,
+      "sha256": "f49a50c17119a432f6dae36855f7730e8ae5c3e7cb0f02d30713cd048ade3740",
+      "git_blob": "e2e6ee1d360836bbb908b80c8ed0658c35a67e9d",
+      "writer": "site/docs/media/nav/account-light.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/account-light.svg"
+    },
+    {
+      "path": "docs/media/nav/banner-catalogs-compact.svg",
+      "size": 1275,
+      "sha256": "6eadb51784c11d1bf78494bb67dad361defe4af6119548c945e8459af7f91332",
+      "git_blob": "99efee1e4550d63ea62b00b4050dbfb6b732e3b6",
+      "writer": "site/docs/media/nav/banner-catalogs-compact.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/banner-catalogs-compact.svg"
+    },
+    {
+      "path": "docs/media/nav/banner-catalogs.svg",
+      "size": 1279,
+      "sha256": "63efa4dba1d3087b8dc5d762fe4bd8bf899854c64abb21c1ad5cdc0f489ec30e",
+      "git_blob": "73f916dbafd7c8d009186f71d50067b28faabe2a",
+      "writer": "site/docs/media/nav/banner-catalogs.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/banner-catalogs.svg"
+    },
+    {
+      "path": "docs/media/nav/banner-documentation-compact.svg",
+      "size": 1290,
+      "sha256": "ce17d3cee68610090c2b38f3a2be3a2114172c20409de3cee801928bd457e301",
+      "git_blob": "7f4e4a4c29805b5e21403f04ac33c95ded0921b9",
+      "writer": "site/docs/media/nav/banner-documentation-compact.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/banner-documentation-compact.svg"
+    },
+    {
+      "path": "docs/media/nav/banner-documentation.svg",
+      "size": 1294,
+      "sha256": "1d4fe23637575966965f820c7cf324dff86d65ce15b578a279525ec4c2dfcc0d",
+      "git_blob": "465552ded335589f14e3abba6ae042fcf7d2ea6c",
+      "writer": "site/docs/media/nav/banner-documentation.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/banner-documentation.svg"
+    },
+    {
+      "path": "docs/media/nav/banner-installation-compact.svg",
+      "size": 1287,
+      "sha256": "3f13647c7f3e1a0d75a8e34fad3b81b2cba10b97255ed9c6295251f4585e9134",
+      "git_blob": "8902addd74f76a13620b82bd2894f6639f62f07d",
+      "writer": "site/docs/media/nav/banner-installation-compact.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/banner-installation-compact.svg"
+    },
+    {
+      "path": "docs/media/nav/banner-installation.svg",
+      "size": 1291,
+      "sha256": "507765d1a58688075c87cdd6ab5cb0c58df1f25357f8aa17ccc2d68e206e1bc4",
+      "git_blob": "e1ddf9ffebb3b8a69d5e2a6be329cff47b54138b",
+      "writer": "site/docs/media/nav/banner-installation.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/banner-installation.svg"
+    },
+    {
+      "path": "docs/media/nav/banner-package-status-compact.svg",
+      "size": 1293,
+      "sha256": "ce7b27dabc2ca0856d1603346eabef0ab497f659b53036ca25bad1b2ce023465",
+      "git_blob": "3109337eddd6e45d411f7a3269bd89167ec3c56e",
+      "writer": "site/docs/media/nav/banner-package-status-compact.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/banner-package-status-compact.svg"
+    },
+    {
+      "path": "docs/media/nav/banner-package-status.svg",
+      "size": 1297,
+      "sha256": "8640371f4fecbb259f48310d399d90c005ba600f428da7814930dc67c069fa32",
+      "git_blob": "44e4f3f1a3f8482ffb6c6ab2236a426c8204be4d",
+      "writer": "site/docs/media/nav/banner-package-status.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/banner-package-status.svg"
+    },
+    {
+      "path": "docs/media/nav/banner-signing-keys-compact.svg",
+      "size": 1287,
+      "sha256": "ffef06b6dfd26b9bc156e96b8cc31b2486a3e22135817a75144635fdfb3607f4",
+      "git_blob": "7da3b49720d9c7bde545951fcfe5889aa6da80b5",
+      "writer": "site/docs/media/nav/banner-signing-keys-compact.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/banner-signing-keys-compact.svg"
+    },
+    {
+      "path": "docs/media/nav/banner-signing-keys.svg",
+      "size": 1291,
+      "sha256": "b1fa4943258cb53ac7e9df87775f2df01bea42113717c42e103791852f0bec80",
+      "git_blob": "72a594b3a24322a25d40cf5a39e6c6e2c2ed5e7e",
+      "writer": "site/docs/media/nav/banner-signing-keys.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/banner-signing-keys.svg"
+    },
+    {
+      "path": "docs/media/nav/organization-dark.svg",
+      "size": 2549,
+      "sha256": "d36ea12f65d5d246ad5f88e4e4dd21c432e2cd99e7b03078676ba8cb8ad1a3d4",
+      "git_blob": "c0d96adff2e57250f284abe2bf276d61034f9671",
+      "writer": "site/docs/media/nav/organization-dark.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/organization-dark.svg"
+    },
+    {
+      "path": "docs/media/nav/organization-icon-dark.svg",
+      "size": 2361,
+      "sha256": "879cfb60490e2a99c8d9c8bff5d1f0aa008cbee43bd81e1e3685d8ba35256c30",
+      "git_blob": "83b391cab85bea48d73dbcdff049ea8b2e21bf07",
+      "writer": "site/docs/media/nav/organization-icon-dark.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/organization-icon-dark.svg"
+    },
+    {
+      "path": "docs/media/nav/organization-icon-light.svg",
+      "size": 2361,
+      "sha256": "311976a99f966054e98ee6c4c3265c4fefd706c0c2a6afec60ff032605c5decc",
+      "git_blob": "ba056591b146e45c9979203ee7f508703e22fb38",
+      "writer": "site/docs/media/nav/organization-icon-light.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/organization-icon-light.svg"
+    },
+    {
+      "path": "docs/media/nav/organization-light.svg",
+      "size": 2549,
+      "sha256": "7f17014e2c523435f6a1208569ebc4c9b52ad7c2db6982f4f868b4e613ac8af5",
+      "git_blob": "3462c047c17f9663544be247bf2f89ec18b29a01",
+      "writer": "site/docs/media/nav/organization-light.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/organization-light.svg"
+    },
+    {
+      "path": "docs/media/nav/repository-dark.svg",
+      "size": 1988,
+      "sha256": "b918f8b2cbb2e4da4c93f28dd6de78c3f7109cf5d6960ef97dcfa56ce5473b6f",
+      "git_blob": "3c36b9b497ff2af757510403a2091d0c62dc8b22",
+      "writer": "site/docs/media/nav/repository-dark.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/repository-dark.svg"
+    },
+    {
+      "path": "docs/media/nav/repository-icon-dark.svg",
+      "size": 1799,
+      "sha256": "a27ee884d7d4f8e2d3977dd0fbf23d90a9d90f91207db3d51b783bad5699b37a",
+      "git_blob": "c7220aaf8dec0da1b5edb3930da2716ad33302cd",
+      "writer": "site/docs/media/nav/repository-icon-dark.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/repository-icon-dark.svg"
+    },
+    {
+      "path": "docs/media/nav/repository-icon-light.svg",
+      "size": 1799,
+      "sha256": "9a6963f736fe55e1efd006746182bc05480672a8c52af99226de9ab591842c80",
+      "git_blob": "28f6f018a93357e7019f6ade2de1dacc77735fcd",
+      "writer": "site/docs/media/nav/repository-icon-light.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/repository-icon-light.svg"
+    },
+    {
+      "path": "docs/media/nav/repository-light.svg",
+      "size": 1988,
+      "sha256": "a7338f59a1d5194d302726eb0f75ff07eeeb6c635ac2a6a32543fc8a3eaab22d",
+      "git_blob": "97ff00380f03e6fdc91b7d557db3c09131cfecb7",
+      "writer": "site/docs/media/nav/repository-light.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/repository-light.svg"
+    },
+    {
+      "path": "docs/media/nav/up-catalogs-dark.svg",
+      "size": 1792,
+      "sha256": "80307ccd8c36c56a4025c1ccad9c4811410c0e150c0e257e741a08c23ab0ac35",
+      "git_blob": "1b1cda8671c8d3de7a661bb7f25a20709da280de",
+      "writer": "site/docs/media/nav/up-catalogs-dark.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/up-catalogs-dark.svg"
+    },
+    {
+      "path": "docs/media/nav/up-catalogs-light.svg",
+      "size": 1792,
+      "sha256": "cb4abf12665dac2d7220069097e3d0acbe0cb2319748bb9f058f121c7d99081e",
+      "git_blob": "6bc6798bebf78d3b9e98e8927d1cf4a641e801c1",
+      "writer": "site/docs/media/nav/up-catalogs-light.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/up-catalogs-light.svg"
+    },
+    {
+      "path": "docs/media/nav/up-documentation-dark.svg",
+      "size": 1807,
+      "sha256": "effcbf798ce51369a5fe0223baa7ce744f8a4a8c0f5dba10e3b7789e0fd204e8",
+      "git_blob": "7f4e6e562d86f3a813037d4999cd30edecec1c4c",
+      "writer": "site/docs/media/nav/up-documentation-dark.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/up-documentation-dark.svg"
+    },
+    {
+      "path": "docs/media/nav/up-documentation-light.svg",
+      "size": 1807,
+      "sha256": "6614fc1dd9df29871c6dcc9042b160f1702f649ff0f5f574b568cdbc52dee6b4",
+      "git_blob": "e212e3060aa4fd257a9225ef0e12f3f508b51cf0",
+      "writer": "site/docs/media/nav/up-documentation-light.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/up-documentation-light.svg"
+    },
+    {
+      "path": "docs/media/nav/up-installation-dark.svg",
+      "size": 1804,
+      "sha256": "35b3ac62789d4757e9bfbaadd75ef91224ad224db1ef416891ea1c38f5430588",
+      "git_blob": "0ac608c94bf598bf66c0ad550bbedc04550d5411",
+      "writer": "site/docs/media/nav/up-installation-dark.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/up-installation-dark.svg"
+    },
+    {
+      "path": "docs/media/nav/up-installation-light.svg",
+      "size": 1804,
+      "sha256": "b885d09f14720e7c2fb80ace77dfb1f97ed2462e490b67557be41afbaefe6520",
+      "git_blob": "a6a6884bdea0af9bc1668d8bb6e2d04c71dd7625",
+      "writer": "site/docs/media/nav/up-installation-light.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/up-installation-light.svg"
+    },
+    {
+      "path": "docs/media/nav/up-package-status-dark.svg",
+      "size": 1810,
+      "sha256": "dfa36a91e48095c1348694a169fc49bdd34e89f8fe561494823f5fdbb2c3d3e3",
+      "git_blob": "abafd69cd1f141fe86661eb2329dd8eb418fa804",
+      "writer": "site/docs/media/nav/up-package-status-dark.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/up-package-status-dark.svg"
+    },
+    {
+      "path": "docs/media/nav/up-package-status-light.svg",
+      "size": 1810,
+      "sha256": "39a97515e9c69f7dae565ef924b5a71d71025bda9cf4e04923630608411eeba9",
+      "git_blob": "e9d5787b7b3a367fdf7944938296edd5cf0510da",
+      "writer": "site/docs/media/nav/up-package-status-light.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/up-package-status-light.svg"
+    },
+    {
+      "path": "docs/media/nav/up-packages-dark.svg",
+      "size": 1792,
+      "sha256": "e9119cb960dade44b9deb4890a84b5e98d2307ab373fc1748e81c24d688bd9dd",
+      "git_blob": "2474ef54998cb959df0b90ef29c7fcba95d3106a",
+      "writer": "site/docs/media/nav/up-packages-dark.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/up-packages-dark.svg"
+    },
+    {
+      "path": "docs/media/nav/up-packages-light.svg",
+      "size": 1792,
+      "sha256": "4eadb9d13030c290d08b49c1a04312ff7e168e937cc9385888109d7e8b2e8890",
+      "git_blob": "c9055be51ba1ae6ba773435b39ea4ddd2129a9bd",
+      "writer": "site/docs/media/nav/up-packages-light.svg (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/media/nav/up-packages-light.svg"
+    },
+    {
+      "path": "docs/publication.md",
+      "size": 6173,
+      "sha256": "fbe7a8b06da2613a437e2b009dfbe422b594d561a7bc57d518a8272d21d234cb",
+      "git_blob": "94b0c66f17a83213d3467d90906aeaa5e4a9b0cb",
+      "writer": "site/docs/publication.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/publication.md"
+    },
+    {
+      "path": "docs/repositories/README.md",
+      "size": 2631,
+      "sha256": "ca7dfcb94dbd667e4344b719f307a8cd4f7424a74be03c59ad1737a290b0885f",
+      "git_blob": "60530d5143aea51c9fd40f994d61cae775ca7555",
+      "writer": "site/docs/repositories/README.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/repositories/README.md"
+    },
+    {
+      "path": "docs/repositories/debian.md",
+      "size": 5955,
+      "sha256": "0e48bbf96fb641a4c6c36bb33486fc74eb2aac576bfd2d4d63845bc6b8b590d3",
+      "git_blob": "3ed45afcdd1a1b12eb318bc9af8a9f95c5108a58",
+      "writer": "site/docs/repositories/debian.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/repositories/debian.md"
+    },
+    {
+      "path": "docs/repositories/fedora.md",
+      "size": 5638,
+      "sha256": "c5b2335439f89f28cc328e097dd101bb2f8fecb27a8554fcb158f808f24f4243",
+      "git_blob": "6ddaaa1eed60245482cf1f4bcc7960d88c9e6a1a",
+      "writer": "site/docs/repositories/fedora.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/repositories/fedora.md"
+    },
+    {
+      "path": "docs/repositories/openwrt.md",
+      "size": 7158,
+      "sha256": "ca48a5c07235dbed3d8191347ab555e8ca8ab4e0cbde0aa142ac14a6c9d70f9d",
+      "git_blob": "359c1a6a252568c38a3d288d55644ebcd8773071",
+      "writer": "site/docs/repositories/openwrt.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/repositories/openwrt.md"
+    },
+    {
+      "path": "docs/repositories/raspberry-pi-os.md",
+      "size": 5997,
+      "sha256": "21ad8095c67df1c9b9eeb5eec59b5ea29d08f3a95b84a29eeaca37d68348ee04",
+      "git_blob": "45399609e0ee1207f016e060c6ba0fb0b449af5b",
+      "writer": "site/docs/repositories/raspberry-pi-os.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/repositories/raspberry-pi-os.md"
+    },
+    {
+      "path": "docs/repositories/rocky-linux.md",
+      "size": 5930,
+      "sha256": "230ed0b1ec9db3c50531cb1621488b6cda9fa2e83c737f6176cd9ec36f722094",
+      "git_blob": "df3e7e3033f7a522f18cd6a38e46fabaa2a4a627",
+      "writer": "site/docs/repositories/rocky-linux.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/repositories/rocky-linux.md"
+    },
+    {
+      "path": "docs/repositories/ubuntu.md",
+      "size": 5576,
+      "sha256": "a83260578f4a9ea3f53fe8ac305fb7a33725ba409fba84d75f6859f220913058",
+      "git_blob": "5ff1aa45cb0117327c5c3d91a578a342e11993a1",
+      "writer": "site/docs/repositories/ubuntu.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/repositories/ubuntu.md"
+    },
+    {
+      "path": "docs/troubleshooting.md",
+      "size": 5343,
+      "sha256": "6b62c2bce0d6060db59a429e42309a187526d2e20aa50fa0663a3888403b81d3",
+      "git_blob": "a83eb6339d6e24c2c0c541596c911704281d4c98",
+      "writer": "site/docs/troubleshooting.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/docs/troubleshooting.md"
+    },
+    {
+      "path": "index.html",
+      "size": 434,
+      "sha256": "59268fbd831b1de1a8daf9fb7216860402a29bc3ba27571920d11b57940abc7f",
+      "git_blob": "1fabf3a299447afcc27aeb41d67a3a6e68d19b12",
+      "writer": "core_ci/feed_status.py"
+    },
+    {
+      "path": "install/install.sh",
+      "size": 7813,
+      "sha256": "4803df82b4998d67efa6437c10a7545b82c36f91dbf5f483ba3c7d3c8e4ba857",
+      "git_blob": "e209c32ea32ef802f4fa74eca84d308119819f3a",
+      "writer": "install/install.sh (tracked installer copied to feed; no periodic writer)",
+      "source_bytes_equal": true
+    },
+    {
+      "path": "install/mqttsuite.sh",
+      "size": 135,
+      "sha256": "e557c28db9abc427efa9e1805053b6f5e32892d2c89a1ec63404876a0b9456ea",
+      "git_blob": "0491685f3708029b2f2c9484d111e73e322c2081",
+      "writer": "install/mqttsuite.sh (tracked installer copied to feed; no periodic writer)",
+      "source_bytes_equal": true
+    },
+    {
+      "path": "install/snodec-idp.sh",
+      "size": 136,
+      "sha256": "97ec24b20d917ee4c95fe633b90819a6b991d8a9fbc37a20b5fd471ced1ba9b2",
+      "git_blob": "40e721e55cf41f869d7eced1c4fb3a56236c2806",
+      "writer": "install/snodec-idp.sh (tracked installer copied to feed; no periodic writer)",
+      "source_bytes_equal": true
+    },
+    {
+      "path": "install/snodec.sh",
+      "size": 132,
+      "sha256": "d38b8eb6389c1a4c2c4ba7ef41e310e9d78d55339a3937090cd8728ce20413f8",
+      "git_blob": "6973d8f13ea04f02c186b2399abd0f79c38a827b",
+      "writer": "install/snodec.sh (tracked installer copied to feed; no periodic writer)",
+      "source_bytes_equal": true
+    },
+    {
+      "path": "keys/README.md",
+      "size": 7258,
+      "sha256": "713b895c3e2f14fea5a9161fbfadc058590034bb07dbc5cf0160db0bba823941",
+      "git_blob": "9343c70327464979be06b722243772089c58d106",
+      "writer": "site/keys/README.md (hand-maintained snapshot; no automatic copier in current workflows)",
+      "site_snapshot_equal": true,
+      "site_source": "site/keys/README.md"
+    },
+    {
+      "path": "status.json",
+      "size": 9006732,
+      "sha256": "539c83c7a0bec15c7b7a2646ac9c0c12766a7907601067ec260637904871a3d4",
+      "git_blob": "0424d50ff90f9335debaa06663c4a677139e6279",
+      "writer": "core_ci/feed_status.py"
+    },
+    {
+      "path": "status/README.md",
+      "size": 619,
+      "sha256": "ef62d952fbea392bb7dd8eb449a5ac84c7c8bc22fa498f927fd464bfe4bee35e",
+      "git_blob": "08164e88adc58f993425cd4829a3b1f23583407d",
+      "writer": "core_ci/feed_status.py"
+    },
+    {
+      "path": "status/badges/blocked.svg",
+      "size": 326,
+      "sha256": "a8e63e30f58ecca20b94a9aa7d37fd962d74519cc38a56af827f99b380fa80cc",
+      "git_blob": "92809dd2c57e6bec9dce6e7b66680ffc985a1101",
+      "writer": "feed-resident static SVG; no writer/copy step found in current main or pinned status renderer"
+    },
+    {
+      "path": "status/badges/cancelled.svg",
+      "size": 353,
+      "sha256": "450febea4c8621670a8325e9314da6dee2dba913c0728235693807ae646d571f",
+      "git_blob": "d54d9b20f6af82125074702e30db43e69d26f35c",
+      "writer": "feed-resident static SVG; no writer/copy step found in current main or pinned status renderer"
+    },
+    {
+      "path": "status/badges/failed.svg",
+      "size": 324,
+      "sha256": "f0ad9645293f23b44f021893d5ca0a0928a185463905abe16a595db3a17800c9",
+      "git_blob": "7838690329f302462fa08e5ecf56fb70829bde43",
+      "writer": "feed-resident static SVG; no writer/copy step found in current main or pinned status renderer"
+    },
+    {
+      "path": "status/badges/not-built.svg",
+      "size": 274,
+      "sha256": "f33bfb6b613723db7292c4f5d23108b667ca558433f8252ae183c18abb213df3",
+      "git_blob": "0b63bb5882a06a525037b9c7cbb4780765fca09f",
+      "writer": "feed-resident static SVG; no writer/copy step found in current main or pinned status renderer"
+    },
+    {
+      "path": "status/badges/pending.svg",
+      "size": 224,
+      "sha256": "31c75caaab9cda6a602d87b63e6c07fbb421a9a91dd5ec311bd9f5fabb24bc06",
+      "git_blob": "d41ef3f6c17b756527b17e1fc0df49f64b1825e2",
+      "writer": "feed-resident static SVG; no writer/copy step found in current main or pinned status renderer"
+    },
+    {
+      "path": "status/badges/publishing.svg",
+      "size": 325,
+      "sha256": "58b84268927a0719e1caf8937f95d6ef327b50c6e6528cf7f51f8a0728037029",
+      "git_blob": "59c6d849bc46ecb778eda5c553f89770fc52f214",
+      "writer": "feed-resident static SVG; no writer/copy step found in current main or pinned status renderer"
+    },
+    {
+      "path": "status/badges/running.svg",
+      "size": 230,
+      "sha256": "bfc723c3bfa20468399c35d757f8fe0641cc2b2a097b55af59347a30e16f9137",
+      "git_blob": "2eee77a1529a7311c8e229d0752d12e93c3c363d",
+      "writer": "feed-resident static SVG; no writer/copy step found in current main or pinned status renderer"
+    },
+    {
+      "path": "status/badges/skipped.svg",
+      "size": 339,
+      "sha256": "3534eaac70ca4dd48e67309a2e69a0d7b6fef9475c8f84dfc9a2bfffe20c88cd",
+      "git_blob": "6c3bf60b5cb934005dfd47ebd74c1eb627e71424",
+      "writer": "feed-resident static SVG; no writer/copy step found in current main or pinned status renderer"
+    },
+    {
+      "path": "status/badges/superseded.svg",
+      "size": 257,
+      "sha256": "4655ad5971569e9be7167efa4c3184736197fc2c7b727751bf0dcbe6e8ccf864",
+      "git_blob": "57d14ba89862bed58b3a6c7c48647de298c27961",
+      "writer": "feed-resident static SVG; no writer/copy step found in current main or pinned status renderer"
+    },
+    {
+      "path": "status/badges/unsatisfiable.svg",
+      "size": 351,
+      "sha256": "b7abec18811ad1db30e96b84e58bc98b97f6ee1014891763473513b237f91cff",
+      "git_blob": "97187c6aa4874a6a60681dd444de4ebb6daf89e9",
+      "writer": "feed-resident static SVG; no writer/copy step found in current main or pinned status renderer"
+    },
+    {
+      "path": "status/badges/waiting.svg",
+      "size": 309,
+      "sha256": "0d4c942d127905c6ca11d659724d89d5efc85cdc037241f22046f93422f2108f",
+      "git_blob": "fe3f92dfbe50da20d955799ab025e61317dc6ce6",
+      "writer": "feed-resident static SVG; no writer/copy step found in current main or pinned status renderer"
+    },
+    {
+      "path": "status/controller.json",
+      "size": 121303,
+      "sha256": "5012a3399c880a04fec3d4f32f9d64b3e8be228130d8b18552b8f36e8024caa9",
+      "git_blob": "c3f9f1f304e4806614631932466f37ba58df34a3",
+      "writer": "core_ci/status_update.py"
+    },
+    {
+      "path": "status/index.html",
+      "size": 413,
+      "sha256": "16a5703624904eef1df7e23101168c203000a25d454bc51fabc94848a7bc6f55",
+      "git_blob": "bd80361f159cec839606c811e3c68949d6affaf3",
+      "writer": "core_ci/feed_status.py"
+    },
+    {
+      "path": "status/mqttsuite.html",
+      "size": 30947,
+      "sha256": "238df32a50be47784da25864bbe2a5cdd1c7ac30319b8e6e836ce831cb3f6dee",
+      "git_blob": "018347092fdc0fcdb26143f0d9efa795b511825c",
+      "writer": "core_ci/feed_status.py"
+    },
+    {
+      "path": "status/mqttsuite.md",
+      "size": 42349,
+      "sha256": "010112e776672afef936e8ee166baf2f19548dcd0a90d4410efeebbbaabc4606",
+      "git_blob": "352aa62d59254d19d0cfaac142f6875bc538b12d",
+      "writer": "core_ci/feed_status.py"
+    },
+    {
+      "path": "status/snodec-idp.html",
+      "size": 14650,
+      "sha256": "543b641da21ddf10751593531a2579bf13574b5e4dfa3786fa2e5e1baff9a020",
+      "git_blob": "7d671955050ed6490347b2cdc7b635f9a0a57000",
+      "writer": "core_ci/feed_status.py"
+    },
+    {
+      "path": "status/snodec-idp.md",
+      "size": 17255,
+      "sha256": "f96c2cdac7fcf4f585da7d9ab31293901c39981172eeb357ffd1630703c80337",
+      "git_blob": "0b42b9acdf96dc1243c3fe49190360fa2e0f3c2f",
+      "writer": "core_ci/feed_status.py"
+    },
+    {
+      "path": "status/snodec.html",
+      "size": 35534,
+      "sha256": "76e6694fabfff851068a02c0cc9386fc1534f09daaa937711f3ee246dbb6366c",
+      "git_blob": "03feb369f495011287d80d2b37a6037e9cfd2180",
+      "writer": "core_ci/feed_status.py"
+    },
+    {
+      "path": "status/snodec.md",
+      "size": 41224,
+      "sha256": "1fb96423675d4285721daed873aaad58de35b69676d2cc8119d7bc97072ba115",
+      "git_blob": "8cdb1fd64b4b46727b29e166cab5c3b7686d198d",
+      "writer": "core_ci/feed_status.py"
+    }
+  ]
+}
