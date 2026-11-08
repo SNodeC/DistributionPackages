@@ -101,7 +101,7 @@ def main():
             manifest['files']['a.deb']=file_hash(artifacts/'a.deb')
             write_json(artifacts/'manifest.json',manifest)
             for index,error in enumerate([ValueError('status output exceeds resource bound'),
-                                           OSError('render write failed'),None]):
+                                           OSError('render write failed'),'receipt-link','receipt-root-link',None]):
                 case= root / ('presentation-'+str(index))
                 originals={'README.md':b'Unrelated README\r\n', 'index.html':b'old index',
                     'status.json':b'old status', 'status/controller.json':b'old controller',
@@ -112,6 +112,17 @@ def main():
                     path=case/name
                     path.parent.mkdir(parents=True,exist_ok=True)
                     path.write_bytes(data)
+                real_render = presentation.render
+                if error == 'receipt-root-link':
+                    outside = root / ('outside-'+str(index))
+                    outside.mkdir()
+                    (case/'receipts').symlink_to(outside, target_is_directory=True)
+                if error == 'receipt-link':
+                    existing = case/'receipts/aaa'
+                    existing.mkdir(parents=True)
+                    target = root/'existing-receipt.json'
+                    target.write_text('{}')
+                    (existing/'1.json').symlink_to(target)
                 def receipt(root,*args):
                     relative='receipts/new/1.json'
                     path=root/relative
@@ -119,6 +130,8 @@ def main():
                     path.write_bytes(b'new receipt')
                     return relative
                 def render(staged,exists=None):
+                    if error == 'receipt-link':
+                        real_render(staged, exists=exists)
                     assert staged!=case, 'optional renderer must not write into the publication checkout'
                     assert exists('debian/pool/stable/a_1.0.0-1_amd64.deb')
                     assert (staged/'receipts/new/1.json').read_bytes()==b'new receipt'
@@ -147,7 +160,8 @@ def main():
                 if error:
                     assert all((case/name).read_bytes()==data for name,data in originals.items())
                     assert not (case/'status/new.html').exists()
-                    assert str(error) in (root/'summary').read_text()
+                    message = 'status receipts cannot contain links' if isinstance(error, str) else str(error)
+                    assert message in (root/'summary').read_text()
                 else:
                     assert (case/'README.md').read_bytes()==originals['README.md']+b'new data'
                     assert (case/'coreci/presentation.json').read_text().find('"generation":2')>=0

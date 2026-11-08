@@ -245,7 +245,8 @@ def publish_once(artifacts, root):
                     presentation_paths.add(receipt(root, manifest, values, feed, paths))
                     try:
                         staged = work / 'presentation'
-                        shutil.copytree(root / 'receipts', staged / 'receipts')
+                        require(not (root / 'receipts').is_symlink(), 'status receipts cannot contain links')
+                        shutil.copytree(root / 'receipts', staged / 'receipts', symlinks=True)
                         state = Path('coreci/presentation.json')
                         if (root / state).exists():
                             (staged / state).parent.mkdir(parents=True)
