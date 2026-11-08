@@ -23,12 +23,13 @@ class Download(unittest.TestCase):
     def transfer(self, command, **kwargs):
         self.assertEqual(command[command.index("--continue-at") + 1], "-")
         for flag, value in [("--retry", "5"), ("--connect-timeout", "30"),
-                            ("--speed-limit", "1024"), ("--speed-time", "120")]:
+                            ("--speed-limit", "1024"), ("--speed-time", "120"),
+                            ("--retry-max-time", "5400")]:
             self.assertEqual(command[command.index(flag) + 1], value)
         self.assertIn("--retry-all-errors", command)
         self.assertIn("--location", command)
-        self.assertLessEqual(kwargs["timeout"], 2700)
-        self.assertGreaterEqual(kwargs["timeout"], 2690)
+        self.assertLessEqual(kwargs["timeout"], 5400)
+        self.assertGreaterEqual(kwargs["timeout"], 5390)
         Path(command[command.index("--output") + 1]).write_bytes(self.content)
         return subprocess.CompletedProcess(command, 0)
 
@@ -82,7 +83,7 @@ class Download(unittest.TestCase):
         with patch.object(sdk.subprocess, "run", side_effect=transfer), \
              patch.object(sdk.time, "monotonic", side_effect=[100, 100, 110]):
             sdk.acquire(self.environment, self.archive)
-        self.assertEqual(calls, [2700, 2690])
+        self.assertEqual(calls, [5400, 5390])
         self.assertEqual(self.archive.read_bytes(), self.content)
 
     def test_timeout_keeps_partial_for_resumption_but_never_caches_it(self):
@@ -104,8 +105,8 @@ class Download(unittest.TestCase):
             Path(command[command.index("--output") + 1]).write_bytes(self.content[:8])
             raise subprocess.CalledProcessError(18, command)
         with patch.object(sdk.subprocess, "run", side_effect=transfer) as run, \
-             patch.object(sdk.time, "monotonic", side_effect=[0, 0, 2701]):
-            with self.assertRaisesRegex(ValueError, "SDK download exceeded 45 minutes"):
+             patch.object(sdk.time, "monotonic", side_effect=[0, 0, 5401]):
+            with self.assertRaisesRegex(ValueError, "SDK download exceeded 90 minutes"):
                 sdk.acquire(self.environment, self.archive)
         self.assertEqual(run.call_count, 1)
         self.assertFalse(self.archive.exists())
