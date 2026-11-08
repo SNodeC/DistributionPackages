@@ -244,11 +244,23 @@ def publish_once(artifacts, root):
                     from .presentation import receipt, refresh, status_fetch
                     presentation_paths.add(receipt(root, manifest, values, feed, paths))
                     try:
-                        status = status_fetch(settings['status_url'])
-                    except (OSError, ValueError):
-                        print('Presentation fetch failed; keeping current presentation')
+                        staged = work / 'presentation'
+                        shutil.copytree(root / 'receipts', staged / 'receipts')
+                        state = Path('coreci/presentation.json')
+                        if (root / state).exists():
+                            (staged / state).parent.mkdir(parents=True)
+                            shutil.copyfile(root / state, staged / state)
+                        rendered = refresh(staged, settings, manifest['feed'],
+                            exists=lambda name: (root / name).is_file(), status=status_fetch(settings['status_url']))
+                    except Exception as error:
+                        with Path(os.environ.get('GITHUB_STEP_SUMMARY', os.devnull)).open('a') as summary:
+                            summary.write(f'\n**Presentation warning:** {error}\n\nExisting presentation retained; publication continues.\n')
                     else:
-                        presentation_paths.update(refresh(root, settings, manifest['feed'], status=status))
+                        for name in rendered:
+                            destination = root / name
+                            destination.parent.mkdir(parents=True, exist_ok=True)
+                            shutil.copyfile(staged / name, destination)
+                        presentation_paths.update(rendered)
                 elif 'badges' in settings:
                     definitions = [declaration(repo) for repo in settings["repositories"]]
                     readme = root / "README.md"

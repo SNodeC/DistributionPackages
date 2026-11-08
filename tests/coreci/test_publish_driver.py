@@ -1,4 +1,4 @@
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack
 from pathlib import Path
 from types import SimpleNamespace
 import tempfile
@@ -24,7 +24,8 @@ def main():
                  INPUT_TARGET='t1',INPUT_CALLBACK_URL='',INPUT_BUILD_REPO='Example/Recipes',INPUT_BUILD_RUN_ID='1',
                  INPUT_ARTIFACT='coreci-'+manifest['build_id'],GITHUB_REPOSITORY='Example/Recipes',
                  GITHUB_WORKFLOW_REF='Example/Recipes/.github/workflows/coreci-publish.yml@refs/heads/test',
-                 RUNNER_TEMP=str(root),GITHUB_OUTPUT=str(root/'outputs'),GH_TOKEN='unit-test-only')
+                 RUNNER_TEMP=str(root),GITHUB_OUTPUT=str(root/'outputs'),GH_TOKEN='unit-test-only',
+                 GITHUB_STEP_SUMMARY=str(root/'summary'))
         events=[]
         def output(args):
             result='a'*40
@@ -72,13 +73,15 @@ def main():
             events.append('availability')
         from coreci import validate as validator
         import contract
-        with environment(env), replace(publish,'registry',registry_data), \
-             replace(publish,'metadata',lambda _:dict(default_branch='main')), replace(publish,'output',output), \
-             replace(publish,'public_key',key), replace(publish,'secrets',private), replace(publish,'signing_key',signer), \
-             replace(publish,'apt_indexes',indices),replace(publish,'prepare_commit',commit),replace(publish,'checked_push',push), \
-             replace(publish,'availability',availability), replace(validator,'validate',validate), \
-             replace(publish,'declaration',lambda _:dict(package='a',matrix=[entry()])), \
-             replace(contract,'package_metadata',lambda *args:dict(name='a',version='1.0.0-1',arch='amd64')):
+        with environment(env), ExitStack() as stack:
+            for context in [replace(publish,'registry',registry_data),
+             replace(publish,'metadata',lambda _:dict(default_branch='main')), replace(publish,'output',output),
+             replace(publish,'public_key',key), replace(publish,'secrets',private), replace(publish,'signing_key',signer),
+             replace(publish,'apt_indexes',indices),replace(publish,'prepare_commit',commit),replace(publish,'checked_push',push),
+             replace(publish,'availability',availability), replace(validator,'validate',validate),
+             replace(publish,'declaration',lambda _:dict(package='a',matrix=[entry()])),
+             replace(contract,'package_metadata',lambda *args:dict(name='a',version='1.0.0-1',arch='amd64'))]:
+                stack.enter_context(context)
             publish.publish(artifacts,feed)
             assert events==['signing-boundary','validate','commit','push','availability']
             assert (root/'outputs').read_text()=='feed_commit='+'b'*40+'\n'
@@ -90,6 +93,66 @@ def main():
             write_json(artifacts/'manifest.json',manifest)
             rejects(publish.publish,artifacts,feed,text='immutable')
             assert events==[], 'conflict must fail before signing'
+            from coreci import presentation
+            settings=registry_data()
+            settings['feeds']['test']['presentation']='Example/Recipes/.github/workflows/coreci-status.yml'
+            settings['status_url']='https://controller.example/api/v1/status.json'
+            (artifacts/'a.deb').write_bytes(b'unsigned input')
+            manifest['files']['a.deb']=file_hash(artifacts/'a.deb')
+            write_json(artifacts/'manifest.json',manifest)
+            for index,error in enumerate([ValueError('status output exceeds resource bound'),
+                                           OSError('render write failed'),None]):
+                case= root / ('presentation-'+str(index))
+                originals={'README.md':b'Unrelated README\r\n', 'index.html':b'old index',
+                    'status.json':b'old status', 'status/controller.json':b'old controller',
+                    'status/index.html':b'old status index', 'status/a.md':b'old page',
+                    'status/assets/style.css':b'old asset', 'docs/a.md':b'old docs',
+                    'install/a.md':b'old install', 'coreci/presentation.json':b'{"generation":1,"jobs":{}}'}
+                for name,data in originals.items():
+                    path=case/name
+                    path.parent.mkdir(parents=True,exist_ok=True)
+                    path.write_bytes(data)
+                def receipt(root,*args):
+                    relative='receipts/new/1.json'
+                    path=root/relative
+                    path.parent.mkdir(parents=True)
+                    path.write_bytes(b'new receipt')
+                    return relative
+                def render(staged,exists=None):
+                    assert staged!=case, 'optional renderer must not write into the publication checkout'
+                    assert exists('debian/pool/stable/a_1.0.0-1_amd64.deb')
+                    assert (staged/'receipts/new/1.json').read_bytes()==b'new receipt'
+                    assert (staged/'status/controller.json').read_bytes()!=originals['status/controller.json']
+                    if error:
+                        for name in originals:
+                            path=staged/name
+                            path.parent.mkdir(parents=True,exist_ok=True)
+                            path.write_bytes(b'partially changed')
+                        (staged/'status/new.html').write_bytes(b'must not leak')
+                        raise error
+                    (staged/'README.md').write_bytes(originals['README.md']+b'new data')
+                    return ['README.md']
+                events.clear()
+                with replace(publish,'registry',lambda:settings),replace(presentation,'receipt',receipt), \
+                     replace(presentation,'status_fetch',lambda _:dict(schema=1,generation=2)), \
+                     replace(presentation,'metadata',lambda _:dict(id=1,default_branch='main')), \
+                     replace(presentation,'declaration',lambda _:{}), \
+                     replace(presentation,'project',lambda *args:dict(schema=1,executions=[])), \
+                     replace(presentation,'render',render):
+                    publish.publish(artifacts,case)
+                assert events==['signing-boundary','validate','commit','push','availability']
+                assert (case/'debian/pool/stable/a_1.0.0-1_amd64.deb').read_bytes()==b'unsigned input'
+                assert (case/'coreci/published/t1/a_1.0.0-1.sha256').read_text()==publish.ledger(manifest)
+                assert (case/'receipts/new/1.json').read_bytes()==b'new receipt'
+                if error:
+                    assert all((case/name).read_bytes()==data for name,data in originals.items())
+                    assert not (case/'status/new.html').exists()
+                    assert str(error) in (root/'summary').read_text()
+                else:
+                    assert (case/'README.md').read_bytes()==originals['README.md']+b'new data'
+                    assert (case/'coreci/presentation.json').read_text().find('"generation":2')>=0
+                    assert all((case/name).read_bytes()==data for name,data in originals.items()
+                               if name not in ('README.md','status/controller.json','coreci/presentation.json'))
         assert (feed/'unrelated').read_bytes()==b'preserve these bytes'
     print('publisher driver: validate-before-push, credential isolation, unchanged bytes, no-op and immutable conflict passed')
     return 0
