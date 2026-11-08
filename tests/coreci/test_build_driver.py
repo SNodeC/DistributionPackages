@@ -26,6 +26,7 @@ def probe(fmt):
         write_json(recipe/'ci/packages.json',dict(package='a',depends_on=[],matrix=[target],
                    build={target['family']:'ci/hook.sh'},build_dependencies={fmt:['cmake']}))
         calls=[]
+        run = subprocess.run
         host=dict(image='example:stable',platform='linux/amd64',resolved_image='example@sha256:'+'0'*64)
         def prepare(target,environment,destination):
             sdk=destination/'extracted/test-sdk'
@@ -33,12 +34,15 @@ def probe(fmt):
             template.parent.mkdir(parents=True)
             template.write_text('private host-generated SDK template')
             template.chmod(0o600)
+            template.parent.chmod(0o700)
             (sdk/'template-link').symlink_to(template.relative_to(sdk))
             (destination/'sdk.archive').write_bytes(b'archive must not enter build image')
             (destination/'query.mk').write_text('preparation only')
             return sdk,Path('staging_dir/target')
         def command(args,**kwargs):
             calls.append(args)
+            if args[:3] == ["chmod", "-R", "a+rX"]:
+                run(args, **kwargs)
             if args[:2]==['docker','build']:
                 context=Path(args[-1])
                 assert not (context/'source/.git').exists()
@@ -47,12 +51,13 @@ def probe(fmt):
                 sdk_copies=[shlex.split(line) for line in dockerfile.splitlines()
                             if line.startswith('COPY --chown=')]
                 if openwrt:
-                    assert sdk_copies==[['COPY','--chown=1000:1000','sdk/extracted/test-sdk','/sdk']]
+                    assert not sdk_copies, 'the SDK must not enter an image layer'
                     template=context/'sdk/extracted/test-sdk/staging_dir/host/lib/meson/openwrt-cross.txt.in'
-                    assert template.stat().st_mode & 0o777==0o600, 'host permissions must not be broadened'
+                    assert template.stat().st_mode & 0o444 == 0o444, 'uid 1000 must read host-generated SDK files'
+                    assert template.parent.stat().st_mode & 0o111 == 0o111, 'uid 1000 must traverse SDK directories'
                     assert (context/'sdk/extracted/test-sdk/template-link').is_symlink()
                     ignored=(context/'.dockerignore').read_text().splitlines()
-                    assert 'sdk' not in ignored and 'sdk/sdk.*' in ignored and 'sdk/query.mk' in ignored
+                    assert 'sdk' in ignored, 'SDK and archive must stay outside the Docker context'
                 else:
                     assert not sdk_copies
             if args[:2]==['docker','run']:
@@ -63,7 +68,10 @@ def probe(fmt):
                 for directory in ('/tmp', '/var/tmp'):
                     assert directory in scratch, 'compiler and RPM temporary directories must be writable'
                     assert 'rw' in scratch[directory] and 'mode=1777' in scratch[directory]
-                assert not any('target=/sdk' in s for s in args), 'host SDK ownership must not enter runtime'
+                sdk_mounts = [s for s in args if 'target=/sdk' in s]
+                assert len(sdk_mounts) == int(openwrt)
+                if openwrt:
+                    assert sdk_mounts[0].endswith('target=/sdk,readonly')
                 assert any('target=/source,readonly' in s for s in args)
                 assert any('target=/definition,readonly' in s for s in args)
                 assert any('target=/core_ci,readonly' in s for s in args)
@@ -82,8 +90,10 @@ def probe(fmt):
         assert read_json(root/'packages/manifest.json')['prerequisites'] == {}
         assert os.access(root/'packages/manifest.json',os.W_OK), 'final manifest must be writable by its host producer'
         assert sorted(p.name for p in (root/'packages').iterdir()) == ['manifest.json']
-        assert [c[1] for c in calls]==['build','run','run','image']
-        assert '--inspect' in calls[2]
+        assert [c[0] for c in calls].count('chmod') == int(openwrt)
+        docker_calls = [c for c in calls if c[0] == 'docker']
+        assert [c[1] for c in docker_calls] == ['build','run','run','image']
+        assert '--inspect' in docker_calls[2]
     return 0
 
 
