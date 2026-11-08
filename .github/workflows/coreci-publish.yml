@@ -71,6 +71,10 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: python3 -m coreci.publish resolve
   publish:
+    permissions:
+      contents: read
+      actions: read
+      packages: read
     needs: resolve
     environment: ${{ needs.resolve.outputs.environment }}
     runs-on: ubuntu-24.04
@@ -95,6 +99,10 @@ jobs:
           name: ${{ inputs.artifact }}
           path: packages
       - uses: docker/setup-qemu-action@v3
+      - name: Log in to read validation images
+        env:
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
       - name: Install publication tools
         run: |
           sudo apt-get update
