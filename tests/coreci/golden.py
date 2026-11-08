@@ -48,6 +48,31 @@ def git_tree(directory):
     return set(names)-{''}
 
 
+def normalized_baseline(value):
+    # Independent expected wire form over a captured, full renderer document.
+    value = copy.deepcopy(value)
+    rows = value['publications']
+    newest = {}
+    for row in sorted(rows, key=lambda row: (
+            p.datetime.fromisoformat(row['published_utc'].replace('Z','+00:00')).timestamp() if row['published_utc'] else -1,
+            row['revision'], row['receipt_url']), reverse=True):
+        newest.setdefault((row['repository'],row['target']),row['receipt_url'])
+    rows = [row for row in rows if row['receipt_url']==newest[(row['repository'],row['target'])]]
+    for row in rows:
+        if row['build_job'] is not None:
+            row['build_job'] = {key:row['build_job'].get(key) for key in
+                ('id','run_id','run_attempt','html_url','started_at','completed_at')}
+    value['publications'] = rows
+    lookup = {(row['receipt_url'],row['package_url']):index for index,row in enumerate(rows)}
+    for project in value['projects']:
+        project['publications'] = [lookup[(row['receipt_url'],row['package_url'])] for row in project['publications']
+                                  if (row['receipt_url'],row['package_url']) in lookup]
+        for target in project['targets']:
+            target['publications'] = [lookup[(row['receipt_url'],row['package_url'])] for row in target['publications']
+                                     if (row['receipt_url'],row['package_url']) in lookup]
+    return value
+
+
 def g1(mode, work):
     root=prepare(work/'feed')
     exists=None
@@ -64,8 +89,12 @@ def g1(mode, work):
     p.render(root,ROOT/'status-templates',exists)
     rows=json.loads((DATA/'manifest.json').read_text())['files']
     for row in rows:
-        assert hashlib.sha256((root/row['path']).read_bytes()).hexdigest()==row['sha256'],row['path']
-    print(f'G1 {mode}: {len(rows)}/122 baseline files byte-identical')
+        if row['path'] == 'status.json':
+            expected = normalized_baseline(json.loads((DATA/'files'/row['path']).read_text()))
+            assert (root/row['path']).read_text() == canonical(expected)+'\n'
+        else:
+            assert hashlib.sha256((root/row['path']).read_bytes()).hexdigest()==row['sha256'],row['path']
+    print(f'G1 {mode}: {len(rows)}/122 baseline files match (status.json normalized; every other file byte-identical)')
 
 
 def g2(work):
@@ -124,7 +153,10 @@ def g2(work):
     for name,raw in expected.items():
         actual=(root/name).read_bytes()
         if name.endswith('.json'):
-            compare(json.loads(raw),json.loads(actual),'',name)
+            expected_json = json.loads(raw)
+            if name == 'status.json':
+                expected_json = normalized_baseline(expected_json)
+            compare(expected_json,json.loads(actual),'',name)
         else:
             assert actual==raw,name
     Path('G2-replaced-positions.json').write_text(json.dumps(positions,indent=2)+'\n')
@@ -134,7 +166,7 @@ def g2(work):
 
 def g3(work):
     root=prepare(work/'feed')
-    sample=json.loads(next((root/'receipts').glob('*/*.json')).read_text())
+    sample=json.loads(sorted((root/'receipts').glob('*/*.json'))[0].read_text())
     source=dict(sample['source'],commit=sample['source_commit']);version=source['tag'].removeprefix('v');package=source['package']
     target=sample['target'];target_id=target['id'];revision=9999
     build_id=f'{package}~{target_id}~{version}~r{revision}'
@@ -148,13 +180,19 @@ def g3(work):
     build_job=dict(sample['build_job'],name='build',html_url='https://github.com/SNodeC/DistributionPackages/actions/runs/123/job/456')
     with environment(dict(GITHUB_REPOSITORY='SNodeC/DistributionPackages',GITHUB_RUN_ID='124')), \
          replace(p,'api',lambda *args:dict(jobs=[build_job])),replace(p,'package_metadata',lambda *args:info), \
-         replace(p,'metadata',lambda *args:dict(default_branch='main')):
+         replace(p,'metadata',lambda *args:dict(default_branch='main')), \
+         replace(p.time,'time',lambda:1794132000):
         receipt=p.receipt(root,manifest,values,feed,{'new.deb':relative})
     data=json.loads((root/receipt).read_text())
     assert data['source']['repository']==source['repository'] and data['build_result']['run']['html_url'].endswith('/123')
     # Rendering uses the new receipt's truthful source.repository, not the recipe run's repository.
     p.render(root,ROOT/'status-templates')
     rendered=json.loads((root/'status.json').read_text())
+    expected_files = json.loads((DATA/'g3-file-hashes.json').read_text())
+    for name, digest in expected_files.items():
+        assert hashlib.sha256((root/name).read_bytes()).hexdigest() == digest, name
+    assert set(data['build_job']) == {'id','run_id','run_attempt','html_url','started_at','completed_at'}
+    assert all(type(index) is int for project in rendered['projects'] for index in project['publications'])
     row=next(row for row in rendered['publications'] if row['execution']==build_id)
     assert row['repository']==source['repository'] and row['revision']==9999 and row['version']==info['version']
     assert row['build_url']=='https://github.com/SNodeC/DistributionPackages/actions/runs/123'
