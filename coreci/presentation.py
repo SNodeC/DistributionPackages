@@ -21,6 +21,37 @@ from github import api
 from publish import prepare_commit
 
 
+JOB_FIELDS = ('id', 'run_id', 'run_attempt', 'html_url', 'started_at', 'completed_at')
+
+
+def normalized_job(value):
+    result = {key: value.get(key) for key in JOB_FIELDS} if value is not None else None
+    return result
+
+
+def status_document(context):
+    latest = {}
+    ranked = []
+    for row in context['publications']:
+        unit = (row['repository'], row['target'])
+        at = datetime.fromisoformat(row['published_utc'].replace('Z', '+00:00')).timestamp() if row['published_utc'] else -1
+        rank = (at, row['revision'], row['receipt_url'])
+        latest[unit] = max(latest.get(unit, rank), rank)
+        ranked.append((row, unit, rank))
+    rows = [row for row, unit, rank in ranked if rank == latest[unit]]
+    positions = {id(row): index for index, row in enumerate(rows)}
+
+    def references(items):
+        result = [positions[id(row)] for row in items if id(row) in positions]
+        return result
+
+    result = dict(context, publications=rows, projects=[
+        dict(project, publications=references(project['publications']), targets=[
+            dict(target, publications=references(target['publications'])) for target in project['targets']])
+        for project in context['projects']])
+    return canonical(result)
+
+
 def render(feed, templates=None, exists=None):
     feed = Path(feed)
     exists = exists or (lambda name: (feed / name).is_file())
@@ -76,7 +107,7 @@ def render(feed, templates=None, exists=None):
         recorded = next((item for item in controller["executions"] if item["id"] == receipt.get("execution")), None) if controller else None
         source = receipt.get("source") or ({"tag": recorded["tag"], "commit": recorded["source_commit"],
                                            "definition_revision": recorded["definition_revision"]} if recorded else None)
-        job = receipt.get("build_job")
+        job = normalized_job(receipt.get("build_job"))
         duration = None
         if job and job.get("started_at") and job.get("completed_at"):
             start = datetime.fromisoformat(job["started_at"].replace("Z", "+00:00"))
@@ -164,7 +195,7 @@ def render(feed, templates=None, exists=None):
         loader=FileSystemLoader(templates), undefined=StrictUndefined, autoescape=True
     )
     environment.globals.clear()
-    outputs = {"status.json": (canonical(context) + "\n").encode()}
+    outputs = {"status.json": (status_document(context) + "\n").encode()}
     pages = [
         ("index.html", "index.html.j2", None),
         ("status/index.html", "index.html.j2", None),
@@ -339,7 +370,7 @@ def receipt(root, manifest, values, feed, paths):
         feed=dict(base_url=feed['url'], repository=feed['repository'], branch=metadata(feed['repository'])['default_branch']),
         build_result=dict(run=dict(html_url=f'https://github.com/{build_repo}/actions/runs/{run_id}')),
         run=dict(html_url=f'https://github.com/{os.environ["GITHUB_REPOSITORY"]}/actions/runs/{os.environ["GITHUB_RUN_ID"]}'),
-        build_job=builds[0], packages=packages, dependencies=[dict(package=name,version=value[0],revision=value[1])
+        build_job=normalized_job(builds[0]), packages=packages, dependencies=[dict(package=name,version=value[0],revision=value[1])
             for name,value in sorted(manifest.get('prerequisites', {}).items())],
         summary=manifest.get('summary'), environment=manifest['environment'], published_utc=utc(time.time()))
     if 'development.tar.gz' in paths:
