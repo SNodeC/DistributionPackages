@@ -16,7 +16,9 @@ def main():
     rpm=entry('rpm')
     script=validate.native_script(rpm,['fedora/stable/x86_64/Packages/a-1.2.3-7.x86_64.rpm'],
                                   'http://127.0.0.1:1234/',Path('/public/test.asc'))
-    assert 'dnf makecache --refresh' in script and 'dnf install -y --downloadonly' in script
+    assert 'dnf makecache -y --refresh' in script and 'dnf install -y --downloadonly' in script
+    assert 'rpm --import /key/test.asc' in script
+    assert script.index('rpm --import') < script.index('dnf ')
     assert 'gpgcheck=1' in script and 'repo_gpgcheck=1' in script and '--assumeno' not in script
     for fmt in ('ipk','apk'):
         target={'build':{'format':fmt}}

@@ -24,6 +24,11 @@ def main():
     assert 'GH_TOKEN: ${{ steps.writer.outputs.token }}' in workflow
     assert workflow.count('secrets.PACKAGES_APP_PRIVATE_KEY') == 1
     assert 'GITHUB_TOKEN: ${{ github.token }}' in workflow
+    publish_job = workflow.split('  publish:\n', 1)[1]
+    assert '      packages: read' in publish_job
+    login = 'docker login ghcr.io -u \"$GITHUB_ACTOR\" --password-stdin'
+    assert login in publish_job and 'REGISTRY_TOKEN: ${{ github.token }}' in publish_job
+    assert publish_job.index(login) < publish_job.index('python3 -m coreci.publish run')
     with tempfile.TemporaryDirectory() as temporary:
         work = Path(temporary)
         fixtures = {name: 'fixture-only-' + name for name in names}
