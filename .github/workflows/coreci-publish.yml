@@ -109,9 +109,19 @@ jobs:
           owner: ${{ needs.resolve.outputs.owner }}
           repositories: ${{ needs.resolve.outputs.repository_name }}
           permission-contents: write
+      - name: Resolve SDK cache identity
+        id: sdk
+        run: python3 -m coreci.sdk --manifest packages/manifest.json
+      - name: Cache SDK archive
+        if: steps.sdk.outputs.archive != ''
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.sdk.outputs.archive }}
+          key: ${{ steps.sdk.outputs.key }}
       - id: publish
         name: Sign, validate and publish
         env:
+          CORECI_SDK_ARCHIVE: ${{ steps.sdk.outputs.archive }}
           GITHUB_TOKEN: ${{ github.token }}
           APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
           PACKAGES_GPG_PASSPHRASE: ${{ secrets.PACKAGES_GPG_PASSPHRASE }}

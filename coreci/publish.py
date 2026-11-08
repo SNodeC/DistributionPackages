@@ -195,7 +195,7 @@ def publish_once(artifacts, root):
         sdk_root = None
         if entry["family"] == "openwrt":
             from environment import sdk
-            from sdk import prepare
+            from .sdk import prepare
 
             environment = sdk(entry, entry["build"]["release"])
             sdk_root, _ = prepare(entry, environment, work / "sdk")

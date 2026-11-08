@@ -90,6 +90,15 @@ jobs:
           ref: ${{ needs.resolve.outputs.recipe }}
           path: recipe
           persist-credentials: false
+      - name: Resolve SDK cache identity
+        id: sdk
+        run: python3 -m coreci.sdk
+      - name: Cache SDK archive
+        if: steps.sdk.outputs.archive != ''
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.sdk.outputs.archive }}
+          key: ${{ steps.sdk.outputs.key }}
       - name: Enable foreign architecture containers
         uses: docker/setup-qemu-action@v3
       - name: Authenticate read-only image pulls
@@ -98,6 +107,7 @@ jobs:
         run: printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
       - name: Build unsigned packages
         env:
+          CORECI_SDK_ARCHIVE: ${{ steps.sdk.outputs.archive }}
           GITHUB_TOKEN: ${{ github.token }}
         run: python3 -m coreci.build run
       - uses: actions/upload-artifact@v4
