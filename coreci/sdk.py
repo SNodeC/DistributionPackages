@@ -29,16 +29,16 @@ def acquire(environment, archive):
         command = [
             "curl", "--fail", "--location", "--show-error", "--continue-at", "-",
             "--retry", "5", "--retry-all-errors", "--connect-timeout", "30",
-            "--speed-limit", "1024", "--speed-time", "120", "--retry-max-time", "2700",
+            "--speed-limit", "1024", "--speed-time", "120", "--retry-max-time", "5400",
             "--max-filesize", str(1024**3), "--output", str(partial),
             "--write-out", "SDK transfer: bytes=%{size_download} speed=%{speed_download} url=%{url_effective}\n",
             environment["sdk"]["url"],
         ]
-        deadline = time.monotonic() + 2700
+        deadline = time.monotonic() + 5400
         downloaded = False
         while not downloaded:
             remaining = deadline - time.monotonic()
-            require(remaining > 0, "SDK download exceeded 45 minutes")
+            require(remaining > 0, "SDK download exceeded 90 minutes")
             previous = partial.stat().st_size if partial.exists() else 0
             try:
                 subprocess.run(command, check=True, timeout=remaining)
