@@ -405,7 +405,7 @@ def main():
         require(workflow_identity(feed['presentation']) == workflow_identity(os.environ['GITHUB_WORKFLOW_REF']), 'presentation workflow mismatch')
         branch = metadata(feed['repository'])['default_branch']
         if not root.exists():
-            subprocess.run(['git','clone','--filter=blob:none','--no-checkout','--single-branch','--branch',branch,
+            subprocess.run(['git','clone','--depth=1','--filter=blob:none','--no-checkout','--single-branch','--branch',branch,
                             'https://github.com/'+feed['repository']+'.git',str(root)],check=True)
         def attempt():
             base = output(['git','-C',str(root),'rev-parse','HEAD'])
