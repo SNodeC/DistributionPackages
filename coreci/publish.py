@@ -2,6 +2,7 @@
 
 import argparse
 from contextlib import contextmanager
+from functools import cmp_to_key
 import os
 from pathlib import Path
 import re
@@ -58,12 +59,59 @@ def immutable(feed, manifest, paths):
     destination = Path(feed) / relative
     repeated = destination.exists()
     if repeated:
+        require(all((Path(feed) / path).is_file() for path in paths), "retired: publication files were removed")
         require(not destination.is_symlink() and destination.read_text() == ledger(manifest), "immutable: conflicting ledger")
     else:
         for path in paths:
             require(not (Path(feed) / path).exists() and not (Path(feed) / path).is_symlink(),
                     "immutable: existing target file without ledger")
     return relative, repeated
+
+
+def sparse_checkout(root, manifest):
+    entry = manifest["entry"]
+    directory = (f'{entry["distribution"]}/pool/{entry["suite"]}' if entry["build"]["format"] == "deb"
+                 else f'{entry["distribution"]}/{entry["suite"]}/{entry["arch"]}')
+    patterns = ["/README.md", "/index.html", "/status.json", "/status/", "/docs/", "/install/", "/receipts/",
+                "/coreci/presentation.json", f'/coreci/published/{entry["id"]}/', f'/dev/{entry["id"]}/', f"/{directory}/"]
+    if entry["build"]["format"] == "deb":
+        patterns += [f"!/{directory}/*.deb", f'/{directory}/*_{entry["arch"]}.deb', f"/{directory}/*_all.deb",
+                     f'/{entry["distribution"]}/dists/{entry["suite"]}/']
+    subprocess.run(["git", "-C", str(root), "sparse-checkout", "set", "--no-cone", "--stdin"],
+                   input="\n".join(patterns) + "\n", text=True, check=True)
+
+
+def retention(root, manifest):
+    from .contract import package_metadata
+
+    entry, package = manifest["entry"], manifest["package"]
+    fmt = entry["build"]["format"]
+    directory = (root / entry["distribution"] / "pool" / entry["suite"] if fmt == "deb"
+                 else root / entry["distribution"] / entry["suite"] / entry["arch"])
+    groups = {}
+    for path in directory.rglob("*." + fmt):
+        if path.name.startswith((package + "_", package + "-")):
+            info = package_metadata(path, fmt)
+            if (info["name"] == package or info["name"].startswith(package + "-")) and info["arch"] == entry["arch"]:
+                groups.setdefault(info["version"], []).append(path)
+    for path in (root / "dev" / entry["id"]).glob(package + "_*.tar.gz"):
+        match = re.fullmatch(re.escape(package) + r"_(.+)-r([0-9]+)\.tar\.gz", path.name)
+        require(match is not None, "invalid development export identity")
+        version = versions(match[1], int(match[2]), fmt, entry)["full"]
+        groups.setdefault(version, []).append(path)
+    def compare(left, right):
+        # APK's encoded prerelease tokens have the same order as the other formats.
+        first, second = (value.replace("_pre0", "~").replace("_p", ".p") for value in (left, right))
+        compared = subprocess.run(["dpkg", "--compare-versions", first, "lt", second], check=False).returncode
+        require(compared in (0, 1), "cannot order publication versions")
+        return -1 if compared == 0 else int(first != second)
+    removed = set()
+    for version in sorted(groups, key=cmp_to_key(compare))[:-2]:
+        for path in groups[version]:
+            require(not path.is_symlink(), "retention cannot remove links")
+            removed.add(str(path.relative_to(root)))
+            path.unlink()
+    return removed
 
 
 def badges(readme, settings, definitions):
@@ -188,6 +236,7 @@ def publish_once(artifacts, root):
             in ("https://github.com/" + feed["repository"].lower(), "git@github.com:" + feed["repository"].lower()),
             "feed checkout mismatch")
     base = output(["git", "-C", str(root), "rev-parse", "HEAD"])
+    sparse_checkout(root, manifest)
     before = snapshot(root)
     entry = manifest["entry"]
     fmt = entry["build"]["format"]
@@ -225,6 +274,7 @@ def publish_once(artifacts, root):
                             "--define", "_gpg_path " + str(home), "--define", "_openpgp_sign_id " +
                             feed["keys"]["gpg"]["fingerprint"], "--define", "_gpg_sign_cmd_extra_args " +
                             shlex_passphrase(private.get("PACKAGES_GPG_PASSPHRASE")), "--addsign", str(root / relative)], check=True)
+                removed = retention(root, manifest)
                 if fmt in ("deb", "rpm"):
                     generator = apt_indexes if fmt == "deb" else rpm_indexes
                     indices = generator(root, entry["distribution"], entry["suite"], entry["arch"], gpg, keyring)
@@ -252,8 +302,9 @@ def publish_once(artifacts, root):
                         if (root / state).exists():
                             (staged / state).parent.mkdir(parents=True)
                             shutil.copyfile(root / state, staged / state)
+                        tracked = set(output(['git', '-C', str(root), 'ls-tree', '-r', '--name-only', 'HEAD']).splitlines()) - removed
                         rendered = refresh(staged, settings, manifest['feed'],
-                            exists=lambda name: (root / name).is_file(), status=status_fetch(settings['status_url']))
+                            exists=lambda name: name in tracked or (root / name).is_file(), status=status_fetch(settings['status_url']))
                     except Exception as error:
                         with Path(os.environ.get('GITHUB_STEP_SUMMARY', os.devnull)).open('a') as summary:
                             summary.write(f'\n**Presentation warning:** {error}\n\nExisting presentation retained; publication continues.\n')
@@ -277,7 +328,7 @@ def publish_once(artifacts, root):
                     validation_key = public_directory / Path(feed["keys"][kind]["file"]).name
                 validate(root, entry, list(paths.values()), validation_key, sdk_root)
                 after = snapshot(root)
-                allowed = set(paths.values()) | {ledger_path} | presentation_paths | {str(p.relative_to(root)) for p in indices}
+                allowed = set(paths.values()) | removed | {ledger_path} | presentation_paths | {str(p.relative_to(root)) for p in indices}
                 if fmt == "rpm":
                     prefix = f'{entry["distribution"]}/{entry["suite"]}/{entry["arch"]}/repodata/'
                     allowed |= {name for name in before if name.startswith(prefix)}

@@ -62,7 +62,7 @@ def probe(fmt):
                     assert not sdk_copies
             if args[:2]==['docker','run']:
                 assert '--user=1000:1000' in args and '--read-only' in args and '--cap-drop=ALL' in args
-                assert ('--cpus=2' if openwrt else '--cpus=4') in args
+                assert not any(arg.startswith('--cpus') for arg in args)
                 assert '--env' not in args and '-e' not in args, 'no credentials forwarded to container'
                 scratch = {args[i+1].split(':',1)[0]: args[i+1].split(':',1)[1]
                            for i, arg in enumerate(args) if arg == '--tmpfs'}

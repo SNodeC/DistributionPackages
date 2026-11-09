@@ -1,6 +1,7 @@
 """Acquire an untrusted SDK archive; existing preparation verifies it again."""
 import argparse
 import os
+import platform
 import re
 import resource
 import shutil
@@ -69,6 +70,11 @@ def prepare(target, environment, destination):
 def cache(manifest=None):
     target = (read_json(manifest)["entry"] if manifest else
               select(read_json(Path("recipe/ci/packages.json")), inputs("build")["target"]))
+    arch = (target["arch"].split("_")[0] if target["family"] == "openwrt"
+            else target["build"]["platform"].split("/")[1])
+    aliases = {"x86": "amd64", "x86_64": "amd64", "aarch64": "arm64", "i386": "386", "powerpc": "ppc"}
+    emulator = aliases.get(arch, arch)
+    github_outputs(emulator="" if emulator == aliases.get(platform.machine(), platform.machine()) else emulator)
     if target["family"] == "openwrt":
         environment = sdk(target, target["build"]["release"])
         archive = cache_path(environment)

@@ -16,14 +16,14 @@ def main():
         ledger = root/path
         ledger.parent.mkdir(parents=True)
         ledger.write_text(publish.ledger(manifest))
+        file = root/'debian/pool/stable/a.deb'
+        file.parent.mkdir(parents=True)
+        file.write_bytes(b'existing unsigned or signed file')
         assert publish.immutable(root, manifest, ['debian/pool/stable/a.deb']) == (path, True)
         changed = copy.deepcopy(manifest)
         changed['files']['a.deb'] = '1'*64
         rejects(publish.immutable, root, changed, ['debian/pool/stable/a.deb'], text='immutable')
         ledger.unlink()
-        file = root/'debian/pool/stable/a.deb'
-        file.parent.mkdir(parents=True)
-        file.write_bytes(b'existing unsigned or signed file')
         rejects(publish.immutable, root, manifest, ['debian/pool/stable/a.deb'], text='immutable')
         subprocess.run(['git','init','-q',str(root)],check=True)
         subprocess.run(['git','-C',str(root),'add','.'],check=True)
