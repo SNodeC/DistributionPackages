@@ -98,6 +98,12 @@ jobs:
           github-token: ${{ github.token }}
           name: ${{ inputs.artifact }}
           path: packages
+      - name: Register 32-bit MIPS emulation
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static binfmt-support
+          sudo update-binfmts --enable qemu-mipsel
+          grep -q '^flags:.*F' /proc/sys/fs/binfmt_misc/qemu-mipsel
       - uses: docker/setup-qemu-action@v3
       - name: Log in to read validation images
         env:
