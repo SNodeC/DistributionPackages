@@ -21,7 +21,7 @@ def main():
         before = {name: (exports / name).read_bytes() for name in protected}
         summary = root / 'summary'
         with environment({'GITHUB_STEP_SUMMARY': str(summary)}):
-            removed = publish.retention(root, dict(package='snodec', entry=target), ['snodec', 'snodec-idp', 'mqttsuite'])
+            removed = publish.retention(root, dict(package='snodec', entry=target, version='1.0.0', revision=3), ['snodec', 'snodec-idp', 'mqttsuite'])
         assert removed == {f'dev/{target["id"]}/snodec_1.0.0-r1.tar.gz'}
         assert all((exports / name).read_bytes() == contents for name, contents in before.items())
         assert all(name in summary.read_text() for name in names)
