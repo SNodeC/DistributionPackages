@@ -87,7 +87,13 @@ def sparse_checkout(root, manifest):
                    input="\n".join(patterns) + "\n", text=True, check=True)
 
 
-def retention(root, manifest):
+def package_owner(name, packages):
+    matches = [package for package in packages if name == package or name.startswith(package + "-")]
+    result = max(matches, key=len, default="")
+    return result
+
+
+def retention(root, manifest, packages):
     from .contract import package_metadata
 
     entry, package = manifest["entry"], manifest["package"]
@@ -97,7 +103,7 @@ def retention(root, manifest):
     for path in directory.rglob("*." + fmt):
         if path.name.startswith((package + "_", package + "-")):
             info = package_metadata(path, fmt)
-            if (info["name"] == package or info["name"].startswith(package + "-")) and info["arch"] == entry["arch"]:
+            if package_owner(info["name"], packages) == package and info["arch"] == entry["arch"]:
                 groups.setdefault(info["version"], []).append(path)
     for path in (root / "dev" / entry["id"]).glob(package + "_*.tar.gz"):
         match = re.fullmatch(re.escape(package) + r"_(.+)-r([0-9]+)\.tar\.gz", path.name)
@@ -279,7 +285,8 @@ def publish_once(artifacts, root):
                             "--define", "_gpg_path " + str(home), "--define", "_openpgp_sign_id " +
                             feed["keys"]["gpg"]["fingerprint"], "--define", "_gpg_sign_cmd_extra_args " +
                             shlex_passphrase(private.get("PACKAGES_GPG_PASSPHRASE")), "--addsign", str(root / relative)], check=True)
-                removed = retention(root, manifest)
+                packages = [declaration(repo)["package"] for repo in settings["repositories"]]
+                removed = retention(root, manifest, packages)
                 if fmt in ("deb", "rpm"):
                     generator = apt_indexes if fmt == "deb" else rpm_indexes
                     indices = generator(root, entry["distribution"], entry["suite"], entry["arch"], gpg, keyring)
