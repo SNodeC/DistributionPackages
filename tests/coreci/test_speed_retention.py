@@ -63,7 +63,7 @@ def native():
             deb(root, version)
             deb(root, version, name='a-extra')
             history.append(version)
-            removed = publish.retention(root, manifest)
+            removed = publish.retention(root, manifest, ['a'])
             assert all(not (root / name).exists() for name in removed)
             actual = {package_metadata(path, 'deb')['version']
                       for path in (root / 'debian/pool/stable').glob('a*_amd64.deb')
@@ -107,7 +107,7 @@ def openwrt():
             independent.write_bytes(b'keep')
             identities[independent] = dict(name='a-common', version='0.1.0-1', arch='noarch')
             with patch('coreci.contract.package_metadata', side_effect=lambda path, _: identities[path]):
-                removed = publish.retention(root, manifest)
+                removed = publish.retention(root, manifest, ['a'])
             assert len(removed) == (2 if fmt == 'rpm' else 4)
             assert independent.read_bytes() == b'keep'
             assert {path.name for path in exports.glob('*.tar.gz')} == (
