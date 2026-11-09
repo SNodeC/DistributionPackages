@@ -80,7 +80,7 @@ def main():
              replace(publish,'apt_indexes',indices),replace(publish,'prepare_commit',commit),replace(publish,'checked_push',push),
              replace(publish,'availability',availability), replace(validator,'validate',validate),
              replace(publish,'declaration',lambda _:dict(package='a',matrix=[entry()])),
-             replace(contract,'package_metadata',lambda *args:dict(name='a',version='1.0.0-1',arch='amd64'))]:
+             replace(contract,'package_metadata',lambda *args:dict(name='a',version='1.0.0-1~stable',arch='amd64'))]:
                 stack.enter_context(context)
             publish.publish(artifacts,feed)
             assert events==['signing-boundary','validate','commit','push','availability']
@@ -133,7 +133,7 @@ def main():
                     if error == 'receipt-link':
                         real_render(staged, exists=exists)
                     assert staged!=case, 'optional renderer must not write into the publication checkout'
-                    assert exists('debian/pool/stable/a_1.0.0-1_amd64.deb')
+                    assert exists('debian/pool/stable/a_1.0.0-1~stable_amd64.deb')
                     assert (staged/'receipts/new/1.json').read_bytes()==b'new receipt'
                     assert (staged/'status/controller.json').read_bytes()!=originals['status/controller.json']
                     if error:
@@ -154,7 +154,7 @@ def main():
                      replace(presentation,'render',render):
                     publish.publish(artifacts,case)
                 assert events==['signing-boundary','validate','commit','push','availability']
-                assert (case/'debian/pool/stable/a_1.0.0-1_amd64.deb').read_bytes()==b'unsigned input'
+                assert (case/'debian/pool/stable/a_1.0.0-1~stable_amd64.deb').read_bytes()==b'unsigned input'
                 assert (case/'coreci/published/t1/a_1.0.0-1.sha256').read_text()==publish.ledger(manifest)
                 assert (case/'receipts/new/1.json').read_bytes()==b'new receipt'
                 if error:

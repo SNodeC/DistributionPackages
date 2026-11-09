@@ -4,8 +4,9 @@ import subprocess
 import tempfile
 from support import entry, environment, replace
 from coreci import common
-from native_container import package
-from contract import package_metadata, read_json, versions
+from coreci.native_container import package
+from contract import package_metadata, read_json
+from coreci.versions import versions
 
 
 def probe(fmt):
@@ -33,7 +34,7 @@ include(CPack)
         assert len(outputs['packages'])==1
         file=out/outputs['packages'][0]['file']
         data=package_metadata(file,fmt)
-        assert data['name']=='a' and data['version']==versions('v1.0.0-alpha+build',7,fmt)['full']
+        assert data['name']=='a' and data['version']==versions('v1.0.0-alpha+build',7,fmt,entry(fmt))['full']
         assert outputs['packages'][0]['component']=='a'
     return 0
 

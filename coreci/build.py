@@ -11,7 +11,8 @@ import tempfile
 
 from .common import (declaration, github_outputs, identifier, inputs, metadata, prerequisites,
                      public_key, registry, select)
-from contract import extract_archive, file_hash, output, read_json, require, versions, write_json
+from .versions import versions
+from contract import extract_archive, file_hash, output, read_json, require, write_json
 from environment import native, sdk
 from native import TOOLS
 from .sdk import prepare
@@ -47,7 +48,7 @@ def dependency_definitions(settings, selected, recipe_ref):
 def export_dependency(feed, name, version, revision, target, environment, root, key):
     from .common import download
 
-    encoded = versions(version, revision, target["build"]["format"])
+    encoded = versions(version, revision, target["build"]["format"], target)
     prefix = "dev/" + target["id"] + "/"
     filename = f'{name}_{version}-{encoded["release"]}.tar.gz'
     sums = root / "SHA256SUMS"
@@ -82,7 +83,7 @@ def dependencies(settings, values, doc, target, environment, work):
         root = work / "prerequisites" / name
         root.mkdir(parents=True)
         key = public_key(feed, "gpg", root)
-        encoded = versions(version, revision, target["build"]["format"])
+        encoded = versions(version, revision, target["build"]["format"], target)
         if target["family"] == "native":
             names = definitions[name]["development_packages"][target["build"]["format"]]
             require(isinstance(names, list) and names, "missing development_packages")
