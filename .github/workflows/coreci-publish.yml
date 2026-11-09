@@ -33,6 +33,7 @@ permissions:
   contents: read
   actions: read
 env:
+  UBUNTU_EMULATORS: '["mips", "mipsel", "ppc"]'
   INPUT_BUILD_ID: ${{ inputs.build_id }}
   INPUT_PACKAGE: ${{ inputs.package }}
   INPUT_VERSION: ${{ inputs.version }}
@@ -109,15 +110,16 @@ jobs:
         with:
           path: ${{ steps.sdk.outputs.archive }}
           key: ${{ steps.sdk.outputs.key }}
-      - name: Register 32-bit MIPS emulation
-        if: steps.sdk.outputs.emulator == 'mipsel'
+      - name: Register Ubuntu emulation
+        if: contains(fromJSON(env.UBUNTU_EMULATORS), steps.sdk.outputs.emulator)
         run: |
           sudo apt-get update
           sudo apt-get install -y qemu-user-static binfmt-support
-          sudo update-binfmts --enable qemu-mipsel
-          grep -q '^flags:.*F' /proc/sys/fs/binfmt_misc/qemu-mipsel
+          sudo update-binfmts --disable
+          sudo update-binfmts --enable qemu-${{ steps.sdk.outputs.emulator }}
+          grep -q '^flags:.*F' /proc/sys/fs/binfmt_misc/qemu-${{ steps.sdk.outputs.emulator }}
       - uses: docker/setup-qemu-action@v3
-        if: steps.sdk.outputs.emulator != '' && steps.sdk.outputs.emulator != 'mipsel'
+        if: steps.sdk.outputs.emulator != '' && !contains(fromJSON(env.UBUNTU_EMULATORS), steps.sdk.outputs.emulator)
         with:
           platforms: ${{ steps.sdk.outputs.emulator }}
       - name: Log in to read validation images
