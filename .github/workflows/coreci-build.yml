@@ -101,6 +101,9 @@ jobs:
           key: ${{ steps.sdk.outputs.key }}
       - name: Enable foreign architecture containers
         uses: docker/setup-qemu-action@v3
+        if: steps.sdk.outputs.emulator != ''
+        with:
+          platforms: ${{ steps.sdk.outputs.emulator }}
       - name: Authenticate read-only image pulls
         env:
           REGISTRY_TOKEN: ${{ github.token }}

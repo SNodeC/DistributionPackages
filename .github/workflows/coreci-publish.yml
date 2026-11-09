@@ -90,6 +90,8 @@ jobs:
           repository: ${{ needs.resolve.outputs.repository }}
           ref: ${{ needs.resolve.outputs.branch }}
           path: feed
+          sparse-checkout: README.md
+          sparse-checkout-cone-mode: false
           persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
@@ -98,13 +100,27 @@ jobs:
           github-token: ${{ github.token }}
           name: ${{ inputs.artifact }}
           path: packages
+      - name: Resolve SDK cache identity
+        id: sdk
+        run: python3 -m coreci.sdk --manifest packages/manifest.json
+      - name: Cache SDK archive
+        if: steps.sdk.outputs.archive != ''
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.sdk.outputs.archive }}
+          key: ${{ steps.sdk.outputs.key }}
       - name: Register 32-bit MIPS emulation
+        if: steps.sdk.outputs.emulator == 'mipsel'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y qemu-user-static binfmt-support
-          sudo update-binfmts --enable qemu-mipsel
+          docker run --privileged --rm -i --entrypoint /bin/sh multiarch/qemu-user-static:7.2.0-1 -e <<'SH'
+          /register --systemd mipsel --persistent yes --exportdir /tmp
+          cat /tmp/qemu-mipsel.conf > /proc/sys/fs/binfmt_misc/register
+          SH
           grep -q '^flags:.*F' /proc/sys/fs/binfmt_misc/qemu-mipsel
       - uses: docker/setup-qemu-action@v3
+        if: steps.sdk.outputs.emulator != '' && steps.sdk.outputs.emulator != 'mipsel'
+        with:
+          platforms: ${{ steps.sdk.outputs.emulator }}
       - name: Log in to read validation images
         env:
           REGISTRY_TOKEN: ${{ github.token }}
@@ -123,15 +139,6 @@ jobs:
           owner: ${{ needs.resolve.outputs.owner }}
           repositories: ${{ needs.resolve.outputs.repository_name }}
           permission-contents: write
-      - name: Resolve SDK cache identity
-        id: sdk
-        run: python3 -m coreci.sdk --manifest packages/manifest.json
-      - name: Cache SDK archive
-        if: steps.sdk.outputs.archive != ''
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.sdk.outputs.archive }}
-          key: ${{ steps.sdk.outputs.key }}
       - id: publish
         name: Sign, validate and publish
         env:

@@ -74,7 +74,7 @@ def main():
         from coreci import validate as validator
         from coreci import contract
         with environment(env), ExitStack() as stack:
-            for context in [replace(publish,'registry',registry_data),
+            for context in [replace(publish,'sparse_checkout',lambda *args: None), replace(publish,'registry',registry_data),
              replace(publish,'metadata',lambda _:dict(default_branch='main')), replace(publish,'output',output),
              replace(publish,'public_key',key), replace(publish,'secrets',private), replace(publish,'signing_key',signer),
              replace(publish,'apt_indexes',indices),replace(publish,'prepare_commit',commit),replace(publish,'checked_push',push),

@@ -163,11 +163,11 @@ class Download(unittest.TestCase):
         prepare.assert_called_once_with("target", self.environment, self.archive.parent / "work", archive=self.archive)
 
     def test_native_targets_do_not_query_or_cache_an_sdk(self):
-        with patch.object(sdk, "read_json", return_value={"entry": {"family": "native"}}), \
+        with patch.object(sdk, "read_json", return_value={"entry": {"family": "native", "build": {"platform": "linux/amd64"}}}), \
              patch.object(sdk, "sdk") as metadata, patch.object(sdk, "github_outputs") as outputs:
             sdk.cache("manifest.json")
         metadata.assert_not_called()
-        outputs.assert_not_called()
+        outputs.assert_called_once_with(emulator="")
 
     def test_build_cache_identity_matches_the_publisher(self):
         target = {"id": "t1", "family": "openwrt", "distribution": "openwrt", "suite": "24.10",
@@ -177,16 +177,16 @@ class Download(unittest.TestCase):
              patch.object(sdk, "sdk", return_value=self.environment), \
              patch.object(sdk, "github_outputs") as outputs, environment({"RUNNER_TEMP": self.temporary.name}):
             sdk.cache()
-        outputs.assert_called_once_with(archive=str(self.archive.parent / "coreci-sdk/sdk.tar.zst"),
+        outputs.assert_any_call(archive=str(self.archive.parent / "coreci-sdk/sdk.tar.zst"),
                                        key="openwrt-sdk-sdk.tar.zst-" + self.environment["sdk"]["sha256"])
 
     def test_cache_identity_is_archive_only_and_shared_by_build_and_publish(self):
-        target = {"family": "openwrt", "build": {"release": "24.10.8"}}
+        target = {"family": "openwrt", "arch": "x86_64", "build": {"release": "24.10.8"}}
         with patch.object(sdk, "read_json", return_value={"entry": target}), \
              patch.object(sdk, "sdk", return_value=self.environment), \
              patch.object(sdk, "github_outputs") as outputs, environment({"RUNNER_TEMP": self.temporary.name}):
             sdk.cache("manifest.json")
-        outputs.assert_called_once_with(archive=str(self.archive.parent / "coreci-sdk/sdk.tar.zst"),
+        outputs.assert_any_call(archive=str(self.archive.parent / "coreci-sdk/sdk.tar.zst"),
                                        key="openwrt-sdk-sdk.tar.zst-" + self.environment["sdk"]["sha256"])
         workflow = Path(".github/workflows/coreci-build.yml").read_text()
         publisher = Path(".github/workflows/coreci-publish.yml").read_text()

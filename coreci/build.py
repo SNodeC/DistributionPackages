@@ -191,7 +191,7 @@ def build(source, definition, destination):
             mounts += ["--mount", f"type=bind,source={sdk_root},target=/sdk,readonly"]
         common = ["docker", "run", "--rm", "--init", "--user=1000:1000", "--platform", host["platform"],
                   "--cap-drop=ALL", "--security-opt=no-new-privileges", "--read-only", "--pids-limit=256",
-                  "--memory=4g", "--cpus=4" if family == "native" else "--cpus=2", "--tmpfs", "/tmp:rw,exec,size=2g,mode=1777",
+                  "--memory=4g", "--tmpfs", "/tmp:rw,exec,size=2g,mode=1777",
                   "--tmpfs", "/var/tmp:rw,exec,size=2g,mode=1777", "--volume", "/work"] + mounts
         command = ["python3", "/tool/container.py", "--tag", values["tag"], "--version", values["version"],
                    "--revision", values["revision"], "--package", values["package"], "--build-id", values["build_id"],
