@@ -7,8 +7,10 @@ import shutil
 import subprocess
 import sys
 
-sys.path.insert(0, "/core_ci")
-from contract import canonical, file_hash, package_metadata, read_json, regular_file, require, versions, write_json, build_summary
+sys.path.extend(["/core_ci", str(Path(__file__).resolve().parent)])
+from contract import canonical, file_hash, package_metadata, read_json, regular_file, require, write_json, build_summary
+
+from versions import versions
 
 
 def inspect(args, target, environment):
@@ -18,7 +20,7 @@ def inspect(args, target, environment):
     require(isinstance(declared["packages"], list) and declared["packages"], "no packages produced")
     files = {}
     fmt = target["build"]["format"]
-    encoded = versions(args.tag, int(args.revision), fmt)
+    encoded = versions(args.tag, int(args.revision), fmt, target)
     if fmt == "apk":
         os.environ["CORE_CI_APK"] = "/sdk/staging_dir/host/bin/apk"
     for item in declared["packages"]:
@@ -67,7 +69,7 @@ def hook(args, target, environment):
     definition = read_json(ci / "ci/packages.json")
     path = (ci / definition["build"][target["family"]]).resolve()
     require(path.is_relative_to(ci) and path.is_file(), "hook escapes recipe checkout")
-    encoded = versions(args.tag, int(args.revision), target["build"]["format"])
+    encoded = versions(args.tag, int(args.revision), target["build"]["format"], target)
     values = {"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "HOME": "/work", "LANG": "C.UTF-8",
               "SOURCE_DIR": str(source), "CI_DIR": str(ci), "TARGET_JSON": "/target.json", "OUTPUT_DIR": "/output",
               "SOURCE_VERSION": args.tag, "SOURCE_TAG": args.tag, "PACKAGE_NAMESPACE": args.package,

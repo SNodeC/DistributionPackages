@@ -21,15 +21,15 @@ def main():
         with replace(build,'dependency_definitions',lambda *args: {'b':other}), replace(build,'public_key',key):
             instructions=build.dependencies(settings,values,doc,target,{},root)
         metadata=read_json(root/'prerequisites/b/metadata.json')
-        assert metadata == dict(package='b',version='1.2.3',revision=9,upstream_version='1.2.3',release='9',target='t1',sdk=None)
+        assert metadata == dict(package='b',version='1.2.3',revision=9,upstream_version='1.2.3',release='9~stable',target='t1',sdk=None)
         lines=build.install_lines(target,instructions)
         assert all('\n' not in line for line in lines), 'each Dockerfile RUN must occupy one physical line'
         source=subprocess.check_output(['sh','-c',lines[0][4:].rsplit(' > ',1)[0]],text=True)
         assert source == ('deb [signed-by=/inputs/prerequisites/b/test.asc] '
                           'https://feed.example/debian stable main\n')
         commands='\n'.join(lines)
-        assert 'b-dev=1.2.3-9' in commands and 'signed-by=/inputs/prerequisites/b/test.asc' in commands
-        assert 'dpkg-query' in commands and '1.2.3-9' in commands
+        assert 'b-dev=1.2.3-9~stable' in commands and 'signed-by=/inputs/prerequisites/b/test.asc' in commands
+        assert 'dpkg-query' in commands and '1.2.3-9~stable' in commands
         rejects(build.dependencies,settings,dict(values,prerequisites=''),doc,target,{},root,text='do not match')
         rpm=dict(instructions[0],names=['b-devel'],arch='x86_64',distribution='fedora')
         lines=build.install_lines(entry('rpm'),[rpm])
@@ -38,7 +38,7 @@ def main():
         assert source == ('[coreci-0]\nname=coreci\nbaseurl=https://feed.example/fedora/stable/x86_64/\n'
                           'gpgcheck=1\nrepo_gpgcheck=1\ngpgkey=file:///inputs/prerequisites/b/test.asc\n')
         commands='\n'.join(lines)
-        assert 'gpgcheck=1' in commands and 'repo_gpgcheck=1' in commands and 'b-devel-1.2.3-9' in commands
+        assert 'gpgcheck=1' in commands and 'repo_gpgcheck=1' in commands and 'b-devel-1.2.3-9~stable' in commands
     print('prerequisites: exact versions, metadata and repository-signature installation passed')
     return 0
 

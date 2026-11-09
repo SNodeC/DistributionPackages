@@ -12,7 +12,8 @@ import time
 
 from .common import (checked_manifest, declaration, download, github_outputs, https, inputs, metadata,
                      public_key, registry, select, token, workflow, workflow_identity)
-from contract import canonical, file_hash, output, read_json, regular_file, require, versions
+from .versions import versions
+from contract import canonical, file_hash, output, read_json, regular_file, require
 from github import api
 from publish import prepare_commit
 from .lease import push as checked_push, retry
@@ -97,7 +98,7 @@ def targets(manifest, artifacts):
 
             identity = package_metadata(regular_file(artifacts, name), fmt)
             package = manifest["package"]
-            encoded = versions(manifest["version"], manifest["revision"], fmt)
+            encoded = versions(manifest["version"], manifest["revision"], fmt, entry)
             require(identity["name"] == package or identity["name"].startswith(package + "-"), "package namespace mismatch")
             require(identity["version"] == encoded["full"] and identity["arch"] in (entry["arch"], "all", "noarch"),
                     "package metadata mismatch")
@@ -115,7 +116,7 @@ def targets(manifest, artifacts):
     require(result, "no publication packages")
     if "development.tar.gz" in manifest["files"]:
         require(entry["family"] == "openwrt", "native export is not supported")
-        encoded = versions(manifest["version"], manifest["revision"], fmt)
+        encoded = versions(manifest["version"], manifest["revision"], fmt, entry)
         result["development.tar.gz"] = (f'dev/{entry["id"]}/{manifest["package"]}_{manifest["version"]}-'
                                         f'{encoded["release"]}.tar.gz')
     return result
