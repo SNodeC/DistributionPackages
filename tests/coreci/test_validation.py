@@ -10,14 +10,15 @@ from coreci import validate
 
 def main():
     workflow=Path('.github/workflows/coreci-publish.yml').read_text()
-    assert "if: steps.sdk.outputs.emulator == 'mipsel'" in workflow
+    assert "if: contains(fromJSON(env.UBUNTU_EMULATORS), steps.sdk.outputs.emulator)" in workflow
     assert "sudo apt-get install -y qemu-user-static binfmt-support" in workflow
     assert "multiarch/qemu-user-static" not in workflow and "--privileged" not in workflow
     assert "platforms: ${{ steps.sdk.outputs.emulator }}" in workflow
-    assert "grep -q '^flags:.*F' /proc/sys/fs/binfmt_misc/qemu-mipsel" in workflow
-    registration=workflow.split('      - name: Register 32-bit MIPS emulation\n')[1].split('      - uses:')[0]
+    assert "grep -q '^flags:.*F' /proc/sys/fs/binfmt_misc/qemu-${{ steps.sdk.outputs.emulator }}" in workflow
+    registration=workflow.split('      - name: Register Ubuntu emulation\n')[1].split('      - uses:')[0]
     registration=registration.split('        run: |\n', 1)[1]
     registration='\n'.join(line[10:] for line in registration.splitlines())
+    registration=registration.replace('${{ steps.sdk.outputs.emulator }}', 'mipsel')
     with tempfile.TemporaryDirectory() as temporary:
         work=Path(temporary)
         sudo=work/'sudo'
