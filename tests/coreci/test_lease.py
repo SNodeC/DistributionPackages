@@ -83,11 +83,13 @@ def main():
         contract.run(['feed-push'],timeout=600)
     assert recorded[-2][1]['timeout']==120 and recorded[-1][1]['timeout']==600
     log=io.StringIO()
-    with replace(lease,'checked_push',lambda *args,**kwargs:'c'*40),contextlib.redirect_stdout(log):
+    with replace(lease,'checked_push',lambda *args,**kwargs:'c'*40), \
+         replace(lease,'output',lambda _: 'c'*40),contextlib.redirect_stdout(log):
         assert lease.push('scratch','main','unit-test-only','a'*40)=='c'*40
     lines=log.getvalue().splitlines()
-    assert lines[0].startswith('push start ') and lines[1].startswith('push end ')
-    assert lines[1].endswith(' success') and float(lines[1].split()[-2])>=0
+    assert lines[0].startswith('push start ') and lines[2].startswith('push end ')
+    assert lines[1]=='push objects 1'
+    assert lines[2].endswith(' success') and float(lines[2].split()[-2])>=0
     print('lease: confirmed conflict retry, ambiguous success resolution, unknown error preservation and five-attempt ceiling passed')
     return 0
 

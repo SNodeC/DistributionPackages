@@ -19,10 +19,12 @@ def push(root, branch, token, base):
     outcome = "error"
     print("push start " + datetime.now(timezone.utc).isoformat(), flush=True)
     try:
+        objects = output(['git','-C',str(root),'rev-list','--objects','--exclude-promisor-objects','HEAD','--not',base])
+        print(f"push objects {len(objects.splitlines())}", flush=True)
         result = checked_push(root, branch, token, base, timeout=600, progress=True)
         outcome = "success"
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
-        subprocess.run(['git','-C',str(root),'fetch','--filter=blob:none','origin',branch],check=True)
+        subprocess.run(['git','-C',str(root),'fetch','--depth=1','--filter=blob:none','origin',branch],check=True)
         remote = output(['git','-C',str(root),'rev-parse','FETCH_HEAD'])
         local = output(['git','-C',str(root),'rev-parse','HEAD'])
         if remote == local:
