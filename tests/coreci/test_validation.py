@@ -20,6 +20,14 @@ def main():
     assert 'rpm --import /key/test.asc' in script
     assert script.index('rpm --import') < script.index('dnf ')
     assert 'gpgcheck=1' in script and 'repo_gpgcheck=1' in script and '--assumeno' not in script
+    assert 'epel-release' not in script and '--set-enabled crb' not in script
+    for suite in ('9','10'):
+        rocky=copy.deepcopy(rpm)
+        rocky.update(distribution='rocky',suite=suite)
+        prepared=validate.native_script(rocky,[], 'http://127.0.0.1:1234/',Path('/public/test.asc'))
+        assert 'dnf install -y dnf-plugins-core epel-release\ndnf config-manager --set-enabled crb\n' in prepared
+        assert prepared.index('epel-release') < prepared.index('dnf makecache')
+        assert 'gpgcheck=1' in prepared and 'repo_gpgcheck=1' in prepared
     for fmt in ('ipk','apk'):
         target={'build':{'format':fmt}}
         package='openwrt/stable/x86_64/a_1.2.3-r7_x86_64.'+fmt

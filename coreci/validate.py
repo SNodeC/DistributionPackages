@@ -29,6 +29,8 @@ def native_script(entry, files, url, key):
         source = (f'[coreci]\nname=coreci\nbaseurl={base}/{entry["suite"]}/{entry["arch"]}/\n'
                   f'gpgcheck=1\nrepo_gpgcheck=1\ngpgkey=file:///key/{key.name}\n')
         script = f"set -euo pipefail\nrpm --import /key/{key.name}\ndnf install -y dnf-plugins-core\n"
+        if entry["distribution"] == "rocky" and entry["suite"] in ("9", "10"):
+            script += "dnf install -y dnf-plugins-core epel-release\ndnf config-manager --set-enabled crb\n"
         script += "printf %s " + shlex.quote(source) + " > /etc/yum.repos.d/coreci.repo\n"
         script += ("dnf makecache -y --refresh\npackages=()\nfor p in " + packages + "; do\n"
                    "packages+=(\"$(rpm -qp --queryformat '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}' \"$p\")\")\ndone\n"
