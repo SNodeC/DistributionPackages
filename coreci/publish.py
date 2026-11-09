@@ -68,10 +68,16 @@ def immutable(feed, manifest, paths):
     return relative, repeated
 
 
+def target_directory(entry):
+    layout = ("pool", entry["suite"]) if entry["build"]["format"] == "deb" else (entry["suite"], entry["arch"])
+    distribution = "openwrt" if entry["family"] == "openwrt" else entry["distribution"]
+    result = "/".join((distribution, *layout))
+    return result
+
+
 def sparse_checkout(root, manifest):
     entry = manifest["entry"]
-    directory = (f'{entry["distribution"]}/pool/{entry["suite"]}' if entry["build"]["format"] == "deb"
-                 else f'{entry["distribution"]}/{entry["suite"]}/{entry["arch"]}')
+    directory = target_directory(entry)
     patterns = ["/README.md", "/index.html", "/status.json", "/status/", "/docs/", "/install/", "/receipts/",
                 "/coreci/presentation.json", f'/coreci/published/{entry["id"]}/', f'/dev/{entry["id"]}/', f"/{directory}/"]
     if entry["build"]["format"] == "deb":
@@ -86,8 +92,7 @@ def retention(root, manifest):
 
     entry, package = manifest["entry"], manifest["package"]
     fmt = entry["build"]["format"]
-    directory = (root / entry["distribution"] / "pool" / entry["suite"] if fmt == "deb"
-                 else root / entry["distribution"] / entry["suite"] / entry["arch"])
+    directory = root / target_directory(entry)
     groups = {}
     for path in directory.rglob("*." + fmt):
         if path.name.startswith((package + "_", package + "-")):
@@ -138,6 +143,7 @@ def targets(manifest, artifacts):
     entry = select({"matrix": [manifest["entry"]]}, manifest["target"])
     fmt = entry["build"]["format"]
     result = {}
+    directory = target_directory(entry)
     for name in manifest["files"]:
         if name != "development.tar.gz":
             require(name.endswith("." + fmt), "unexpected publication file")
@@ -151,14 +157,13 @@ def targets(manifest, artifacts):
             require(identity["version"] == encoded["full"] and identity["arch"] in (entry["arch"], "all", "noarch"),
                     "package metadata mismatch")
             if fmt == "deb":
-                path = f'{entry["distribution"]}/pool/{entry["suite"]}/{identity["name"]}_{identity["version"]}_{identity["arch"]}.deb'
+                path = f'{directory}/{identity["name"]}_{identity["version"]}_{identity["arch"]}.deb'
             elif fmt == "rpm":
-                path = (f'{entry["distribution"]}/{entry["suite"]}/{entry["arch"]}/Packages/'
-                        f'{identity["name"]}-{identity["version"]}.{identity["arch"]}.rpm')
+                path = f'{directory}/Packages/{identity["name"]}-{identity["version"]}.{identity["arch"]}.rpm'
             else:
                 filename = (f'{identity["name"]}_{identity["version"]}_{identity["arch"]}.ipk' if fmt == "ipk"
                             else f'{identity["name"]}-{identity["version"]}.apk')
-                path = f'openwrt/{entry["suite"]}/{entry["arch"]}/{filename}'
+                path = f'{directory}/{filename}'
             require(path not in result.values(), "duplicate package destination")
             result[name] = path
     require(result, "no publication packages")
