@@ -8,9 +8,10 @@ import subprocess
 import urllib.parse
 import urllib.request
 
-from contract import canonical, file_hash, output, regular_file, relative_path, require, versions, write_json
-from github import NoRedirect, api
-from sign_native import fingerprints
+from .contract import canonical, file_hash, output, regular_file, relative_path, require, write_json
+from .versions import versions
+from .github import NoRedirect, api
+from .sign_native import fingerprints
 
 
 def identifier(value):

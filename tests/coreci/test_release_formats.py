@@ -9,7 +9,7 @@ from golden import prepare
 from support import entry, environment, replace, rejects
 from coreci import native_container, publish, presentation
 from coreci.versions import versions
-from contract import file_hash, package_metadata, read_json, write_json
+from coreci.contract import file_hash, package_metadata, read_json, write_json
 
 CASES = [('debian',suite,'deb') for suite in ('trixie','forky','sid')]
 CASES += [('ubuntu',suite,'deb') for suite in ('noble','resolute')]

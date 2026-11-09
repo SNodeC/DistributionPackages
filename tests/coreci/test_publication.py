@@ -4,7 +4,7 @@ import subprocess
 import tempfile
 from support import rejects, registry_data, entry, replace
 from coreci import publish
-from contract import file_hash
+from coreci.contract import file_hash
 
 
 def main():

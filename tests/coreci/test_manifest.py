@@ -2,7 +2,7 @@ from pathlib import Path
 import tempfile
 from support import rejects, entry
 from coreci import common
-from contract import file_hash, write_json
+from coreci.contract import file_hash, write_json
 
 
 def main():

@@ -10,15 +10,15 @@ from urllib.parse import quote, urlsplit
 from jinja2 import FileSystemLoader, StrictUndefined
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 
-from contract import canonical, read_json, regular_file, relative_path, require, write_json, file_hash, package_metadata, output, compatibility
+from .contract import canonical, read_json, regular_file, relative_path, require, write_json, file_hash, package_metadata, output, compatibility
 import os
 import subprocess
 import time
 import urllib.request
 from .common import declaration, metadata, registry, token, https, NoRedirect, github_outputs, workflow_identity
 from .lease import retry, push as checked_push, restore_partial
-from github import api
-from publish import prepare_commit
+from .github import api
+from .lease import prepare_commit
 
 
 JOB_FIELDS = ('id', 'run_id', 'run_attempt', 'html_url', 'started_at', 'completed_at')

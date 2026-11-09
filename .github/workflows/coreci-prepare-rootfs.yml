@@ -11,7 +11,7 @@ jobs:
       matrix:
         suite: [bookworm, trixie]
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Authenticate registry writer
@@ -19,4 +19,4 @@ jobs:
           REGISTRY_TOKEN: ${{ github.token }}
         run: printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
       - name: Prepare official checksum-pinned image
-        run: python3 core_ci/rootfs_image.py --suite '${{ matrix.suite }}'
+        run: python3 -m coreci.rootfs_image --suite '${{ matrix.suite }}'

@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import tempfile
 
-from contract import file_hash, output, require
+from .contract import file_hash, output, require
 
 
 def prepare(specification, image, directory):

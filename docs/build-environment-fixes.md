@@ -7,7 +7,7 @@ Rocky targets name the major series (9 or 10); point releases retain that series
 Other numeric series, including Ubuntu 24.04, remain exact. Debian sid is checked
 against the official image's apt deb822 `Suites: sid` line because os-release may
 identify the next stable codename. Distribution and architecture checks remain.
-Run `python3 tests/native_bootstrap.py` for the ten acceptance/rejection cases.
+The assignment-based bootstrap and its acceptance/rejection tests were retired with the old `core-ci-*.yml` workflows; current workers validate source declarations through `coreci.common` and the retained CTest suite.
 
 The hook container uses a disposable anonymous disk-backed /work volume instead
 of a 4 GiB RAM filesystem. The image creates /work with mode 1777 so UID1000 can

@@ -10,7 +10,7 @@ import sys
 import tempfile
 from support import ROOT, replace, environment, rejects
 from coreci import presentation as p
-from contract import canonical
+from coreci.contract import canonical
 
 DATA = Path(__file__).parent/'data/presentation'
 TREE = '5b55385c73aeeb18f4390f83db9ce834997c825e'

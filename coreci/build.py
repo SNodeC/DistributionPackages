@@ -12,10 +12,16 @@ import tempfile
 from .common import (declaration, github_outputs, identifier, inputs, metadata, prerequisites,
                      public_key, registry, select)
 from .versions import versions
-from contract import extract_archive, file_hash, output, read_json, require, write_json
-from environment import native, sdk
-from native import TOOLS
+from .contract import extract_archive, file_hash, output, read_json, require, write_json
+from .environment import native, sdk
 from .sdk import prepare
+
+
+TOOLS = {
+    "deb": ("apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "
+            "build-essential python3 pkg-config ca-certificates git file"),
+    "rpm": "dnf install -y gcc gcc-c++ make rpm-build python3 pkgconf-pkg-config findutils tar gzip git && dnf clean all",
+}
 
 
 def resolve():
@@ -151,7 +157,7 @@ def build(source, definition, destination):
         instructions = dependencies(settings, values, doc, target, environment, work)
         write_json(work / "target.json", target)
         write_json(work / "environment.json", environment)
-        for name, tree in (("source", source), ("definition", definition), ("core_ci", tooling / "core_ci"),
+        for name, tree in (("source", source), ("definition", definition),
                            ("coreci", tooling / "coreci")):
             shutil.copytree(tree, work / name, ignore=shutil.ignore_patterns(".git", "__pycache__"), symlinks=True)
         tools = TOOLS.get(fmt, "apt-get update && apt-get install -y build-essential clang flex bison gawk gettext git "
@@ -171,13 +177,13 @@ def build(source, definition, destination):
         lines += ["RUN mkdir -p /work && chmod 1777 /work && "
                   "(getent passwd 1000 >/dev/null || useradd -u 1000 -U -M -d /tmp builder)"]
         (work / "Dockerfile").write_text("\n".join(lines) + "\n")
-        (work / ".dockerignore").write_text("sdk\nsource\ndefinition\ncore_ci\ncoreci\n")
+        (work / ".dockerignore").write_text("sdk\nsource\ndefinition\ncoreci\n")
         image = "coreci-build:" + str(os.getpid())
         subprocess.run(["docker", "build", "--platform", host["platform"], "-t", image, str(work)], check=True, timeout=3600)
         mounts = []
         for source_path, container_path, readonly in ((work / "source", "/source", True),
                 (work / "definition", "/definition", True), (work / "coreci", "/tool", True),
-                (work / "core_ci", "/core_ci", True), (work / "prerequisites", "/prerequisites", True),
+                (work / "prerequisites", "/prerequisites", True),
                 (work / "target.json", "/target.json", True), (work / "environment.json", "/environment.json", True),
                 (destination, "/output", False)):
             mounts += ["--mount", f'type=bind,source={source_path},target={container_path}' + (",readonly" if readonly else "")]

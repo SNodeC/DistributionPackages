@@ -5,7 +5,7 @@ import tempfile
 from support import entry, environment, replace
 from coreci import common
 from coreci.native_container import package
-from contract import package_metadata, read_json
+from coreci.contract import package_metadata, read_json
 from coreci.versions import versions
 
 

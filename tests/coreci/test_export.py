@@ -6,7 +6,7 @@ import tarfile
 import tempfile
 from support import replace, rejects
 from coreci import build, common
-from contract import file_hash
+from coreci.contract import file_hash
 
 
 def main():

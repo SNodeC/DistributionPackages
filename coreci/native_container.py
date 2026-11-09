@@ -5,9 +5,12 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 
-sys.path.extend(["/core_ci", str(Path(__file__).resolve().parent)])
-from contract import output, package_metadata, read_json, require, write_json
-from versions import versions
+if __package__:
+    from .contract import output, package_metadata, read_json, require, write_json
+    from .versions import versions
+else:
+    from contract import output, package_metadata, read_json, require, write_json
+    from versions import versions
 
 
 def package(build):
