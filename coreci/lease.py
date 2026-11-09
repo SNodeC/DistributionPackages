@@ -1,4 +1,5 @@
 """Retry only a confirmed competing feed push; resolve an ambiguous successful push."""
+from datetime import datetime, timezone
 import random
 import shutil
 import subprocess
@@ -14,18 +15,26 @@ class LeaseConflict(Exception):
 
 def push(root, branch, token, base):
     result = None
+    started = time.monotonic()
+    outcome = "error"
+    print("push start " + datetime.now(timezone.utc).isoformat(), flush=True)
     try:
-        result = checked_push(root, branch, token, base)
-    except subprocess.CalledProcessError:
+        result = checked_push(root, branch, token, base, timeout=600, progress=True)
+        outcome = "success"
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
         subprocess.run(['git','-C',str(root),'fetch','--filter=blob:none','origin',branch],check=True)
         remote = output(['git','-C',str(root),'rev-parse','FETCH_HEAD'])
         local = output(['git','-C',str(root),'rev-parse','HEAD'])
         if remote == local:
             result = local
-        elif remote != base:
-            raise LeaseConflict('feed lease changed') from None
+            outcome = "success"
+        elif remote != base or isinstance(error, subprocess.TimeoutExpired):
+            outcome = 'retry'
+            raise LeaseConflict('feed lease changed or push timed out') from None
         else:
             raise
+    finally:
+        print(f"push end {datetime.now(timezone.utc).isoformat()} {time.monotonic() - started:.3f} {outcome}", flush=True)
     return result
 
 

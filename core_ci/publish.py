@@ -123,7 +123,7 @@ def prepare_commit(feed, expected_paths, message="Publish verified core-ci packa
     return base
 
 
-def checked_push(feed, branch, token, base=""):
+def checked_push(feed, branch, token, base="", timeout=120, progress=False):
     authorization = base64.b64encode(("x-access-token:" + token).encode()).decode()
     environment = {
         **os.environ,
@@ -135,8 +135,9 @@ def checked_push(feed, branch, token, base=""):
     require(not base or re.fullmatch(r"[a-f0-9]{40}", base), "invalid expected feed head")
     lease = ["--force-with-lease=refs/heads/" + branch + ":" + base] if base else []
     run(
-        ["git", "-C", str(feed), "push", *lease, "origin", "HEAD:refs/heads/" + branch],
+        ["git", "-C", str(feed), "push", *(["--progress"] if progress else []), *lease, "origin", "HEAD:refs/heads/" + branch],
         env=environment,
+        timeout=timeout,
         stdout=subprocess.DEVNULL,
     )
     revision = output(["git", "-C", str(feed), "rev-parse", "HEAD"])

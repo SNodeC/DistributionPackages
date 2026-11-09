@@ -65,8 +65,8 @@ def write_json(path, value):
     Path(path).write_text(canonical(value) + "\n")
 
 
-def run(arguments, **options):
-    completed = subprocess.run(arguments, check=True, text=True, timeout=120, **options)
+def run(arguments, timeout=120, **options):
+    completed = subprocess.run(arguments, check=True, text=True, timeout=timeout, **options)
     return completed
 
 
