@@ -99,7 +99,7 @@ def retention(root, manifest, packages):
     entry, package = manifest["entry"], manifest["package"]
     fmt = entry["build"]["format"]
     directory = root / target_directory(entry)
-    groups = {}
+    groups = {versions(manifest["version"], manifest["revision"], fmt, entry)["full"]: []}
     for path in directory.rglob("*." + fmt):
         if path.name.startswith((package + "_", package + "-")):
             info = package_metadata(path, fmt)
@@ -130,7 +130,6 @@ def retention(root, manifest, packages):
         for path in groups[version]:
             require(not path.is_symlink(), "retention cannot remove links")
             removed.add(str(path.relative_to(root)))
-            path.unlink()
     return removed
 
 
@@ -296,6 +295,8 @@ def publish_once(artifacts, root):
                             shlex_passphrase(private.get("PACKAGES_GPG_PASSPHRASE")), "--addsign", str(root / relative)], check=True)
                 packages = [declaration(repo)["package"] for repo in settings["repositories"]]
                 removed = retention(root, manifest, packages)
+                for relative in removed:
+                    (root / relative).unlink()
                 if fmt in ("deb", "rpm"):
                     generator = apt_indexes if fmt == "deb" else rpm_indexes
                     indices = generator(root, entry["distribution"], entry["suite"], entry["arch"], gpg, keyring)

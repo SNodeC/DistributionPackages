@@ -16,6 +16,10 @@ def main():
         artifacts.mkdir()
         (feed/'README.md').write_bytes(b'Unrelated README\r\n')
         (feed/'unrelated').write_bytes(b'preserve these bytes')
+        old = feed/'debian/pool/stable/a_0.8.0-1~stable_amd64.deb'
+        old.parent.mkdir(parents=True)
+        old.write_bytes(b'old own payload')
+        (old.parent/'a_0.9.0-1~stable_amd64.deb').write_bytes(b'previous own payload')
         (artifacts/'a.deb').write_bytes(b'unsigned input')
         manifest=dict(build_id='a~t1~1.0.0~r1',package='a',version='1.0.0',revision=1,
                       target='t1',feed='test',entry=entry(),files={'a.deb':file_hash(artifacts/'a.deb')})
@@ -61,6 +65,7 @@ def main():
         def commit(root,changes,**kwargs):
             events.append('commit')
             assert kwargs['orphan'] is True
+            assert not (root/'debian/pool/stable/a_0.8.0-1~stable_amd64.deb').exists()
             assert 'unrelated' not in changes
             assert (root/'README.md').read_bytes().startswith(b'Unrelated README\r\n')
             return 'a'*40
@@ -80,7 +85,7 @@ def main():
              replace(publish,'apt_indexes',indices),replace(publish,'prepare_commit',commit),replace(publish,'checked_push',push),
              replace(publish,'availability',availability), replace(validator,'validate',validate),
              replace(publish,'declaration',lambda _:dict(package='a',matrix=[entry()])),
-             replace(contract,'package_metadata',lambda *args:dict(name='a',version='1.0.0-1~stable',arch='amd64'))]:
+             replace(contract,'package_metadata',lambda path,*args:dict(name='a',version=path.name.split('_')[1] if '_' in path.name else '1.0.0-1~stable',arch='amd64'))]:
                 stack.enter_context(context)
             publish.publish(artifacts,feed)
             assert events==['signing-boundary','validate','commit','push','availability']
