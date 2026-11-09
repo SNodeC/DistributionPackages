@@ -11,7 +11,8 @@ from coreci import validate
 def main():
     workflow=Path('.github/workflows/coreci-publish.yml').read_text()
     assert "if: steps.sdk.outputs.emulator == 'mipsel'" in workflow
-    assert "--systemd mipsel --persistent yes" in workflow
+    assert "sudo apt-get install -y qemu-user-static binfmt-support" in workflow
+    assert "multiarch/qemu-user-static" not in workflow and "--privileged" not in workflow
     assert "platforms: ${{ steps.sdk.outputs.emulator }}" in workflow
     assert "grep -q '^flags:.*F' /proc/sys/fs/binfmt_misc/qemu-mipsel" in workflow
     registration=workflow.split('      - name: Register 32-bit MIPS emulation\n')[1].split('      - uses:')[0]
@@ -19,16 +20,16 @@ def main():
     registration='\n'.join(line[10:] for line in registration.splitlines())
     with tempfile.TemporaryDirectory() as temporary:
         work=Path(temporary)
-        docker=work/'docker'
-        docker.write_text('#!/bin/sh\ncat >/dev/null\nprintf "%s\\n" "$*"\n')
-        docker.chmod(0o755)
+        sudo=work/'sudo'
+        sudo.write_text('#!/bin/sh\nprintf "%s\\n" "$*"\n')
+        sudo.chmod(0o755)
         flags=work/'qemu-mipsel'
         commands=registration.replace('/proc/sys/fs/binfmt_misc/qemu-mipsel',str(flags))
         for value,expected in [('enabled\nflags: POCF\n',0),('enabled\nflags: POC\n',1)]:
             flags.write_text(value)
             result=subprocess.run(['/bin/sh','-ec',commands],env={**os.environ,'PATH':str(work)+':'+os.environ['PATH']},capture_output=True,text=True)
             assert result.returncode==expected
-            assert 'multiarch/qemu-user-static:7.2.0-1' in result.stdout
+            assert 'update-binfmts --enable qemu-mipsel' in result.stdout
     deb=entry()
     script=validate.native_script(deb,['debian/pool/stable/a_1.2.3-7_amd64.deb'],'http://127.0.0.1:1234/',Path('/public/test.asc'))
     assert 'apt-get update' in script and 'apt-get install --dry-run' in script

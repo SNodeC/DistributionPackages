@@ -112,10 +112,9 @@ jobs:
       - name: Register 32-bit MIPS emulation
         if: steps.sdk.outputs.emulator == 'mipsel'
         run: |
-          docker run --privileged --rm -i --entrypoint /bin/sh multiarch/qemu-user-static:7.2.0-1 -e <<'SH'
-          /register --systemd mipsel --persistent yes --exportdir /tmp
-          cat /tmp/qemu-mipsel.conf > /proc/sys/fs/binfmt_misc/register
-          SH
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static binfmt-support
+          sudo update-binfmts --enable qemu-mipsel
           grep -q '^flags:.*F' /proc/sys/fs/binfmt_misc/qemu-mipsel
       - uses: docker/setup-qemu-action@v3
         if: steps.sdk.outputs.emulator != '' && steps.sdk.outputs.emulator != 'mipsel'
