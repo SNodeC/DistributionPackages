@@ -105,11 +105,20 @@ def retention(root, manifest, packages):
             info = package_metadata(path, fmt)
             if package_owner(info["name"], packages) == package and info["arch"] == entry["arch"]:
                 groups.setdefault(info["version"], []).append(path)
-    for path in (root / "dev" / entry["id"]).glob(package + "_*.tar.gz"):
-        match = re.fullmatch(re.escape(package) + r"_(.+)-r([0-9]+)\.tar\.gz", path.name)
-        require(match is not None, "invalid development export identity")
-        version = versions(match[1], int(match[2]), fmt, entry)["full"]
-        groups.setdefault(version, []).append(path)
+    for path in (root / "dev" / entry["id"]).glob("*"):
+        match = re.fullmatch(r"(.+)_(.+)-r([0-9]+)\.tar\.gz", path.name)
+        encoded = None
+        if match is not None and match[1] in packages:
+            try:
+                encoded = versions(match[2], int(match[3]), fmt, entry)
+            except ValueError:
+                pass
+        if encoded is not None and path.is_file() and not path.is_symlink():
+            if match[1] == package:
+                groups.setdefault(encoded["full"], []).append(path)
+        elif path.name not in ("SHA256SUMS", "SHA256SUMS.asc"):
+            with Path(os.environ.get("GITHUB_STEP_SUMMARY", os.devnull)).open("a") as summary:
+                summary.write("- Retention left unknown development entry untouched: " + canonical(str(path.relative_to(root))) + "\n")
     def compare(left, right):
         # APK's encoded prerelease tokens have the same order as the other formats.
         first, second = (value.replace("_pre0", "~").replace("_p", ".p") for value in (left, right))
