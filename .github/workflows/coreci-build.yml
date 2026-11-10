@@ -1,4 +1,5 @@
 name: coreci build
+run-name: ${{ inputs.build_id }}
 on:
   workflow_dispatch:
     inputs:

@@ -81,6 +81,7 @@ def declaration(repo, ref=""):
     identifier(result["package"])
     require(isinstance(result["matrix"], list), "matrix must be an array")
     require(len({identifier(t["id"]) for t in result["matrix"]}) == len(result["matrix"]), "duplicate target")
+    result["matrix"] = [select(result, entry["id"]) for entry in result["matrix"]]
     return result
 
 
@@ -188,6 +189,16 @@ def select(doc, target):
     matches = [entry for entry in doc["matrix"] if entry["id"] == target]
     require(len(matches) == 1, "target not found exactly once")
     result = matches[0]
+    if set(result) <= {"id", "feed"}:
+        settings = registry()
+        path = settings["targets"]
+        relative_path(path)
+        entries = document(Path(path).read_bytes())["targets"]
+        require(isinstance(entries, list), "catalog targets must be an array")
+        catalog = {identifier(entry["id"]): entry for entry in entries}
+        require(len(catalog) == len(entries), "duplicate catalog target")
+        require(target in catalog, "unknown catalog target")
+        result = dict(catalog[target], **({"feed": result["feed"]} if "feed" in result else {}))
     require(result["family"] in ("native", "openwrt"), "invalid target family")
     require(result["build"]["format"] in (("deb", "rpm") if result["family"] == "native" else ("ipk", "apk")),
             "invalid target format")
