@@ -17,14 +17,21 @@ def compare(feed, before, names, exists=None):
     assert paths and all(name.startswith('status/') and name.endswith('.md') for name in paths)
     for name in names:
         raw=(feed/name).read_bytes()
-        assert without_header(raw,name)==(before/name).read_bytes(), name
+        assert without_header(raw,name)==without_header((before/name).read_bytes(),name), name
     for name in paths:
         raw=(feed/name).read_text()
         header=re.search(r'<!-- snodec:begin page-header -->.*?<!-- snodec:end page-header -->',raw,re.S).group()
-        reference=(HEADERS/('README.md' if name=='status/README.md' else 'snodec.md')).read_text().rstrip('\n')
-        assert header==reference.replace('<a id="page-overview">','<a id="banner"></a>\n<a id="page-overview">'),name
-    assert hashlib.sha256((HEADERS/'snodec.md').read_text().rstrip('\n').encode()).hexdigest()==\
-        'd5200a286f267741391717400d00cbd2ee13dc03e03238995b0c989da53f9341'
+        reference=(HEADERS/'docs.md').read_text().rstrip('\n')
+        reference=reference.replace('../../media/nav/','../docs/media/nav/').replace('../../../README.md#banner','../README.md#banner')
+        reference=reference.replace('banner-installation','banner-package-status').replace('Packages — Installation','Packages — Package status')
+        overview=name=='status/README.md'
+        reference=reference.replace('href="../README.md#banner" title="Up to Installation"',
+            'href="'+('../README.md#banner' if overview else 'README.md#banner')+'" title="Up to Installation"')
+        reference=reference.replace('up-installation-', 'up-packages-' if overview else 'up-package-status-')
+        reference=reference.replace('Up to Installation','Up to Packages' if overview else 'Up to Package status')
+        assert header==reference,name
+    assert hashlib.sha256((HEADERS/'docs.md').read_bytes()).hexdigest()==\
+        '7cacecf6668717ed37a80bdf5dc797a2b88a2dd605c2e23082a0d431150f05d1'
     print(f'{len(names)} files: README/badges byte-identical; status Markdown differs only by exact reference header')
     return None
 
