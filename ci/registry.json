@@ -29,5 +29,6 @@
     "SNodeC/mqttsuite",
     "SNodeC/snode.c-idp"
   ],
-  "status_url": "https://core.vchrist.at:8443/api/v1/status.json"
+  "status_url": "https://core.vchrist.at:8443/api/v1/status.json",
+  "targets": "ci/targets.json"
 }
