@@ -5,7 +5,7 @@ import sys
 import tempfile
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from coreci.common import select
+from coreci.common import select, declaration
 from coreci.contract import canonical
 
 root = Path(__file__).resolve().parents[2]
@@ -14,6 +14,8 @@ for path in sorted((root / "tests/coreci/fixtures/catalog").glob("*.json")):
     doc = json.loads(path.read_bytes())
     reduced = dict(doc, matrix=[{key: value for key, value in entry.items() if key in ("id", "feed")}
                                 for entry in doc["matrix"]])
+    with patch("coreci.common.request_file", lambda *args: reduced):
+        assert canonical(declaration("Example/Source", "main")).encode() == canonical(doc).encode()
     for entry in doc["matrix"]:
         assert canonical(select(doc, entry["id"])).encode() == canonical(entry).encode()
         assert canonical(select(reduced, entry["id"])).encode() == canonical(entry).encode()

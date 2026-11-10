@@ -81,6 +81,7 @@ def declaration(repo, ref=""):
     identifier(result["package"])
     require(isinstance(result["matrix"], list), "matrix must be an array")
     require(len({identifier(t["id"]) for t in result["matrix"]}) == len(result["matrix"]), "duplicate target")
+    result["matrix"] = [select(result, entry["id"]) for entry in result["matrix"]]
     return result
 
 
