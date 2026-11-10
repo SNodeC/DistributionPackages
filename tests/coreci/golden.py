@@ -48,29 +48,15 @@ def git_tree(directory):
     return set(names)-{''}
 
 
-def normalized_baseline(value):
-    # Independent expected wire form over a captured, full renderer document.
-    value = copy.deepcopy(value)
-    rows = value['publications']
-    newest = {}
-    for row in sorted(rows, key=lambda row: (
-            p.datetime.fromisoformat(row['published_utc'].replace('Z','+00:00')).timestamp() if row['published_utc'] else -1,
-            row['revision'], row['receipt_url']), reverse=True):
-        newest.setdefault((row['repository'],row['target']),row['receipt_url'])
-    rows = [row for row in rows if row['receipt_url']==newest[(row['repository'],row['target'])]]
-    for row in rows:
-        if row['build_job'] is not None:
-            row['build_job'] = {key:row['build_job'].get(key) for key in
-                ('id','run_id','run_attempt','html_url','started_at','completed_at')}
-    value['publications'] = rows
-    lookup = {(row['receipt_url'],row['package_url']):index for index,row in enumerate(rows)}
-    for project in value['projects']:
-        project['publications'] = [lookup[(row['receipt_url'],row['package_url'])] for row in project['publications']
-                                  if (row['receipt_url'],row['package_url']) in lookup]
-        for target in project['targets']:
-            target['publications'] = [lookup[(row['receipt_url'],row['package_url'])] for row in target['publications']
-                                     if (row['receipt_url'],row['package_url']) in lookup]
-    return value
+def remaining(name):
+    result = name not in ('index.html', 'status.json') and not re.fullmatch(r'status/[^/]+\.html', name)
+    return result
+
+
+def without_header(raw, name):
+    result = re.sub(rb'<!-- snodec:begin page-header -->.*?<!-- snodec:end page-header -->',
+                    b'<a id="banner"></a>', raw, flags=re.S)
+    return result if name.startswith('status/') and name.endswith('.md') else raw
 
 
 def g1(mode, work):
@@ -88,13 +74,10 @@ def g1(mode, work):
         exists=lambda name:name in files
     p.render(root,ROOT/'status-templates',exists)
     rows=json.loads((DATA/'manifest.json').read_text())['files']
+    rows = [row for row in rows if remaining(row['path'])]
     for row in rows:
-        if row['path'] == 'status.json':
-            expected = normalized_baseline(json.loads((DATA/'files'/row['path']).read_text()))
-            assert (root/row['path']).read_text() == canonical(expected)+'\n'
-        else:
-            assert hashlib.sha256((root/row['path']).read_bytes()).hexdigest()==row['sha256'],row['path']
-    print(f'G1 {mode}: {len(rows)}/122 baseline files match (status.json normalized; every other file byte-identical)')
+        assert hashlib.sha256(without_header((root/row['path']).read_bytes(), row['path'])).hexdigest()==row['sha256'],row['path']
+    print(f'G1 {mode}: {len(rows)} remaining baseline files match, removing only the page header before comparison')
 
 
 def g2(work):
@@ -118,7 +101,7 @@ def g2(work):
         text=''.join(chunks)
         return text.encode()
     expected={row['path']:replaced((DATA/'files'/row['path']).read_bytes(),row['path'])
-              for row in json.loads((DATA/'manifest.json').read_text())['files']}
+              for row in json.loads((DATA/'manifest.json').read_text())['files'] if remaining(row['path'])}
     for file in (root/'receipts').glob('*/*.json'):
         file.write_bytes(replaced(file.read_bytes(),str(file.relative_to(root))))
     old=json.loads((DATA/'files/status/controller.json').read_text())
@@ -151,17 +134,15 @@ def g2(work):
         else:
             assert a==b,(file,path,a,b)
     for name,raw in expected.items():
-        actual=(root/name).read_bytes()
+        actual=without_header((root/name).read_bytes(), name)
         if name.endswith('.json'):
             expected_json = json.loads(raw)
-            if name == 'status.json':
-                expected_json = normalized_baseline(expected_json)
             compare(expected_json,json.loads(actual),'',name)
         else:
             assert actual==raw,name
     Path('G2-replaced-positions.json').write_text(json.dumps(positions,indent=2)+'\n')
     Path('G2-exceptions.json').write_text(json.dumps(exceptions,indent=2)+'\n')
-    print(f'G2: all 122 files compared; {len(positions)} identifier replacements, {len(exceptions)} ordering exceptions; every other value and page byte matches')
+    print(f'G2: all remaining files compared (header removed); {len(positions)} identifier replacements, {len(exceptions)} ordering exceptions; every other value and page byte matches')
 
 
 def g3(work):
@@ -187,26 +168,24 @@ def g3(work):
     assert data['source']['repository']==source['repository'] and data['build_result']['run']['html_url'].endswith('/123')
     # Rendering uses the new receipt's truthful source.repository, not the recipe run's repository.
     p.render(root,ROOT/'status-templates')
-    rendered=json.loads((root/'status.json').read_text())
     expected_files = json.loads((DATA/'g3-file-hashes.json').read_text())
     for name, digest in expected_files.items():
-        assert hashlib.sha256((root/name).read_bytes()).hexdigest() == digest, name
+        if remaining(name):
+            assert hashlib.sha256(without_header((root/name).read_bytes(), name)).hexdigest() == digest, name
     assert set(data['build_job']) == {'id','run_id','run_attempt','html_url','started_at','completed_at'}
-    assert all(type(index) is int for project in rendered['projects'] for index in project['publications'])
-    row=next(row for row in rendered['publications'] if row['execution']==build_id)
-    assert row['repository']==source['repository'] and row['revision']==9999 and row['version']==info['version']
-    assert row['build_url']=='https://github.com/SNodeC/DistributionPackages/actions/runs/123'
+    assert data['source']['repository']==source['repository'] and data['revision']==9999
+    assert data['packages'][0]['version']==info['version']
+    assert data['build_result']['run']['html_url']=='https://github.com/SNodeC/DistributionPackages/actions/runs/123'
     baseline=json.loads((DATA/'files/status.json').read_text())
     old=next(row for row in baseline['publications'] if row['repository']==source['repository']
              and row['coordinates']==sample['compatibility'])
-    assert set(row)==set(old), 'new publication row must preserve the baseline renderer schema'
-    assert isinstance(row['environment'],dict) and isinstance(row['dependencies'],list)
-    assert row['coordinates']==old['coordinates'] and row['environment']==sample['environment']
-    assert all(x['repository']!='SNodeC/DistributionPackages' for x in rendered['projects'])
-    project=next(x for x in rendered['projects'] if x['repository']==source['repository'])
-    page=(root/project['status_path']).read_text()
+    assert isinstance(data['environment'],dict) and isinstance(data['dependencies'],list)
+    assert data['compatibility']==old['coordinates'] and data['environment']==sample['environment']
+    project_path='status/'+json.loads((ROOT/'status-templates/presentation.json').read_text())['projects'][source['repository']]['page']+'.md'
+    assert not (root/'status/DistributionPackages.md').exists()
+    page=(root/project_path).read_text()
     new_row=next(row for row in re.findall(r'<tr>.*?</tr>',page,re.S) if info['version'] in row)
-    baseline_page=(DATA/'files'/project['status_path']).read_text()
+    baseline_page=(DATA/'files'/project_path).read_text()
     old_rows=[row for row in re.findall(r'<tr>.*?</tr>',baseline_page,re.S)
               if '<code>'+target['arch']+'</code>' in row and old['version'] in row]
     def shape(row):

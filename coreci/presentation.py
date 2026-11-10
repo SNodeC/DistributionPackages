@@ -10,7 +10,7 @@ from urllib.parse import quote, urlsplit
 from jinja2 import FileSystemLoader, StrictUndefined
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 
-from .contract import canonical, read_json, regular_file, relative_path, require, write_json, file_hash, package_metadata, output, compatibility
+from .contract import read_json, regular_file, relative_path, require, write_json, file_hash, package_metadata, output, compatibility
 import os
 import subprocess
 import time
@@ -27,29 +27,6 @@ JOB_FIELDS = ('id', 'run_id', 'run_attempt', 'html_url', 'started_at', 'complete
 def normalized_job(value):
     result = {key: value.get(key) for key in JOB_FIELDS} if value is not None else None
     return result
-
-
-def status_document(context):
-    latest = {}
-    ranked = []
-    for row in context['publications']:
-        unit = (row['repository'], row['target'])
-        at = datetime.fromisoformat(row['published_utc'].replace('Z', '+00:00')).timestamp() if row['published_utc'] else -1
-        rank = (at, row['revision'], row['receipt_url'])
-        latest[unit] = max(latest.get(unit, rank), rank)
-        ranked.append((row, unit, rank))
-    rows = [row for row, unit, rank in ranked if rank == latest[unit]]
-    positions = {id(row): index for index, row in enumerate(rows)}
-
-    def references(items):
-        result = [positions[id(row)] for row in items if id(row) in positions]
-        return result
-
-    result = dict(context, publications=rows, projects=[
-        dict(project, publications=references(project['publications']), targets=[
-            dict(target, publications=references(target['publications'])) for target in project['targets']])
-        for project in context['projects']])
-    return canonical(result)
 
 
 def render(feed, templates=None, exists=None):
@@ -195,10 +172,8 @@ def render(feed, templates=None, exists=None):
         loader=FileSystemLoader(templates), undefined=StrictUndefined, autoescape=True
     )
     environment.globals.clear()
-    outputs = {"status.json": (status_document(context) + "\n").encode()}
+    outputs = {}
     pages = [
-        ("index.html", "index.html.j2", None),
-        ("status/index.html", "index.html.j2", None),
         ("status/README.md", "index.md.j2", None),
     ]
     for project in projects:
@@ -207,7 +182,6 @@ def render(feed, templates=None, exists=None):
             "colliding project status pages",
         )
         pages.append((project["status_path"], "project.md.j2", project))
-        pages.append((project["status_path"].removesuffix(".md") + ".html", "project.md.j2", project))
     for path, template, project in pages:
         chunks = []
         size = 0
@@ -416,16 +390,24 @@ def main():
                     destination.parent.mkdir(parents=True, exist_ok=True)
                     require(not destination.is_symlink(), 'linked presentation file')
                     destination.write_bytes(subprocess.check_output(['git','-C',str(root),'show','HEAD:'+name]))
-            changed = refresh(root, settings, feed_id, lambda name:name in files)
-            differences = [name for name in changed if name != 'coreci/presentation.json' and
+            removed = sorted(name for name in files if name in ('index.html', 'status.json', '.github/workflows/pages.yml')
+                or re.fullmatch(r'status/[^/]+\.html|receipts/[0-9a-f]{64}/.+', name))
+            for name in removed:
+                (root / name).unlink(missing_ok=True)
+                parent = (root / name).parent
+                while parent != root and parent.is_dir() and not any(parent.iterdir()):
+                    parent.rmdir()
+                    parent = parent.parent
+            changed = refresh(root, settings, feed_id, lambda name:name in files) or render(root, exists=lambda name:name in files)
+            differences = removed + [name for name in changed if name != 'coreci/presentation.json' and
                 (name not in files or output(['git','-C',str(root),'hash-object',str(root/name)]) !=
                  output(['git','-C',str(root),'rev-parse','HEAD:'+name]))]
             if changed and differences:
                 # Populate the index from the tree, retaining every package without fetching its blob.
                 subprocess.run(['git','-C',str(root),'read-tree','HEAD'],check=True)
                 subprocess.run(['git','-C',str(root),'update-index','--skip-worktree','-z','--stdin'],check=True,
-                    input=''.join(name+'\0' for name in files if not (root/name).exists()).encode())
-                prepare_commit(root, changed, 'Update public core-ci status', orphan=True)
+                    input=''.join(name+'\0' for name in files - set(removed) if not (root/name).exists()).encode())
+                prepare_commit(root, changed + removed, 'Update public core-ci status', orphan=True, removed=removed)
                 checked_push(root, branch, os.environ['GH_TOKEN'], base)
             return None
         retry(root, attempt, restore_partial)

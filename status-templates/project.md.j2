@@ -1,15 +1,17 @@
 {% if output_path.endswith('.md') and site.parameters.get('style') == 'snodec' -%}
 {% include 'project-snodec.md.j2' %}
 {% else %}
-{% set html = output_path.endswith('.html') %}
 {% set root = '../' * (project.status_path.count('/') - 1) %}
-{% if html %}<!doctype html><html lang="en"><meta charset="utf-8">
-<meta name="viewport" content="width=device-width"><title>{{ project.title }} package status</title><body>{% endif %}
+<!-- snodec:begin page-header -->
 <a id="banner"></a>
+<a id="page-overview"></a>
+<p><picture><source media="(max-width: 640px)" srcset="../docs/media/nav/banner-package-status-compact.svg"><img src="../docs/media/nav/banner-package-status.svg" alt="Packages — Package status" width="100%"></picture></p>
+<p><a href="README.md#page-overview" title="Up to Package status"><picture><source media="(prefers-color-scheme: dark)" srcset="../docs/media/nav/up-package-status-dark.svg"><img src="../docs/media/nav/up-package-status-light.svg" alt="Up to Package status" title="Up to Package status" width="160" height="28"></picture></a><a href="https://github.com/SNodeC" title="SNodeC organization"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="../docs/media/nav/organization-icon-dark.svg"><source media="(max-width: 640px)" srcset="../docs/media/nav/organization-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="../docs/media/nav/organization-dark.svg"><img align="right" src="../docs/media/nav/organization-light.svg" alt="SNodeC organization" title="SNodeC organization"></picture></a><a href="../README.md#project-overview" title="Packages repository"><picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="../docs/media/nav/repository-icon-dark.svg"><source media="(max-width: 640px)" srcset="../docs/media/nav/repository-icon-light.svg"><source media="(prefers-color-scheme: dark)" srcset="../docs/media/nav/repository-dark.svg"><img align="right" src="../docs/media/nav/repository-light.svg" alt="Packages repository" title="Packages repository"></picture></a><br clear="all"></p>
+<!-- snodec:end page-header -->
 {% set latest = project.versions|first|default(none) %}
 <h1>{{ project.title }} package status · latest release {{ latest or '—' }}</h1>
 <p>{% for label, url in project.parameters.get('navigation', {}).items() %}
-<a href="{{ url }}">{{ label }}</a> · {% endfor %}<a href="{{ root }}{{ 'index.html' if html else 'README.md' }}#banner">All projects</a></p>
+<a href="{{ url }}">{{ label }}</a> · {% endfor %}<a href="{{ root }}README.md#banner">All projects</a></p>
 <h2 id="distributions">Distributions</h2>
 <p>{% for distribution in project.targets|groupby('coordinates.distribution') %}{% for suite in distribution.list|groupby('coordinates.suite') %}
 <a href="#{{ distribution.grouper }}-{{ suite.grouper|replace('.', '') }}">{{ distribution.grouper }} {{ suite.grouper }}</a> ·
@@ -32,13 +34,13 @@
 {% for id in active.prerequisites %}{% set prerequisite = controller.executions|selectattr('id', 'equalto', id)|first %}
 {% set page = projects|selectattr('repository', 'equalto', prerequisite.repository)|first %}
 {% set link = page.status_path.removeprefix('status/') %}
-<a href="{{ root }}{{ link.removesuffix('.md') ~ '.html' if html else link }}#{{ id }}">
+<a href="{{ root }}{{ link }}#{{ id }}">
 {{ prerequisite.repository }} {{ prerequisite.tag }}</a>{% if not loop.last %}, {% endif %}
 {% endfor %}{% endif %}
 {% else %}—{% endif %}</td><td>
 {% set log = active.build_job_url if active else (available.build_job.html_url if available and available.build_job else none) %}
 {% if log %}<a href="{{ log }}">Build log</a> · {% endif %}
-{% if available %}<a href="{{ (available.feed_tree_url if html else root ~ '../') ~ available.package_directory }}">Packages</a>{% else %}—{% endif %}
+{% if available %}<a href="{{ root ~ '../' ~ available.package_directory }}">Packages</a>{% else %}—{% endif %}
 </td></tr>
 {% if available and available.summary %}<tr><td colspan="5"><details><summary>Hook-reported build summary</summary>
 {% for compiler in available.summary.get('compilers', []) %}{{ compiler.name }} {{ compiler.version }}; {% endfor %}
@@ -56,5 +58,4 @@
 Failed: explicit retry required. Superseded: retained waiting work replaced by a newer automatic selection.
 —: no recorded value. Publication times are the controller's first successful verification in UTC.</p>
 
-{% if html %}</body></html>{% endif %}
 {% endif %}

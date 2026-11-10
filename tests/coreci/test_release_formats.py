@@ -61,9 +61,7 @@ include(CPack)
         receipt=presentation.receipt(feed,manifest,values,settings,paths)
     assert read_json(feed/receipt)['packages'][0]['version']==encoded['full']
     presentation.render(feed)
-    context=json.loads((feed/'status.json').read_text())
-    project=next(item for item in context['projects'] if item['repository']=='SNodeC/snode.c')
-    assert encoded['full'] in (feed/project['status_path']).read_text()
+    assert encoded['full'] in (feed/'status/snodec.md').read_text()
     print(distribution,suite,name,'build = publisher = receipt = Available:',encoded['full'])
     return None
 
