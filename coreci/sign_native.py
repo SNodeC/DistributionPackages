@@ -100,27 +100,27 @@ def apt_indexes(feed, distribution, suite, arch, gpg, keyring):
     architectures = " ".join(
         sorted(path.name.removeprefix("binary-") for path in (release.parent / "main").glob("binary-*"))
     )
-    with release.open("wb") as outgoing:
-        subprocess.run(
-            [
-                "apt-ftparchive",
-                "-o",
-                "APT::FTPArchive::Release::Suite=" + suite,
-                "-o",
-                "APT::FTPArchive::Release::Codename=" + suite,
-                "-o",
-                "APT::FTPArchive::Release::Components=main",
-                "-o",
-                "APT::FTPArchive::Release::Architectures=" + architectures,
-                "release",
-                str(relative),
-            ],
-            cwd=root,
-            check=True,
-            stdout=outgoing,
-            stderr=subprocess.PIPE,
-            timeout=120,
-        )
+    contents = subprocess.run(
+        [
+            "apt-ftparchive",
+            "-o",
+            "APT::FTPArchive::Release::Suite=" + suite,
+            "-o",
+            "APT::FTPArchive::Release::Codename=" + suite,
+            "-o",
+            "APT::FTPArchive::Release::Components=main",
+            "-o",
+            "APT::FTPArchive::Release::Architectures=" + architectures,
+            "release",
+            str(relative),
+        ],
+        cwd=root,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=120,
+    ).stdout
+    release.write_bytes(contents)
     signature = sign_file(gpg, keyring, release)
     signature.rename(release.parent / "Release.gpg")
     inline = sign_file(gpg, keyring, release, clear=True)
