@@ -50,11 +50,11 @@ def main():
         writes=[]
         def render(root,exists=None):
             writes.append(exists)
-            (root/'status.json').write_text('rendered')
-            return ['status.json']
+            (root/'status/README.md').write_text('rendered')
+            return ['status/README.md']
         with replace(p,'metadata',lambda _:dict(id=1,default_branch='main')),replace(p,'declaration',lambda _:doc),replace(p,'render',render):
             paths=p.refresh(root,dict(settings,repositories=['Example/Source']),'test',exists=lambda _:True,status=dict(status,generation=11))
-        assert paths==['status/controller.json','status.json','coreci/presentation.json']
+        assert paths==['status/controller.json','status/README.md','coreci/presentation.json']
         assert len(writes)==1 and callable(writes[0])
         assert json.loads((root/'coreci/presentation.json').read_text())==dict(generation=11,jobs={'99':'cached'})
     cache={}

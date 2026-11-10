@@ -13,29 +13,6 @@ def document_contract():
                steps=['discard'], runner_name='discard')
     assert set(p.normalized_job(job)) == {'id','run_id','run_attempt','html_url','started_at','completed_at'}
     assert job['steps'] == ['discard'] and p.normalized_job(None) is None
-    rows = []
-    for repository, revision, date, version in [('A/Source',1,'2026-11-01T12:00:00Z','1.0.0'),
-            ('A/Source',2,'2026-11-02T12:00:00+00:00','1.0.0'),
-            ('A/Source',1,'2026-11-03T12:00:00Z','2.0.0'),
-            ('B/Source',9,'2026-11-01T12:00:00Z','3.0.0')]:
-        for name in ('runtime','dev'):
-            rows.append(dict(repository=repository,target='os/suite/arch/deb',revision=revision,
-                receipt_url=repository+'/'+version+'/'+str(revision),published_utc=date,
-                version=version,package=name))
-    context=dict(schema=1,site={},controller={},publications=list(reversed(rows)),projects=[])
-    for repository in ('A/Source','B/Source'):
-        selected=[row for row in context['publications'] if row['repository']==repository]
-        context['projects'].append(dict(repository=repository,publications=selected,
-                                       targets=[dict(publications=selected)]))
-    original=copy.deepcopy(context)
-    value=json.loads(p.status_document(context))
-    assert context == original, 'serialization must not remove history from the template context'
-    assert len(value['publications']) == 4
-    assert {row['version'] for row in value['publications']} == {'2.0.0','3.0.0'}
-    for project in value['projects']:
-        indices=project['publications']
-        assert len(indices)==2 and project['targets'][0]['publications']==indices
-        assert all(value['publications'][index]['repository']==project['repository'] for index in indices)
     return None
 
 
@@ -77,17 +54,14 @@ def projected(releases, root):
     write_json(root/'status/controller.json',controller)
     paths=p.render(root,exists=lambda _:True)
     sizes={name:(root/name).stat().st_size for name in paths}
-    value=json.loads((root/'status.json').read_text())
-    assert len(value['controller']['executions'])==178
-    assert len(value['publications'])==package_rows//releases
-    assert all(set(row['build_job'])==set(p.JOB_FIELDS) for row in value['publications'])
-    assert all(type(index) is int and 0<=index<len(value['publications'])
-               for project in value['projects'] for target in project['targets'] for index in target['publications'])
+    assert len(controller['executions'])==178
+    assert set(paths)=={'status/README.md','status/snodec.md','status/snodec-idp.md','status/mqttsuite.md'}
+    assert not (root/'status.json').exists() and not (root/'index.html').exists()
     assert sum(sizes.values())<32*1024**2
     # The renderer must leave historical receipt inputs intact.
     assert all('steps' in json.loads(path.read_text())['build_job'] for path in (root/'receipts').glob('*/*.json'))
     print(canonical(dict(releases=releases,units=178,receiptRows=package_rows,
-                         statusJsonBytes=sizes['status.json'],totalBytes=sum(sizes.values()))))
+                         totalBytes=sum(sizes.values()))))
     return sum(sizes.values())
 
 

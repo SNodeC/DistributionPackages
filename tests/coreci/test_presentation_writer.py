@@ -7,7 +7,7 @@ import subprocess
 import sys
 import tempfile
 from support import replace, environment
-from golden import DATA, git_tree
+from golden import DATA, git_tree, remaining
 from coreci import presentation as p
 
 
@@ -71,6 +71,7 @@ def main():
             for path in (DATA/folder).rglob('*'):
                 if path.is_file():
                     git(root,'hash-object','-w','--stdin',input=path.read_bytes())
+        git(root,'hash-object','-w','--stdin',input=(DATA/'pages.yml').read_bytes())
         base=git(root,'-c','user.name=fixture','-c','user.email=fixture@example.invalid','commit-tree',
                  '5b55385c73aeeb18f4390f83db9ce834997c825e','-m','baseline')
         git(root,'update-ref','HEAD',base)
@@ -106,7 +107,14 @@ def main():
         packages={name for name in names if name.endswith(('.deb','.rpm','.ipk','.apk'))}
         assert packages and packages<=after
         changed=set(git(root,'diff-tree','--no-commit-id','--name-only','-r',base,first).splitlines())
-        assert changed and all(name in ('status.json','index.html','coreci/presentation.json') or name.startswith('status/') for name in changed)
+        removed = {name for name in names if not remaining(name) or name=='.github/workflows/pages.yml'
+                   or p.re.fullmatch(r'receipts/[0-9a-f]{64}/.+',name)}
+        assert names-after==removed, (names-after)^removed
+        assert not (root/'.github').exists()
+        assert changed and all(name in removed or name=='coreci/presentation.json' or name.startswith('status/') for name in changed)
+        for name in names-removed:
+            if not name.startswith('status/') and name!='coreci/presentation.json':
+                assert git(root,'rev-parse',base+':'+name)==git(root,'rev-parse',first+':'+name), name
         for name in packages:
             assert git(root,'rev-parse',base+':'+name)==git(root,'rev-parse',first+':'+name)
             assert not (root/name).exists(),'writer must not materialize package files'

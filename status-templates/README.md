@@ -13,9 +13,8 @@ an already-started push failed. No template/rendering dependency is added to the
 ## Files and configuration
 
 - `presentation.json`: schema 1, `title`, public `parameters`, optional `projects` and `assets`.
-- `index.html.j2`: HTTPS root and status index HTML.
 - `index.md.j2`: GitHub status index Markdown.
-- `project.md.j2`: project-specific GitHub Markdown and HTTPS HTML, with safe HTML tables.
+- `project.md.j2`: project-specific GitHub Markdown, with safe HTML tables.
 - `table.html.j2`: shared include; templates can use includes/macros in this bundle.
 - `requirements.txt`: pinned GitHub-side Jinja2/MarkupSafe dependencies.
 
@@ -64,7 +63,7 @@ The default template selects the first source version and shows only a matching 
 for each target. When that version has not published, Available is `—`, even if older packages
 are retained. Set `site.parameters.show_history` to true to include retained publication tables.
 `project.parameters.navigation` maps public navigation labels to trusted deployment URLs.
-The context is also written to `status.json`; the existing `publications` array stays present.
+The renderer writes only Markdown status pages and configured assets; it does not write feed `status.json` or Pages HTML.
 Rows include only package files still present in the retained feed tree. The field
 `development_export_available` distinguishes retained installation packages from build inputs
 whose development export has expired. Public controller executions cover retained/live work
