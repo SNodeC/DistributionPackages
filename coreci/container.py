@@ -7,7 +7,6 @@ import shutil
 import subprocess
 import sys
 
-sys.path.extend(["/core_ci", str(Path(__file__).resolve().parent)])
 from contract import canonical, file_hash, package_metadata, read_json, regular_file, require, write_json, build_summary
 
 from versions import versions

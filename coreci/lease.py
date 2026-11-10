@@ -5,8 +5,10 @@ import shutil
 import subprocess
 import time
 from pathlib import Path
-from contract import output
-from publish import checked_push
+import base64
+import os
+import re
+from .contract import output, require, run
 
 
 class LeaseConflict(Exception):
@@ -72,3 +74,48 @@ def retry(root, operation, restore=restore_full):
             restore(root)
             time.sleep(random.uniform(5,30))
     return result
+
+
+def prepare_commit(feed, expected_paths, message="Publish verified core-ci packages", orphan=False, removed=()):
+    base = output(["git", "-C", str(feed), "rev-parse", "--verify", "HEAD"]) if orphan else ""
+    require(set(removed) <= set(expected_paths), "unapproved feed deletion")
+    run(["git", "-C", str(feed), "add", "--all", "--", *expected_paths])
+    staged_paths = output(["git", "-C", str(feed), "diff", "--cached", "--name-only", "--no-renames"]).splitlines()
+    require(set(staged_paths) <= set(expected_paths), "feed index contains changes outside the prepared update")
+    for path in expected_paths:
+        if path in removed:
+            require(not (feed / path).exists() and not (feed / path).is_symlink(), "deleted feed path still exists")
+            run(["git", "-C", str(feed), "cat-file", "-e", "HEAD:" + path], stdout=subprocess.DEVNULL)
+        else:
+            raw = output(["git", "-C", str(feed), "hash-object", "--no-filters", str(feed / path)])
+            staged = output(["git", "-C", str(feed), "rev-parse", ":" + path])
+            require(raw == staged, "feed index omits or transforms verified package/index bytes")
+    changed = subprocess.run(["git", "-C", str(feed), "diff", "--cached", "--quiet"], check=False).returncode
+    require(changed in (0, 1), "cannot inspect feed changes")
+    identity = ["git", "-C", str(feed), "-c", "user.name=core-ci publisher", "-c", "user.email=core-ci@users.noreply.github.com"]
+    if orphan:
+        snapshot = output(identity + ["commit-tree", output(["git", "-C", str(feed), "write-tree"]), "-m", message])
+        run(["git", "-C", str(feed), "update-ref", "HEAD", snapshot, base])
+    elif changed == 1:
+        run(identity + ["commit", "-m", message], stdout=subprocess.DEVNULL)
+    return base
+
+def checked_push(feed, branch, token, base="", timeout=120, progress=False):
+    authorization = base64.b64encode(("x-access-token:" + token).encode()).decode()
+    environment = {
+        **os.environ,
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "http.https://github.com/.extraheader",
+        "GIT_CONFIG_VALUE_0": "AUTHORIZATION: basic " + authorization,
+        "GIT_TERMINAL_PROMPT": "0",
+    }
+    require(not base or re.fullmatch(r"[a-f0-9]{40}", base), "invalid expected feed head")
+    lease = ["--force-with-lease=refs/heads/" + branch + ":" + base] if base else []
+    run(
+        ["git", "-C", str(feed), "push", *(["--progress"] if progress else []), *lease, "origin", "HEAD:refs/heads/" + branch],
+        env=environment,
+        timeout=timeout,
+        stdout=subprocess.DEVNULL,
+    )
+    revision = output(["git", "-C", str(feed), "rev-parse", "HEAD"])
+    return revision

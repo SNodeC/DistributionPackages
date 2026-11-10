@@ -10,7 +10,7 @@ import time
 import urllib.request
 
 from .common import download
-from contract import file_hash, output, require
+from .contract import file_hash, output, require
 
 
 def native_script(entry, files, url, key):

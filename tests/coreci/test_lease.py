@@ -3,8 +3,8 @@ import contextlib
 import io
 from support import replace
 from coreci import lease
-import contract
-import publish
+from coreci import contract
+from coreci import lease as publish
 
 
 def main():

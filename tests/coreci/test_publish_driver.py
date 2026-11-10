@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import tempfile
 from support import environment, registry_data, entry, replace, rejects
 from coreci import publish
-from contract import file_hash, write_json
+from coreci.contract import file_hash, write_json
 
 
 def main():
@@ -72,7 +72,7 @@ def main():
         def availability(*args):
             events.append('availability')
         from coreci import validate as validator
-        import contract
+        from coreci import contract
         with environment(env), ExitStack() as stack:
             for context in [replace(publish,'registry',registry_data),
              replace(publish,'metadata',lambda _:dict(default_branch='main')), replace(publish,'output',output),

@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 from golden import DATA
-from contract import canonical, write_json
+from coreci.contract import canonical, write_json
 from coreci import presentation as p
 
 

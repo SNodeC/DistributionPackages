@@ -3,7 +3,7 @@ import subprocess
 import tempfile
 from support import registry_data, entry, replace, rejects
 from coreci import build
-from contract import read_json
+from coreci.contract import read_json
 
 
 def main():

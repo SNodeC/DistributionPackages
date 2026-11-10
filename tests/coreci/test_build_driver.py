@@ -5,7 +5,7 @@ import shlex
 import tempfile
 from support import build_inputs, entry, environment, registry_data, replace, rejects
 from coreci import build
-from contract import write_json, read_json
+from coreci.contract import write_json, read_json
 
 
 def probe(fmt):
@@ -75,7 +75,7 @@ def probe(fmt):
                     assert sdk_mounts[0].endswith('target=/sdk,readonly')
                 assert any('target=/source,readonly' in s for s in args)
                 assert any('target=/definition,readonly' in s for s in args)
-                assert any('target=/core_ci,readonly' in s for s in args)
+                assert any('target=/tool,readonly' in s for s in args)
                 if '--inspect' in args:
                     assert '--network=none' in args
                     destination=root/'packages'

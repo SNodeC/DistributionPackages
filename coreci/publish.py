@@ -13,11 +13,11 @@ import time
 from .common import (checked_manifest, declaration, download, github_outputs, https, inputs, metadata,
                      public_key, registry, select, token, workflow, workflow_identity)
 from .versions import versions
-from contract import canonical, file_hash, output, read_json, regular_file, require
-from github import api
-from publish import prepare_commit
+from .contract import canonical, file_hash, output, read_json, regular_file, require
+from .github import api
+from .lease import prepare_commit
 from .lease import push as checked_push, retry
-from sign_native import apt_indexes, rpm_indexes, signing_key, sign_file
+from .sign_native import apt_indexes, rpm_indexes, signing_key, sign_file
 
 
 def provenance(values, settings):
@@ -94,7 +94,7 @@ def targets(manifest, artifacts):
         if name != "development.tar.gz":
             require(name.endswith("." + fmt), "unexpected publication file")
             # The builder inspected identities; re-inspect independently at the signing boundary.
-            from contract import package_metadata
+            from .contract import package_metadata
 
             identity = package_metadata(regular_file(artifacts, name), fmt)
             package = manifest["package"]
@@ -195,7 +195,7 @@ def publish_once(artifacts, root):
         work = Path(temporary)
         sdk_root = None
         if entry["family"] == "openwrt":
-            from environment import sdk
+            from .environment import sdk
             from .sdk import prepare
 
             environment = sdk(entry, entry["build"]["release"])
@@ -300,7 +300,7 @@ def shlex_passphrase(path):
 
 
 def openwrt_indices(root, entry, feed, paths, sdk_root, private, work):
-    from sign_openwrt import indexes
+    from .sign_openwrt import indexes
 
     fmt = entry["build"]["format"]
     kind = "usign" if fmt == "ipk" else "apk"
