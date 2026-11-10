@@ -19,6 +19,7 @@ for path in sorted((root / "tests/coreci/fixtures/catalog").glob("*.json")):
     for entry in doc["matrix"]:
         assert canonical(select(doc, entry["id"])).encode() == canonical(entry).encode()
         assert canonical(select(reduced, entry["id"])).encode() == canonical(entry).encode()
+        assert json.dumps(select(reduced, entry["id"]), indent=2).encode() == json.dumps(entry, indent=2).encode()
         count += 1
 assert count == 178
 assert select({"matrix": [{"id": "debian-trixie-amd64", "feed": "other"}]}, "debian-trixie-amd64")["feed"] == "other"
@@ -39,4 +40,4 @@ with tempfile.TemporaryDirectory() as directory:
         except ValueError:
             rejected = True
         assert rejected
-print("178/178 catalog targets byte-identical in canonical JSON; transition and invalid catalog cases passed")
+print("178/178 catalog targets byte-identical in canonical and indented JSON (including key order); transition and invalid catalog cases passed")
