@@ -1,8 +1,12 @@
-"""Generated APT checksums cover only the completed suite indices."""
+"""Retain the Packages 6c1007a Release contract and completed-index checksums.
+
+Header fixture: SNodeC/Packages@6c1007a debian/dists/trixie/Release.
+"""
 
 from contextlib import contextmanager
 import gzip
 import hashlib
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 import subprocess
 import tempfile
@@ -49,14 +53,26 @@ def generated_suite(directory):
 
 def check_checksums(root):
     suite = root / 'debian/dists/trixie'
+    baseline = (ROOT / 'tests/coreci/data/apt-release-6c1007a').read_text().splitlines()
+    fields = (suite / 'Release').read_text().splitlines()[:len(baseline)]
+    assert [line.split(':', 1)[0] for line in fields] == [line.split(':', 1)[0] for line in baseline]
+    for actual, original in zip(fields, baseline):
+        name = original.split(':', 1)[0]
+        if name == 'Architectures':
+            assert actual == 'Architectures: amd64 arm64'
+        elif name == 'Date':
+            assert parsedate_to_datetime(actual.split(': ', 1)[1]).tzinfo is not None
+        else:
+            assert actual == original, (actual, original)
     expected = {f'main/binary-{arch}/{name}' for arch in ('amd64', 'arm64')
                 for name in ('Packages', 'Packages.gz')}
-    algorithms = {'MD5Sum': 'md5', 'SHA1': 'sha1', 'SHA256': 'sha256', 'SHA512': 'sha512'}
+    algorithms = {'SHA256': 'sha256'}
     lists = {name: {} for name in algorithms}
     section = None
     for line in (suite / 'Release').read_text().splitlines():
         if line and not line[0].isspace():
             section = line.split(':', 1)[0]
+            assert section not in ('MD5Sum', 'SHA1', 'SHA512'), section
         elif section in algorithms:
             digest, size, name = line.split()
             assert name not in lists[section], (section, 'duplicate entry', name)
@@ -68,6 +84,7 @@ def check_checksums(root):
             data = (suite / path).read_bytes()
             assert len(data) == size, (name, path, 'size mismatch')
             assert hashlib.new(algorithms[name], data).hexdigest() == digest, (name, path, 'digest mismatch')
+            assert (suite / Path(path).parent / 'by-hash/SHA256' / digest).read_bytes() == data
     assert (suite / 'InRelease').is_file() and (suite / 'Release.gpg').is_file()
 
 
@@ -75,7 +92,7 @@ def main():
     with tempfile.TemporaryDirectory() as temporary:
         with generated_suite(Path(temporary)) as (root, key):
             check_checksums(root)
-    print('APT Release: exactly four indices; MD5Sum/SHA1/SHA256/SHA512 sizes and digests match')
+    print('APT Release: exactly four indices; SHA256 sizes, digests and by-hash bytes match')
     return 0
 
 
