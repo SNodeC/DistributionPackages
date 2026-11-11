@@ -14,5 +14,6 @@ Installation guides, package catalogs, troubleshooting and how publication works
 - [Catalogs](catalogs/README.md#banner)
 - [Installation](installation/README.md#banner)
 - [How publication works](publication.md#banner)
+- [Repository maintenance](maintainers.md#banner)
 - [Troubleshooting](troubleshooting.md#banner)
 <!-- snodec:end section-pages -->
