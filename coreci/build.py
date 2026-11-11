@@ -114,7 +114,7 @@ def install_lines(target, instructions):
         base = item["feed"] + item["distribution"]
         if target["build"]["format"] == "deb":
             source = f'deb [signed-by={key}] {base} {item["suite"]} main\n'
-            lines += ["RUN printf '%s\\n' " + shlex.join(source.splitlines()) + f' > /etc/apt/sources.list.d/coreci-{index}.list',
+            lines += ["RUN printf '%s\\n' " + shlex.join(source.splitlines()) + ' > /etc/apt/sources.list.d/coreci.list',
                       "RUN apt-get update && apt-get install -y --no-install-recommends " +
                       " ".join(shlex.quote(p + "=" + item["full"]) for p in item["names"])]
         else:

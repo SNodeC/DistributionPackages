@@ -30,6 +30,21 @@ def main():
         commands='\n'.join(lines)
         assert 'b-dev=1.2.3-9~stable' in commands and 'signed-by=/inputs/prerequisites/b/test.asc' in commands
         assert 'dpkg-query' in commands and '1.2.3-9~stable' in commands
+        sources=root/'sources.list.d'
+        sources.mkdir()
+        second=dict(instructions[0], names=['c-dev'], key='prerequisites/c/test.asc', full='2.0.0-1~stable')
+        combined=build.install_lines(target, instructions + [second])
+        for line in combined:
+            if ' > /etc/apt/sources.list.d/' in line:
+                command,destination=line[4:].rsplit(' > ',1)
+                (sources/Path(destination).name).write_text(subprocess.check_output(['sh','-c',command],text=True))
+        parsed=subprocess.run(['apt-get','indextargets','-o','Dir::Etc::sourcelist=-',
+                               '-o','Dir::Etc::sourceparts='+str(sources)],capture_output=True,text=True)
+        assert parsed.returncode == 0, parsed.stderr
+        assert not parsed.stderr, parsed.stderr
+        assert len(list(sources.glob('*.list'))) == 1, 'one active source per prerequisite feed'
+        commands='\n'.join(combined)
+        assert 'b-dev=1.2.3-9~stable' in commands and 'c-dev=2.0.0-1~stable' in commands
         rejects(build.dependencies,settings,dict(values,prerequisites=''),doc,target,{},root,text='do not match')
         rpm=dict(instructions[0],names=['b-devel'],arch='x86_64',distribution='fedora')
         lines=build.install_lines(entry('rpm'),[rpm])
