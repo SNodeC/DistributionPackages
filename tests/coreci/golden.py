@@ -76,7 +76,10 @@ def g1(mode, work):
     rows=json.loads((DATA/'manifest.json').read_text())['files']
     rows = [row for row in rows if remaining(row['path'])]
     for row in rows:
-        assert hashlib.sha256(without_header((root/row['path']).read_bytes(), row['path'])).hexdigest()==row['sha256'],row['path']
+        if row['path'].startswith('docs/'):
+            assert (root/row['path']).read_bytes()==(ROOT/'site'/row['path']).read_bytes(),row['path']
+        else:
+            assert hashlib.sha256(without_header((root/row['path']).read_bytes(), row['path'])).hexdigest()==row['sha256'],row['path']
     print(f'G1 {mode}: {len(rows)} remaining baseline files match, removing only the page header before comparison')
 
 
@@ -135,7 +138,9 @@ def g2(work):
             assert a==b,(file,path,a,b)
     for name,raw in expected.items():
         actual=without_header((root/name).read_bytes(), name)
-        if name.endswith('.json'):
+        if name.startswith('docs/'):
+            assert actual==(ROOT/'site'/name).read_bytes(),name
+        elif name.endswith('.json'):
             expected_json = json.loads(raw)
             compare(expected_json,json.loads(actual),'',name)
         else:
@@ -170,7 +175,9 @@ def g3(work):
     p.render(root,ROOT/'status-templates')
     expected_files = json.loads((DATA/'g3-file-hashes.json').read_text())
     for name, digest in expected_files.items():
-        if remaining(name):
+        if name.startswith('docs/'):
+            assert (root/name).read_bytes()==(ROOT/'site'/name).read_bytes(),name
+        elif remaining(name):
             assert hashlib.sha256(without_header((root/name).read_bytes(), name)).hexdigest() == digest, name
     assert set(data['build_job']) == {'id','run_id','run_attempt','html_url','started_at','completed_at'}
     assert data['source']['repository']==source['repository'] and data['revision']==9999

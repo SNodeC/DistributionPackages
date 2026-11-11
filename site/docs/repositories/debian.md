@@ -84,6 +84,12 @@ Native package definitions: [SNode.C CPack](https://github.com/SNodeC/snode.c/bl
 
 ## Troubleshooting
 
+If APT reports that the repository "changed its 'Origin' value" to `SNodeC/DistributionPackages`, accept that Origin change once:
+
+```sh
+sudo apt-get update -o Acquire::AllowReleaseInfoChange::Origin=true
+```
+
 See [common problems and fixes](../troubleshooting.md#banner) for download, signature, dependency and application errors.
 
 | Symptom | What to check |
