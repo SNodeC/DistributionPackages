@@ -19,3 +19,8 @@ jobs:
         run: |
           cmake -S tests/coreci -B "$RUNNER_TEMP/worker-checks"
           ctest --test-dir "$RUNNER_TEMP/worker-checks" --output-on-failure --parallel "$(nproc)"
+      - name: Validate the six source revisions qualified for enrollment
+        if: ${{ !cancelled() }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 tests/coreci/check_enrollment.py tests/coreci/data/enrollment-refs.json
