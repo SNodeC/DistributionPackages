@@ -27,7 +27,10 @@
   "repositories": [
     "SNodeC/snode.c",
     "SNodeC/mqttsuite",
-    "SNodeC/snode.c-idp"
+    "SNodeC/snode.c-idp",
+    "SNodeC/core-ci",
+    "SNodeC/AISuite",
+    "SNodeC/CodexUI"
   ],
   "status_url": "https://core.vchrist.at:8443/api/v1/status.json",
   "targets": "ci/targets.json"

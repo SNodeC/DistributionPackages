@@ -1,0 +1,21 @@
+name: Verify package tooling
+on: [pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    container: debian:trixie
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install test dependencies
+        run: |
+          apt-get update
+          apt-get install -y cmake rpm git file python3 python3-pip gnupg openssl zstd xz-utils
+          python3 -m pip install --break-system-packages -r status-templates/requirements.txt
+      - name: Configure and run all worker checks
+        run: |
+          cmake -S tests/coreci -B "$RUNNER_TEMP/worker-checks"
+          ctest --test-dir "$RUNNER_TEMP/worker-checks" --output-on-failure --parallel "$(nproc)"

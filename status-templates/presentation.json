@@ -67,6 +67,18 @@
     "SNodeC/snode.c-idp": {
       "title": "SNode.C IDP",
       "page": "snodec-idp"
+    },
+    "SNodeC/core-ci": {
+      "title": "core-ci",
+      "page": "core-ci"
+    },
+    "SNodeC/AISuite": {
+      "title": "AISuite",
+      "page": "aisuite"
+    },
+    "SNodeC/CodexUI": {
+      "title": "CodexUI",
+      "page": "codexui"
     }
   }
 }
