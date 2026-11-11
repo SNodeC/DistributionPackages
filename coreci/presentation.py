@@ -29,6 +29,18 @@ def normalized_job(value):
     return result
 
 
+def documentation():
+    root = Path(__file__).resolve().parents[1] / 'site/docs'
+    require(root.is_dir() and not root.is_symlink(), 'documentation requires a trusted regular directory')
+    result = {}
+    for path in sorted(root.rglob('*')):
+        require(not path.is_symlink(), 'documentation cannot contain links')
+        if path.is_file():
+            name = path.relative_to(root).as_posix()
+            result['docs/' + name] = regular_file(root, name).read_bytes()
+    return result
+
+
 def render(feed, templates=None, exists=None):
     feed = Path(feed)
     exists = exists or (lambda name: (feed / name).is_file())
@@ -172,7 +184,7 @@ def render(feed, templates=None, exists=None):
         loader=FileSystemLoader(templates), undefined=StrictUndefined, autoescape=True
     )
     environment.globals.clear()
-    outputs = {}
+    outputs = documentation()
     pages = [
         ("status/README.md", "index.md.j2", None),
     ]
@@ -197,7 +209,7 @@ def render(feed, templates=None, exists=None):
         require(name.startswith("assets/"), "status assets must be inside the bundle's assets directory")
         outputs["status/" + name] = regular_file(templates, name).read_bytes()
     require(sum(len(data) for data in outputs.values()) <= 32 * 1024 * 1024, "status output exceeds resource bound")
-    # Validate/render everything before changing status files. Packages/keys/receipts are never outputs.
+    # Validate all presentation outputs before writing. Packages/keys/receipts are never outputs.
     for path in outputs:
         require(
             all(not (feed / parent).is_symlink() for parent in Path(path).parents), "linked status parent directory"
@@ -384,6 +396,7 @@ def main():
         def attempt():
             base = output(['git','-C',str(root),'rev-parse','HEAD'])
             files = set(output(['git','-C',str(root),'ls-tree','-r','--name-only','HEAD']).splitlines())
+            docs = documentation()
             for name in files:
                 if name.startswith(('receipts/','status/','docs/','install/')) or name in ('README.md','index.html','status.json','coreci/presentation.json'):
                     destination = root / name
@@ -391,7 +404,8 @@ def main():
                     require(not destination.is_symlink(), 'linked presentation file')
                     destination.write_bytes(subprocess.check_output(['git','-C',str(root),'show','HEAD:'+name]))
             removed = sorted(name for name in files if name in ('index.html', 'status.json', '.github/workflows/pages.yml')
-                or re.fullmatch(r'status/[^/]+\.html|receipts/[0-9a-f]{64}/.+', name))
+                or re.fullmatch(r'status/[^/]+\.html|receipts/[0-9a-f]{64}/.+', name)
+                or name.startswith('docs/') and name not in docs)
             for name in removed:
                 (root / name).unlink(missing_ok=True)
                 parent = (root / name).parent

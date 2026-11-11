@@ -55,7 +55,7 @@ def projected(releases, root):
     paths=p.render(root,exists=lambda _:True)
     sizes={name:(root/name).stat().st_size for name in paths}
     assert len(controller['executions'])==178
-    assert set(paths)=={'status/README.md','status/snodec.md','status/snodec-idp.md','status/mqttsuite.md'}
+    assert set(paths)=={'status/README.md','status/snodec.md','status/snodec-idp.md','status/mqttsuite.md'}|set(p.documentation())
     assert not (root/'status.json').exists() and not (root/'index.html').exists()
     assert sum(sizes.values())<32*1024**2
     # The renderer must leave historical receipt inputs intact.

@@ -331,6 +331,11 @@ def publish_once(artifacts, root):
                         with Path(os.environ.get('GITHUB_STEP_SUMMARY', os.devnull)).open('a') as summary:
                             summary.write(f'\n**Presentation warning:** {error}\n\nExisting presentation retained; publication continues.\n')
                     else:
+                        if rendered:
+                            obsolete = {name for name in tracked if name.startswith('docs/') and name not in rendered}
+                            for name in obsolete:
+                                (root / name).unlink()
+                            removed.update(obsolete)
                         for name in rendered:
                             destination = root / name
                             destination.parent.mkdir(parents=True, exist_ok=True)

@@ -14,11 +14,13 @@ HEADERS = Path(__file__).parent/'data/headers'
 
 def compare(feed, before, names, exists=None):
     paths=p.render(feed, exists=exists)
-    assert paths and all(name.startswith('status/') and name.endswith('.md') for name in paths)
+    status_paths=[name for name in paths if name.startswith('status/')]
+    assert status_paths and all(name.endswith('.md') for name in status_paths)
+    assert set(paths)==set(status_paths)|set(p.documentation())
     for name in names:
         raw=(feed/name).read_bytes()
         assert without_header(raw,name)==without_header((before/name).read_bytes(),name), name
-    for name in paths:
+    for name in status_paths:
         raw=(feed/name).read_text()
         header=re.search(r'<!-- snodec:begin page-header -->.*?<!-- snodec:end page-header -->',raw,re.S).group()
         reference=(HEADERS/'docs.md').read_text().rstrip('\n')

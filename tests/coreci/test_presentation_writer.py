@@ -107,13 +107,16 @@ def main():
         packages={name for name in names if name.endswith(('.deb','.rpm','.ipk','.apk'))}
         assert packages and packages<=after
         changed=set(git(root,'diff-tree','--no-commit-id','--name-only','-r',base,first).splitlines())
+        docs=p.documentation()
         removed = {name for name in names if not remaining(name) or name=='.github/workflows/pages.yml'
+                   or name.startswith('docs/') and name not in docs
                    or p.re.fullmatch(r'receipts/[0-9a-f]{64}/.+',name)}
         assert names-after==removed, (names-after)^removed
         assert not (root/'.github').exists()
-        assert changed and all(name in removed or name=='coreci/presentation.json' or name.startswith('status/') for name in changed)
+        assert changed and all(name in removed or name=='coreci/presentation.json' or name.startswith(('status/','docs/')) for name in changed)
+        assert {name:subprocess.check_output(['git','-C',str(root),'show',first+':'+name]) for name in docs}==docs
         for name in names-removed:
-            if not name.startswith('status/') and name!='coreci/presentation.json':
+            if not name.startswith(('status/','docs/')) and name!='coreci/presentation.json':
                 assert git(root,'rev-parse',base+':'+name)==git(root,'rev-parse',first+':'+name), name
         for name in packages:
             assert git(root,'rev-parse',base+':'+name)==git(root,'rev-parse',first+':'+name)

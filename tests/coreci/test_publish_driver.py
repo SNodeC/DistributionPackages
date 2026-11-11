@@ -35,6 +35,8 @@ def main():
             result='a'*40
             if 'get-url' in args:
                 result='https://github.com/Example/Feed'
+            elif 'ls-tree' in args:
+                result='\n'.join(publish.snapshot(Path(args[args.index('-C')+1])))
             return result
         def key(feed,kind,path):
             result=path/'test.asc'
@@ -149,7 +151,9 @@ def main():
                         (staged/'status/new.html').write_bytes(b'must not leak')
                         raise error
                     (staged/'README.md').write_bytes(originals['README.md']+b'new data')
-                    return ['README.md']
+                    (staged/'docs').mkdir(exist_ok=True)
+                    (staged/'docs/new.md').write_bytes(b'authoritative docs')
+                    return ['README.md','docs/new.md']
                 events.clear()
                 with replace(publish,'registry',lambda:settings),replace(presentation,'receipt',receipt), \
                      replace(presentation,'status_fetch',lambda _:dict(schema=1,generation=2)), \
@@ -170,8 +174,10 @@ def main():
                 else:
                     assert (case/'README.md').read_bytes()==originals['README.md']+b'new data'
                     assert (case/'coreci/presentation.json').read_text().find('"generation":2')>=0
+                    assert not (case/'docs/a.md').exists()
+                    assert (case/'docs/new.md').read_bytes()==b'authoritative docs'
                     assert all((case/name).read_bytes()==data for name,data in originals.items()
-                               if name not in ('README.md','status/controller.json','coreci/presentation.json'))
+                               if name not in ('README.md','status/controller.json','coreci/presentation.json','docs/a.md'))
         assert (feed/'unrelated').read_bytes()==b'preserve these bytes'
     print('publisher driver: validate-before-push, credential isolation, unchanged bytes, no-op and immutable conflict passed')
     return 0
