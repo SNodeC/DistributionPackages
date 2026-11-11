@@ -100,9 +100,18 @@ def apt_indexes(feed, distribution, suite, arch, gpg, keyring):
     architectures = " ".join(
         sorted(path.name.removeprefix("binary-") for path in (release.parent / "main").glob("binary-*"))
     )
+    hashes = []
+    for index in sorted((release.parent / "main").glob("binary-*/Packages*")):
+        target = index.parent / "by-hash/SHA256" / file_hash(index)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(index, target)
+        hashes.append(target)
     contents = subprocess.run(
         [
             "apt-ftparchive",
+            "--md5=no", "--sha1=no", "--sha512=no",
+            "-o", "APT::FTPArchive::Release::Origin=SNodeC/DistributionPackages",
+            "-o", "APT::FTPArchive::Release::Acquire-By-Hash=yes",
             "-o",
             "APT::FTPArchive::Release::Suite=" + suite,
             "-o",
@@ -125,7 +134,7 @@ def apt_indexes(feed, distribution, suite, arch, gpg, keyring):
     signature.rename(release.parent / "Release.gpg")
     inline = sign_file(gpg, keyring, release, clear=True)
     inline.rename(release.parent / "InRelease")
-    result = [packages, binary / "Packages.gz", release, release.parent / "Release.gpg", release.parent / "InRelease"]
+    result = [packages, binary / "Packages.gz", release, release.parent / "Release.gpg", release.parent / "InRelease"] + hashes
     return result
 
 def rpm_indexes(feed, distribution, suite, arch, gpg, keyring):
