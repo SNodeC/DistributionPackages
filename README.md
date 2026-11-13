@@ -1,8 +1,3 @@
-# Distribution packages
+# DistributionPackages
 
-Target catalog and package installation documentation for SNode.C projects.
-
-- [Targets](catalog/targets.json)
-- [Registry](catalog/registry.json)
-- [Rootfs images](catalog/rootfs-images.json)
-- [Documentation](site/README.md)
+This repository holds distribution package metadata for the SNode.C ecosystem. It will be rebuilt by the new slim CI.
